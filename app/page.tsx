@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="page">
@@ -8,6 +10,7 @@ export default function Home() {
           <p style={{ margin: 0, fontSize: 18, lineHeight: 1.6, opacity: .75 }}>
             Nueva base del sistema ShuVision + Focus. Esta versión se construirá por bloques y quedará respaldada en GitHub.
           </p>
+          <Link className="primary-link" href="/tareas">Ver prototipo de tareas y supervisión</Link>
         </section>
       </div>
     </main>
