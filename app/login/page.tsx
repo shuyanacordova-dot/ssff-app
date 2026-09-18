@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { iniciarSesion } from "./actions";
 
 type LoginPageProps = {
-  searchParams: Promise<{ error?: string | string[]; next?: string | string[] }>;
+  searchParams: Promise<{ error?: string | string[]; next?: string | string[]; enviado?: string | string[] }>;
 };
 
 function valorUnico(value: string | string[] | undefined, fallback = "") {
@@ -12,6 +13,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const query = await searchParams;
   const error = valorUnico(query.error);
   const next = valorUnico(query.next, "/");
+  const enviado = valorUnico(query.enviado);
 
   return (
     <main className="login-page">
@@ -28,8 +30,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           Contraseña
           <input type="password" name="password" required autoComplete="current-password" placeholder="••••••••" />
         </label>
+        {enviado === "contrasena-actualizada" && <p className="login-copy">Tu contraseña se actualizó. Ya puedes iniciar sesión.</p>}
         {error && <p className="login-error" role="alert">{error}</p>}
         <button className="login-submit" type="submit">Iniciar sesión</button>
+        <p className="login-copy" style={{ marginTop: 14 }}><Link href="/olvide-contrasena">¿Olvidaste tu contraseña?</Link></p>
       </form>
     </main>
   );

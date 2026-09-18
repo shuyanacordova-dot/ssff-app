@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const key = () => process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const publicPaths = ["/login", "/recibo"];
+const publicPaths = ["/login", "/recibo", "/olvide-contrasena", "/actualizar-contrasena", "/auth"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
