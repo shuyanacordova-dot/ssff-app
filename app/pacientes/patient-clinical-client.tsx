@@ -8,12 +8,18 @@ import ConsultationModal from "./consultation-form";
 import ConsultationDetailModal from "./consultation-detail";
 import FilesPanel from "./files-panel";
 import Cart from "@/app/ventas/cart";
+import { AnularModal, GarantiaModal, ReciboModal, SaleCard, VentaDetailModal } from "@/app/ventas/sales-board";
+import LabOrderModal from "@/app/ventas/lab-order-modal";
+import { anularVenta, registrarAbono } from "@/app/ventas/actions";
+import { crearGarantia } from "@/app/ventas/garantia-actions";
 import type { ClinicalData, ClinicalPhoto, Consultation, PatientRecord, PatientSale } from "@/lib/clinical";
+import type { Garantia, SaleLabOrder } from "@/lib/ventas";
 
 const demoPatients: PatientRecord[] = [
-  { id: "demo-1", nombres: "Paciente", apellidos: "de ejemplo", cedula: "No es un paciente real", telefono: "", ocupacion: null, responsable_id: null, fecha_nacimiento: null, frecuencia_cobro: null, actualizado_en: "2026-09-15" },
-  { id: "demo-2", nombres: "Historia", apellidos: "compartida", cedula: "Solo demostración", telefono: "", ocupacion: null, responsable_id: null, fecha_nacimiento: null, frecuencia_cobro: null, actualizado_en: "2026-09-12" },
+  { id: "demo-1", nombres: "Paciente", apellidos: "de ejemplo", cedula: "No es un paciente real", telefono: "", email: null, direccion: null, sexo: null, ocupacion: null, responsable_id: null, fecha_nacimiento: null, frecuencia_cobro: null, empresa_origen_id: null, actualizado_en: "2026-09-15" },
+  { id: "demo-2", nombres: "Historia", apellidos: "compartida", cedula: "Solo demostración", telefono: "", email: null, direccion: null, sexo: null, ocupacion: null, responsable_id: null, fecha_nacimiento: null, frecuencia_cobro: null, empresa_origen_id: null, actualizado_en: "2026-09-12" },
 ];
+const money = (n: number) => `$${Number(n).toFixed(2)}`;
 const fullName = (patient: PatientRecord) => `${patient.nombres} ${patient.apellidos}`;
 const initials = (patient: PatientRecord) => `${patient.nombres[0] ?? ""}${patient.apellidos[0] ?? ""}`.toUpperCase();
 const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${value.slice(0, 10)}T12:00:00`));
@@ -37,7 +43,7 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
   const [searchResults, setSearchResults] = useState<PatientRecord[]>([]);
   const [searching, setSearching] = useState(false);
   const [extraPatients, setExtraPatients] = useState<PatientRecord[]>([]);
-  const [historial, setHistorial] = useState<Record<string, { consultations: Consultation[]; photos: ClinicalPhoto[]; sales: PatientSale[] }>>({});
+  const [historial, setHistorial] = useState<Record<string, { consultations: Consultation[]; photos: ClinicalPhoto[]; sales: PatientSale[]; labOrders: SaleLabOrder[]; garantias: Garantia[] }>>({});
   const [loadingHistorial, setLoadingHistorial] = useState(false);
   const [selectedId, setSelectedId] = useState(patients[0]?.id ?? "");
   const [section, setSection] = useState<"consultations" | "sales" | "files">("consultations");
@@ -45,6 +51,11 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
   const [isConsulting, setIsConsulting] = useState(false);
   const [isSelling, setIsSelling] = useState(false);
   const [viewingConsultation, setViewingConsultation] = useState<Consultation | null>(null);
+  const [viewingSale, setViewingSale] = useState<PatientSale | null>(null);
+  const [labOrderContext, setLabOrderContext] = useState<{ sale: PatientSale; orderId?: string; esGarantia?: boolean; ordenOriginalId?: string | null } | null>(null);
+  const [reciboSale, setReciboSale] = useState<PatientSale | null>(null);
+  const [garantiaModal, setGarantiaModal] = useState<{ defaultVentaId?: string } | null>(null);
+  const [anulling, setAnulling] = useState<PatientSale | null>(null);
   const [notice, setNotice] = useState("");
   const [edadNuevoPaciente, setEdadNuevoPaciente] = useState<number | null>(null);
   const [tieneResponsable, setTieneResponsable] = useState(false);
@@ -87,7 +98,28 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
   const consultations = usingExtraHistorial ? (historial[selected.id]?.consultations ?? []) : props.consultations.filter((consultation) => consultation.paciente_id === selected?.id);
   const photos = usingExtraHistorial ? (historial[selected.id]?.photos ?? []) : props.photos.filter((photo) => photo.paciente_id === selected?.id);
   const sales = usingExtraHistorial ? (historial[selected.id]?.sales ?? []) : props.sales.filter((sale) => sale.paciente_id === selected?.id);
+  const saleIds = useMemo(() => new Set(sales.map((sale) => sale.id)), [sales]);
+  const labOrders = usingExtraHistorial ? (historial[selected?.id ?? ""]?.labOrders ?? []) : props.labOrders.filter((order) => saleIds.has(order.venta_id));
+  const garantias = usingExtraHistorial ? (historial[selected?.id ?? ""]?.garantias ?? []) : props.garantias.filter((garantia) => saleIds.has(garantia.venta_id));
   const companyName = (id: string) => props.companies.find((company) => company.id === id)?.nombre ?? "Empresa";
+  const productoById = useMemo(() => new Map(props.products.map((product) => [product.id, product])), [props.products]);
+  const lensItemsFor = (sale: PatientSale) => sale.venta_items.filter((item) => item.producto_id && productoById.get(item.producto_id)?.categoria === "lente");
+  const labOrderItemsFor = (sale: PatientSale) => { const strict = lensItemsFor(sale); return strict.length ? strict : (sale.venta_items ?? []); };
+  const canAnular = props.profile?.rol === "superadmin";
+  const abonar = (sale: PatientSale, data: FormData) => start(async () => { data.set("venta_id", sale.id); try { await registrarAbono(data); setNotice("Abono registrado."); } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo registrar el abono."); } });
+  const anular = (sale: PatientSale, motivo: string) => start(async () => { const data = new FormData(); data.set("venta_id", sale.id); data.set("motivo", motivo); try { await anularVenta(data); setNotice("Venta anulada."); setAnulling(null); } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo anular la venta."); } });
+  const crearGarantiaSubmit = (form: HTMLFormElement) => start(async () => {
+    try {
+      const garantiaId = await crearGarantia(new FormData(form));
+      const ventaId = new FormData(form).get("venta_id") as string;
+      const tipo = new FormData(form).get("tipo") as string;
+      setNotice("Garantía registrada.");
+      setGarantiaModal(null);
+      form.reset();
+      if (tipo === "luna") { const sale = sales.find((s) => s.id === ventaId); if (sale) setLabOrderContext({ sale, esGarantia: true }); }
+      void garantiaId;
+    } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo registrar la garantía."); }
+  });
 
   const selectPatient = (id: string) => {
     setSelectedId(id); setSection("consultations");
@@ -111,7 +143,7 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
     <div className="clinical-layout"><aside className="glass patient-sidebar"><div className="sidebar-top"><div><p className="section-label">PACIENTES</p><h2>Buscar historia</h2></div>{!demoMode && <button className="icon-button" onClick={() => setIsCreating(true)} aria-label="Registrar paciente"><Plus size={18} /></button>}</div><label className="patient-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre o cédula" /></label><p className="search-hint">{search.trim().length >= 2 ? "Buscando en los 3,000+ pacientes registrados." : "Escribe al menos 2 letras para buscar en todos los pacientes."}</p><div className="patient-list">{searching && <p className="empty-patients">Buscando…</p>}{!searching && visible.map((patient) => <button key={patient.id} className={`patient-row ${patient.id === selected?.id ? "selected" : ""}`} onClick={() => selectPatient(patient.id)}><span className="patient-avatar">{initials(patient)}</span><span className="patient-row-text"><strong>{fullName(patient)}</strong><small>{patient.cedula ?? "Sin cédula"} · {formatDate(patient.actualizado_en)}</small></span><ChevronRight size={16} /></button>)}{!searching && visible.length === 0 && <p className="empty-patients">No se encontraron pacientes.</p>}</div><div className="shared-note"><History size={16} /><span>Las atenciones de SHUVISION y Focus quedan en la misma ficha.</span></div></aside>
     <section className="clinical-main">{selected ? <><article className="glass patient-hero"><div className="patient-identity"><span className="patient-avatar large">{initials(selected)}</span><div><p className="section-label">CARPETA CENTRAL DEL PACIENTE</p><h2>{fullName(selected)}</h2><p>{selected.cedula ?? "Sin cédula"} · {selected.telefono || "Sin WhatsApp"}</p></div></div>{!demoMode && <button className="new-consultation" type="button" onClick={() => setIsConsulting(true)}><ClipboardPlus size={17} /> Nueva revisión</button>}</article>{usingExtraHistorial && loadingHistorial && <p className="empty-patients">Cargando historial…</p>}<nav className="clinical-tabs"><button className={section === "consultations" ? "active" : ""} onClick={() => setSection("consultations")}><Stethoscope size={16} /> Revisiones ({consultations.length})</button><button className={section === "sales" ? "active" : ""} onClick={() => setSection("sales")}><ReceiptText size={16} /> Ventas ({sales.length})</button><button className={section === "files" ? "active" : ""} onClick={() => setSection("files")}><ImageIcon size={16} /> Fotos y documentos</button></nav>
     {section === "consultations" && <section className="clinical-content history-list">{consultations.length ? consultations.map((consultation) => <article className="glass consultation-card" key={consultation.id} onClick={() => setViewingConsultation(consultation)} style={{ cursor: "pointer" }}><div className="consultation-date"><CalendarDays size={17} /><strong>{formatDate(consultation.fecha_consulta)}</strong><span>Consulta clínica</span></div><div><p className="section-label">{consultation.motivo_consulta ?? "Sin motivo registrado"}</p><h3>{consultation.impresion_diagnostica ?? "Sin diagnóstico registrado"}</h3><p>{consultation.plan_manejo ?? "Sin receta registrada"}</p><div className="consultation-stats"><span><strong>AV lejos c/rx antigua OD/OI</strong>{consultation.lensometria?.od_av_lejos || "—"} / {consultation.lensometria?.oi_av_lejos || "—"}</span><span><strong>Rx final OD</strong>{[consultation.refraccion?.od_esfera, consultation.refraccion?.od_cilindro, consultation.refraccion?.od_eje].filter(Boolean).join(" ") || "—"}</span><span><strong>Astigmatismo corneal OD/OI</strong>{consultation.queratometria?.od_astigmatismo || "—"} / {consultation.queratometria?.oi_astigmatismo || "—"}</span></div></div></article>) : <section className="glass empty-state"><Stethoscope size={27} /><h3>Sin consultas registradas</h3><p>La primera consulta se guardará en esta ficha compartida.</p></section>}</section>}
-    {section === "sales" && <section className="clinical-content history-list">{!demoMode && <div className="tab-actions"><button className="new-consultation" type="button" onClick={() => setIsSelling(true)}><ReceiptText size={17} /> Nueva venta</button></div>}{sales.length ? sales.map((sale) => <article className="glass consultation-card" key={sale.id}><div className="consultation-date"><ReceiptText size={17} /><strong>{formatTimestamp(sale.creado_en)}</strong><span>{companyName(sale.empresa_id)}</span></div><div><p className="section-label">{sale.estado}</p><h3>{sale.venta_items.map((item) => `${item.descripcion} ×${item.cantidad}`).join(", ") || "Compra sin detalle"}</h3><p>Total: ${Number(sale.total).toFixed(2)} · Pagado: ${Number(sale.pagado).toFixed(2)} · Saldo: ${Number(sale.saldo).toFixed(2)}</p></div></article>) : <section className="glass empty-state"><ReceiptText size={27} /><h3>Sin compras registradas</h3><p>Las ventas que se registren para este paciente aparecerán aquí, aunque se hayan realizado en SHUVISION o Focus.</p></section>}</section>}
+    {section === "sales" && <section className="clinical-content history-list">{!demoMode && <div className="tab-actions"><button className="new-consultation" type="button" onClick={() => setIsSelling(true)}><ReceiptText size={17} /> Nueva venta</button></div>}{sales.length ? <div className="task-list">{sales.map((sale) => <SaleCard key={sale.id} sale={sale} companyName={companyName(sale.empresa_id)} patient={selected} lensItems={lensItemsFor(sale)} hasLabOrderItems={labOrderItemsFor(sale).length > 0} labOrders={labOrders.filter((order) => order.venta_id === sale.id)} canAnular={canAnular} pending={pending} onAbono={abonar} onRequestAnular={setAnulling} onCreateLabOrder={() => setLabOrderContext({ sale })} onViewOrder={(orderId) => setLabOrderContext({ sale, orderId })} onRecibo={() => setReciboSale(sale)} onDetalle={() => setViewingSale(sale)} onGarantia={() => setGarantiaModal({ defaultVentaId: sale.id })} />)}</div> : <section className="glass empty-state"><ReceiptText size={27} /><h3>Sin compras registradas</h3><p>Las ventas que se registren para este paciente aparecerán aquí, aunque se hayan realizado en SHUVISION o Focus.</p></section>}</section>}
     {section === "files" && <FilesPanel pacienteId={selected.id} photos={photos} consultations={consultations} onNotice={setNotice} />}
     </> : <section className="glass empty-state"><Search size={27} /><h3>No hay pacientes para mostrar</h3><p>Los pacientes autorizados aparecerán aquí.</p></section>}</section></div>
   </div>
@@ -126,6 +158,11 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
     <div className="modal-actions"><button className="outline-action" type="button" onClick={closeCreating}>Cancelar</button><button className="new-consultation" disabled={pending} type="submit">{pending ? "Guardando…" : "Guardar ficha clínica"}</button></div></form></section></div>}
   {isConsulting && selected && <ConsultationModal pacienteId={selected.id} onClose={() => setIsConsulting(false)} onSaved={setNotice} />}
   {isSelling && selected && !demoMode && <div className="modal-backdrop"><div className="sale-modal-shell"><button className="modal-close" onClick={() => setIsSelling(false)} aria-label="Cerrar"><X size={19} /></button><Cart products={props.products} stock={props.stock} companies={props.companies} branches={props.branches} patients={[selected]} empresasConvenio={props.empresasConvenio} defaultCompany={props.companies[0]?.id ?? ""} defaultBranch="" defaultPacienteId={selected.id} lockPatient onDone={(message) => { setNotice(message); setSection("sales"); setIsSelling(false); }} /></div></div>}
-  {viewingConsultation && selected && <ConsultationDetailModal consultation={viewingConsultation} patientName={fullName(selected)} onClose={() => setViewingConsultation(null)} />}
+  {viewingConsultation && selected && <ConsultationDetailModal consultation={viewingConsultation} patient={selected} company={props.companies.find((c) => c.id === selected.empresa_origen_id) ?? props.companies[0]} onClose={() => setViewingConsultation(null)} />}
+  {viewingSale && selected && <VentaDetailModal sale={viewingSale} companyName={companyName(viewingSale.empresa_id)} patient={selected} onClose={() => setViewingSale(null)} />}
+  {labOrderContext && selected && <LabOrderModal sale={labOrderContext.sale} lensItems={labOrderItemsFor(labOrderContext.sale)} productoById={productoById} existingOrderId={labOrderContext.orderId} esGarantia={labOrderContext.esGarantia} patientName={fullName(selected)} patientPhone={selected.telefono} company={props.companies.find((c) => c.id === labOrderContext.sale.empresa_id)} onClose={() => setLabOrderContext(null)} onCreated={(message) => setNotice(message)} />}
+  {reciboSale && selected && <ReciboModal sale={reciboSale} patient={selected} onClose={() => setReciboSale(null)} onSaved={(message) => setNotice(message)} />}
+  {anulling && <AnularModal sale={anulling} pending={pending} onClose={() => setAnulling(null)} onConfirm={(motivo) => anular(anulling, motivo)} />}
+  {garantiaModal && selected && <GarantiaModal sales={sales.filter((sale) => sale.estado === "completada")} defaultVentaId={garantiaModal.defaultVentaId} productoById={productoById} patients={[selected]} onClose={() => setGarantiaModal(null)} onCreate={crearGarantiaSubmit} pending={pending} />}
   </main>;
 }

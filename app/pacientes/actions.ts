@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { ClinicalPhoto, Consultation, PatientRecord, PatientSale } from "@/lib/clinical";
+import type { Garantia, SaleLabOrder } from "@/lib/ventas";
 
 const clinicalRoles = new Set(["superadmin", "admin_sucursal", "optometra"]);
 const text = (data: FormData, name: string) => typeof data.get(name) === "string" ? String(data.get(name)).trim() : "";
@@ -88,28 +89,36 @@ export async function buscarPacientesClinicos(query: string): Promise<PatientRec
     : `and(${tokens.map((t) => `or(nombres.ilike.%${t}%,apellidos.ilike.%${t}%)`).join(",")})`;
   const cedulaFilter = `cedula.ilike.%${esc(q)}%`;
   const { data, error } = await supabase.from("pacientes_clinicos")
-    .select("id,nombres,apellidos,cedula,telefono,ocupacion,responsable_id,fecha_nacimiento,frecuencia_cobro,actualizado_en")
+    .select("id,nombres,apellidos,cedula,telefono,email,direccion,sexo,ocupacion,responsable_id,fecha_nacimiento,frecuencia_cobro,empresa_origen_id,actualizado_en")
     .or(`${nameFilter},${cedulaFilter}`).order("actualizado_en", { ascending: false }).limit(30);
   if (error) throw new Error("No se pudo buscar pacientes.");
   return data ?? [];
 }
 
-export async function obtenerHistorialPaciente(pacienteId: string): Promise<{ consultations: Consultation[]; photos: ClinicalPhoto[]; sales: PatientSale[] }> {
+export async function obtenerHistorialPaciente(pacienteId: string): Promise<{ consultations: Consultation[]; photos: ClinicalPhoto[]; sales: PatientSale[]; labOrders: SaleLabOrder[]; garantias: Garantia[] }> {
   const { supabase } = await currentClinicalProfile();
   if (!pacienteId) throw new Error("Falta identificar al paciente.");
   const [consultationsResult, photosResult, salesResult] = await Promise.all([
     supabase.from("consultas_optometricas").select("id,paciente_id,fecha_consulta,motivo_consulta,antecedentes,agudeza_visual,lensometria,queratometria,autorefractor,refraccion,examen_binocular,biomicroscopia,impresion_diagnostica,receta,plan_manejo,observaciones").eq("paciente_id", pacienteId).order("fecha_consulta", { ascending: false }).limit(150),
     supabase.from("historia_fotos").select("id,paciente_id,consulta_id,tipo,descripcion,storage_path,creado_en").eq("paciente_id", pacienteId).order("creado_en", { ascending: false }).limit(150),
-    supabase.from("ventas").select("id,paciente_id,empresa_id,estado,total,pagado,saldo,creado_en,venta_items(descripcion,cantidad)").eq("paciente_id", pacienteId).order("creado_en", { ascending: false }).limit(150),
+    supabase.from("ventas").select("id,empresa_id,sucursal_id,paciente_id,cliente_nombre,estado,subtotal,descuento,total,pagado,saldo,motivo_anulacion,recibo_token,fecha_entrega_estimada,creado_en,folio,venta_items(id,producto_id,descripcion,cantidad,precio_unitario,descuento,total_linea),pagos_venta(id,metodo,monto,referencia,banco,creado_en)").eq("paciente_id", pacienteId).order("creado_en", { ascending: false }).limit(150),
   ]);
   if (consultationsResult.error || photosResult.error) throw new Error("No se pudieron leer los detalles clínicos.");
   const photoRows = photosResult.data ?? [];
   const signed = photoRows.length ? await supabase.storage.from("historias").createSignedUrls(photoRows.map((photo) => photo.storage_path), 3600) : { data: [] as { path: string; signedUrl: string }[] };
   const urlByPath = new Map((signed.data ?? []).map((item) => [item.path, item.signedUrl]));
+  const sales = salesResult.error ? [] : ((salesResult.data ?? []) as unknown as PatientSale[]);
+  const saleIds = sales.map((sale) => sale.id);
+  const [labOrdersResult, garantiasResult] = saleIds.length ? await Promise.all([
+    supabase.from("ordenes_laboratorio").select("id,venta_id,venta_item_id,estado,laboratorio,es_garantia").in("venta_id", saleIds),
+    supabase.from("garantias").select("id,venta_id,venta_item_id,tipo,motivo,estado,orden_laboratorio_id,notas,creado_en").in("venta_id", saleIds).order("creado_en", { ascending: false }),
+  ]) : [{ data: [], error: null }, { data: [], error: null }];
   return {
     consultations: (consultationsResult.data ?? []) as unknown as Consultation[],
     photos: photoRows.map((photo) => ({ ...photo, url: urlByPath.get(photo.storage_path) ?? null })) as ClinicalPhoto[],
-    sales: salesResult.error ? [] : ((salesResult.data ?? []) as unknown as PatientSale[]),
+    sales,
+    labOrders: labOrdersResult.error ? [] : (labOrdersResult.data ?? []),
+    garantias: garantiasResult.error ? [] : ((garantiasResult.data ?? []) as unknown as Garantia[]),
   };
 }
 

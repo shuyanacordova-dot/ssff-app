@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BarChart3, Banknote, CalendarDays, ClipboardList, Coins, Glasses, FileBarChart, Landmark, LogOut, Package, Search, ShieldCheck, UserPlus, Wallet } from "lucide-react";
+import { BarChart3, Banknote, Building2, CalendarDays, ClipboardList, Coins, Glasses, FileBarChart, Landmark, LogOut, Package, Search, ShieldCheck, UserPlus, Wallet } from "lucide-react";
 import type { TaskData } from "@/lib/tasks";
 import TaskBoard from "./tareas/task-board";
 import { cerrarSesion } from "./login/actions";
@@ -30,6 +30,7 @@ export default function DashboardShell({ taskData }: { taskData: TaskData }) {
           {isSuperadmin && <Link className="dashboard-nav-item" href="/caja"><Landmark size={18} /> Cuentas de bancos y cuadre de caja global</Link>}
           <Link className="dashboard-nav-item" href="/caja?gasto=1"><Coins size={18} /> Salidas de caja chica</Link>
           <Link className="dashboard-nav-item" href="/cuentas-cobrar"><Wallet size={18} /> Cuentas por cobrar</Link>
+          <Link className="dashboard-nav-item" href="/convenios"><Building2 size={18} /> Convenios</Link>
           <Link className="dashboard-nav-item" href="/inventario?grupo=monturas"><Package size={18} /> Inventario de monturas y accesorios</Link>
           <Link className="dashboard-nav-item" href="/inventario?grupo=lunas"><Glasses size={18} /> Inventario de lunas</Link>
           {canVerInformes && <Link className="dashboard-nav-item" href="/informes"><BarChart3 size={18} /> Informes</Link>}

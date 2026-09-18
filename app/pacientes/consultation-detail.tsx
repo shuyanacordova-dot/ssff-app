@@ -1,9 +1,20 @@
 "use client";
 import { Printer, X } from "lucide-react";
-import type { Consultation } from "@/lib/clinical";
+import type { Consultation, PatientRecord } from "@/lib/clinical";
+import type { SaleCompany } from "@/lib/ventas";
+import Letterhead from "../print-letterhead";
 
 const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${value.slice(0, 10)}T12:00:00`));
 const prettyKey = (key: string) => key.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+const sexoLabel: Record<string, string> = { femenino: "Femenino", masculino: "Masculino", otro: "Otro" };
+const calcularEdad = (fechaISO: string | null): number | null => {
+  if (!fechaISO) return null;
+  const nacimiento = new Date(`${fechaISO}T12:00:00`); const hoy = new Date();
+  let edad = hoy.getFullYear() - nacimiento.getFullYear();
+  const aunNoCumple = hoy.getMonth() < nacimiento.getMonth() || (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate());
+  if (aunNoCumple) edad -= 1;
+  return edad;
+};
 
 function FieldGrid({ data }: { data: Record<string, string> | null | undefined }) {
   const entries = Object.entries(data ?? {}).filter(([, value]) => value && String(value).trim() !== "");
@@ -26,13 +37,28 @@ function EyeTable({ data, columns }: { data: Record<string, string> | null | und
   </table>;
 }
 
-export default function ConsultationDetailModal({ consultation, patientName, onClose }: { consultation: Consultation; patientName: string; onClose: () => void }) {
+export default function ConsultationDetailModal({ consultation, patient, company, onClose }: { consultation: Consultation; patient: PatientRecord; company?: SaleCompany; onClose: () => void }) {
   const receta = consultation.receta;
+  const patientName = `${patient.nombres} ${patient.apellidos}`;
+  const edad = calcularEdad(patient.fecha_nacimiento);
   return <div className="modal-backdrop"><section className="new-patient-modal task-modal lab-modal" role="dialog" aria-modal="true" aria-labelledby="consultation-detail-title"><button className="modal-close no-print" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>
-    <div className="print-area">
-      <p className="section-label">REVISIÓN CLÍNICA</p>
+    <div className="print-area print-a4">
+      <Letterhead company={company} />
+      <p className="section-label">REVISIÓN</p>
       <h2 id="consultation-detail-title">{patientName}</h2>
       <p className="field-hint">{formatDate(consultation.fecha_consulta)} · {consultation.motivo_consulta || "Sin motivo registrado"}</p>
+
+      <p className="section-label" style={{ marginTop: 14 }}>DATOS DEL PACIENTE</p>
+      <div className="consultation-stats">
+        <span><strong>Género</strong>{patient.sexo ? (sexoLabel[patient.sexo] ?? patient.sexo) : "—"}</span>
+        <span><strong>Fecha de nacimiento</strong>{patient.fecha_nacimiento ? formatDate(patient.fecha_nacimiento) : "—"}</span>
+        <span><strong>Edad</strong>{edad !== null ? `${edad} años` : "—"}</span>
+        <span><strong>Cédula</strong>{patient.cedula || "—"}</span>
+        <span><strong>Celular</strong>{patient.telefono || "—"}</span>
+        <span><strong>Email</strong>{patient.email || "—"}</span>
+        <span><strong>Dirección</strong>{patient.direccion || "—"}</span>
+        <span><strong>Ocupación</strong>{patient.ocupacion || "—"}</span>
+      </div>
 
       <p className="section-label" style={{ marginTop: 14 }}>ANTECEDENTES</p>
       <FieldGrid data={consultation.antecedentes} />
@@ -74,6 +100,11 @@ export default function ConsultationDetailModal({ consultation, patientName, onC
       <p>{consultation.plan_manejo || "Sin indicaciones adicionales"}</p>
 
       {consultation.observaciones && <><p className="section-label" style={{ marginTop: 14 }}>OBSERVACIONES</p><p>{consultation.observaciones}</p></>}
+
+      <div className="print-center" style={{ marginTop: 46 }}>
+        <div style={{ borderTop: "1px solid #34455c", width: 260, margin: "0 auto" }} />
+        <p style={{ margin: "4px 0 0", fontSize: 13 }}>Firma del profesional</p>
+      </div>
     </div>
     <div className="modal-actions no-print"><button className="outline-action" type="button" onClick={onClose}>Cerrar</button><button className="new-consultation" type="button" onClick={() => window.print()}><Printer size={16} /> Imprimir revisión</button></div>
   </section></div>;

@@ -10,3 +10,11 @@ export async function actualizarFrecuenciaCobro(pacienteId: string, frecuencia: 
   if (error) throw new Error(error.message || "No se pudo actualizar la frecuencia de cobro.");
   revalidatePath("/cuentas-cobrar");
 }
+
+export async function activarCobroInsistente(pacienteId: string, activo: boolean) {
+  const supabase = await createSupabaseServerClient();
+  if (!pacienteId) throw new Error("Falta identificar al paciente.");
+  const { error } = await supabase.rpc("activar_cobro_insistente", { p_paciente: pacienteId, p_activo: activo });
+  if (error) throw new Error(error.message || "No se pudo actualizar el cobro insistente.");
+  revalidatePath("/cuentas-cobrar");
+}

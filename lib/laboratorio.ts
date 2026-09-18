@@ -3,7 +3,7 @@ export type UsoCalculado = "lejos" | "cerca" | "lejos_y_cerca";
 export type TipoLente = "monofocal_lejos" | "monofocal_cerca" | "bifocal" | "progresivo";
 export type EstadoOrdenLaboratorio = "pendiente" | "enviado" | "en_proceso" | "recibido" | "control_calidad" | "listo_entrega" | "notificado" | "entregado" | "rechazado";
 
-export type RxEye = { esfera: string; cilindro: string; eje: string; add: string; dnp: string };
+export type RxEye = { esfera: string; cilindro: string; eje: string; add: string; dnp: string; procesar: boolean };
 export type OrdenLaboratorioRx = { od: RxEye; oi: RxEye };
 export type OrdenLaboratorioMedidas = { vertical: string; horizontal_mayor: string; puente: string; altura: string; dnp: string };
 
@@ -11,11 +11,32 @@ export type OrdenLaboratorio = {
   id: string;
   venta_id: string;
   venta_item_id: string | null;
+  consulta_id: string | null;
   estado: EstadoOrdenLaboratorio;
   laboratorio: LaboratorioProveedor;
+  uso_calculado: UsoCalculado;
+  tipo_lente: TipoLente;
+  rx: OrdenLaboratorioRx;
+  medidas: OrdenLaboratorioMedidas;
+  notas: string | null;
+  es_garantia: boolean;
+  orden_original_id: string | null;
+  creado_en: string;
 };
 
 export type RefraccionOption = { id: string; fecha_consulta: string; refraccion: Record<string, string> };
+
+export const estadoOrdenLabels: Record<EstadoOrdenLaboratorio, string> = {
+  pendiente: "Pendiente",
+  enviado: "Enviado al laboratorio",
+  en_proceso: "En proceso",
+  recibido: "Recibido en óptica",
+  control_calidad: "Control de calidad",
+  listo_entrega: "Listo para entrega",
+  notificado: "Paciente notificado",
+  entregado: "Entregado",
+  rechazado: "Rechazado",
+};
 
 export const laboratorioLabels: Record<LaboratorioProveedor, string> = {
   provision: "Provisión Laboratorio",
@@ -54,13 +75,27 @@ export function tipoLenteSugerido(uso: UsoCalculado): TipoLente {
   return "monofocal_lejos";
 }
 
-export const emptyRxEye = (): RxEye => ({ esfera: "", cilindro: "", eje: "", add: "", dnp: "" });
+export function tipoLenteDesdeDescripcion(descripcion: string): TipoLente | null {
+  const d = descripcion.toLowerCase();
+  if (d.includes("progresivo")) return "progresivo";
+  if (d.includes("bifocal")) return "bifocal";
+  if (d.includes("monofocal")) return (d.includes("cerca") || d.includes("lectura")) ? "monofocal_cerca" : "monofocal_lejos";
+  return null;
+}
+
+export function usoDesdeTipoLente(tipo: TipoLente): UsoCalculado {
+  if (tipo === "monofocal_cerca") return "cerca";
+  if (tipo === "bifocal" || tipo === "progresivo") return "lejos_y_cerca";
+  return "lejos";
+}
+
+export const emptyRxEye = (): RxEye => ({ esfera: "", cilindro: "", eje: "", add: "", dnp: "", procesar: true });
 export const emptyRx = (): OrdenLaboratorioRx => ({ od: emptyRxEye(), oi: emptyRxEye() });
 export const emptyMedidas = (): OrdenLaboratorioMedidas => ({ vertical: "", horizontal_mayor: "", puente: "", altura: "", dnp: "" });
 
 export function rxFromRefraccion(refraccion: Record<string, string>): OrdenLaboratorioRx {
   return {
-    od: { esfera: refraccion.od_esfera || "", cilindro: refraccion.od_cilindro || "", eje: refraccion.od_eje || "", add: refraccion.od_add || "", dnp: refraccion.od_dnp || "" },
-    oi: { esfera: refraccion.oi_esfera || "", cilindro: refraccion.oi_cilindro || "", eje: refraccion.oi_eje || "", add: refraccion.oi_add || "", dnp: refraccion.oi_dnp || "" },
+    od: { esfera: refraccion.od_esfera || "", cilindro: refraccion.od_cilindro || "", eje: refraccion.od_eje || "", add: refraccion.od_add || "", dnp: refraccion.od_dnp || "", procesar: true },
+    oi: { esfera: refraccion.oi_esfera || "", cilindro: refraccion.oi_cilindro || "", eje: refraccion.oi_eje || "", add: refraccion.oi_add || "", dnp: refraccion.oi_dnp || "", procesar: true },
   };
 }

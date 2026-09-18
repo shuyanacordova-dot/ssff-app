@@ -51,7 +51,7 @@ export async function actualizarEntregaVenta(ventaId: string, fecha: string) {
   if (!ventaId) throw new Error("Falta identificar la venta.");
   const { data, error } = await supabase.rpc("actualizar_entrega_venta", { p_venta: ventaId, p_fecha: fecha || null });
   if (error) throw new Error(error.message || "No se pudo generar el recibo.");
-  revalidatePath("/ventas");
+  revalidatePath("/ventas"); revalidatePath("/pacientes");
   return data as { recibo_token: string; fecha_entrega_estimada: string | null };
 }
 

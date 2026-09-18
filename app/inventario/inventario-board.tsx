@@ -4,7 +4,7 @@ import Link from "next/link";
 import { AlertTriangle, ArrowLeftRight, Calculator, Glasses, Package, Plus, ShoppingBag, Upload, X } from "lucide-react";
 import { useState, useTransition } from "react";
 import type { InventarioData, MovimientoInventario, Producto } from "@/lib/inventario";
-import { actualizarStockMinimo, crearArmazonesMasivo, crearMovimientoInventario, crearProductoInventario, transferirInventario, type ArmazonMasivo } from "./actions";
+import { actualizarProductoInventario, actualizarStockMinimo, crearArmazonesMasivo, crearMovimientoInventario, crearProductoInventario, transferirInventario, type ArmazonMasivo } from "./actions";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
 const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
@@ -24,6 +24,8 @@ export default function InventarioBoard(props: InventarioData & { grupoInicial?:
   const [rxCilindro, setRxCilindro] = useState("");
   const [rxAdicion, setRxAdicion] = useState("");
   const [showProducto, setShowProducto] = useState(false);
+  const [editingProducto, setEditingProducto] = useState<Producto | null>(null);
+  const [mostrar, setMostrar] = useState<"basico" | "detallado">("basico");
   const [showMovimiento, setShowMovimiento] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showMasivo, setShowMasivo] = useState(false);
@@ -100,17 +102,17 @@ export default function InventarioBoard(props: InventarioData & { grupoInicial?:
       </>}
     </section>}
 
-    <section className="glass agenda-board" style={{ marginBottom: 18 }}><div className="agenda-toolbar"><div><p className="section-label">CATÁLOGO</p><h2>Productos y existencias</h2></div><div style={{ display: "flex", gap: 8 }}>{canEdit && subgrupo === "monturas_gafas" && <button className="outline-action" type="button" onClick={() => setShowMasivo(true)}><Upload size={15} /> Subida masiva</button>}{canEdit && <button className="new-task" type="button" onClick={() => setShowProducto(true)}><Plus size={18} /> Nuevo producto</button>}</div></div>
-    <div className="tabs" style={{ marginBottom: 12 }}>{categoriasVisibles.map((cat) => <button key={cat} className={cat === categoriaActiva ? "active" : ""} onClick={() => { setCategoriaActiva(cat); setClasificacionActiva(""); }}>{categoriaLabel[cat]} <span>{productos.filter((p) => p.categoria === cat).length}</span></button>)}</div>
-    {clasificacionesVisibles.length > 1 && <div className="tabs" style={{ marginBottom: 12 }}>
-      <button className={!clasificacionActiva ? "active" : ""} onClick={() => setClasificacionActiva("")}>Todas <span>{productosCategoriaSinFiltrar.length}</span></button>
-      {clasificacionesVisibles.map((clas) => <button key={clas} className={clas === clasificacionActiva ? "active" : ""} onClick={() => setClasificacionActiva(clas)}>{clas} <span>{productosCategoriaSinFiltrar.filter((p) => p.clasificacion === clas).length}</span></button>)}
-    </div>}
-    {productosCategoria.length ? <div className="task-list">{productosCategoria.map((producto) => <article className="task-card" key={producto.id}><div className="task-status" /><div className="task-main"><div className="task-meta"><span>{categoriaLabel[producto.categoria] ?? producto.categoria}</span>{producto.clasificacion && <span>{producto.clasificacion}</span>}{producto.material && <span>{producto.material}</span>}{producto.indice != null && <span>Índice {producto.indice}</span>}{producto.tecnologia && <span>{producto.tecnologia}</span>}{producto.proveedor && <span>{producto.proveedor}</span>}{!producto.controla_inventario && <span>No controla stock</span>}</div><h2>{producto.nombre}</h2><p>Precio: {money(producto.precio_venta)}{producto.costo_referencial != null ? ` · Costo: ${money(producto.costo_referencial)}` : ""}{producto.codigo ? ` · Código: ${producto.codigo}` : ""}{producto.codigo_barra ? ` · Varilla: ${producto.codigo_barra}` : ""}{producto.rango_esf_pos != null && producto.rango_esf_neg != null ? ` · Esfera ${producto.rango_esf_neg} a ${producto.rango_esf_pos}` : ""}{producto.rango_cil_pos != null && producto.rango_cil_neg != null ? ` · Cilindro ${producto.rango_cil_neg} a ${producto.rango_cil_pos}` : ""}</p>{producto.controla_inventario && <div className="stock-rows">{branches.map((branch) => { const row = stockFor(producto.id, branch.id); const cantidad = row?.cantidad ?? 0; const minimo = row?.stock_minimo ?? 0; const low = minimo > 0 && cantidad <= minimo; return <StockPill key={branch.id} nombre={branch.nombre} cantidad={cantidad} minimo={minimo} low={low} canEdit={canEdit} onSaveMinimo={(value) => saveMinimo(producto.id, branch.id, value)} />; })}</div>}</div><div className="task-actions" /></article>)}</div> : <section className="empty-state"><Package size={27} /><h3>Aún no hay productos en {categoriaLabel[categoriaActiva]?.toLowerCase()}</h3><p>Crea el primer producto de esta categoría.</p></section>}</section>
+    <section className="glass agenda-board" style={{ marginBottom: 18 }}><div className="agenda-toolbar"><div><p className="section-label">CATÁLOGO</p><h2>Productos y existencias</h2></div><div style={{ display: "flex", gap: 8, alignItems: "center" }}><label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: "#5d7086" }}>Mostrar<select value={mostrar} onChange={(event) => setMostrar(event.target.value as "basico" | "detallado")} style={{ border: "1px solid #d4e0ea", borderRadius: 9, padding: "8px 10px" }}><option value="basico">Básico</option><option value="detallado">Detallado (con stock y ficha)</option></select></label>{canEdit && subgrupo === "monturas_gafas" && <button className="outline-action" type="button" onClick={() => setShowMasivo(true)}><Upload size={15} /> Subida masiva</button>}{canEdit && <button className="new-task" type="button" onClick={() => setShowProducto(true)}><Plus size={18} /> Nuevo producto</button>}</div></div>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+      {categoriasVisibles.length > 1 && <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: "#5d7086" }}>Categoría<select value={categoriaActiva} onChange={(event) => { setCategoriaActiva(event.target.value); setClasificacionActiva(""); }} style={{ border: "1px solid #d4e0ea", borderRadius: 9, padding: "8px 10px" }}>{categoriasVisibles.map((cat) => <option key={cat} value={cat}>{categoriaLabel[cat]} ({productos.filter((p) => p.categoria === cat).length})</option>)}</select></label>}
+      {clasificacionesVisibles.length > 1 && <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: "#5d7086" }}>Tipo<select value={clasificacionActiva} onChange={(event) => setClasificacionActiva(event.target.value)} style={{ border: "1px solid #d4e0ea", borderRadius: 9, padding: "8px 10px" }}><option value="">Todas ({productosCategoriaSinFiltrar.length})</option>{clasificacionesVisibles.map((clas) => <option key={clas} value={clas}>{clas} ({productosCategoriaSinFiltrar.filter((p) => p.clasificacion === clas).length})</option>)}</select></label>}
+    </div>
+    {productosCategoria.length ? <div className="task-list">{productosCategoria.map((producto) => { const detalle = mostrar === "detallado"; const resumenExtra = [producto.marca, producto.modelo, producto.color].filter(Boolean).join(" · "); return <article className="task-card" key={producto.id} style={canEdit ? { cursor: "pointer" } : undefined} onClick={() => canEdit && setEditingProducto(producto)}><div className="task-status" /><div className="task-main">{detalle && <div className="task-meta"><span>{categoriaLabel[producto.categoria] ?? producto.categoria}</span>{producto.clasificacion && <span>{producto.clasificacion}</span>}{producto.material && <span>{producto.material}</span>}{producto.indice != null && <span>Índice {producto.indice}</span>}{producto.tecnologia && <span>{producto.tecnologia}</span>}{producto.proveedor && <span>{producto.proveedor}</span>}{producto.consignacion && <span>Consignación</span>}{!producto.controla_inventario && <span>No controla stock</span>}</div>}<h2>{producto.nombre}{canEdit && <span className="text-action" style={{ marginLeft: 8 }}>Editar</span>}</h2><p>{resumenExtra && `${resumenExtra} · `}Precio: {money(producto.precio_venta)}{detalle && producto.costo_referencial != null ? ` · Costo: ${money(producto.costo_referencial)}` : ""}{detalle && producto.codigo ? ` · Código: ${producto.codigo}` : ""}{detalle && producto.codigo_barra ? ` · Varilla: ${producto.codigo_barra}` : ""}{detalle && producto.rango_esf_pos != null && producto.rango_esf_neg != null ? ` · Esfera ${producto.rango_esf_neg} a ${producto.rango_esf_pos}` : ""}{detalle && producto.rango_cil_pos != null && producto.rango_cil_neg != null ? ` · Cilindro ${producto.rango_cil_neg} a ${producto.rango_cil_pos}` : ""}</p>{detalle && producto.controla_inventario && <div className="stock-rows" onClick={(event) => event.stopPropagation()}>{branches.map((branch) => { const row = stockFor(producto.id, branch.id); const cantidad = row?.cantidad ?? 0; const minimo = row?.stock_minimo ?? 0; const low = minimo > 0 && cantidad <= minimo; return <StockPill key={branch.id} nombre={branch.nombre} cantidad={cantidad} minimo={minimo} low={low} canEdit={canEdit} onSaveMinimo={(value) => saveMinimo(producto.id, branch.id, value)} />; })}</div>}</div><div className="task-actions" /></article>; })}</div> : <section className="empty-state"><Package size={27} /><h3>Aún no hay productos en {categoriaLabel[categoriaActiva]?.toLowerCase()}</h3><p>Crea el primer producto de esta categoría.</p></section>}</section>
 
     {canEdit && <section className="glass agenda-board"><div className="agenda-toolbar"><div><p className="section-label">MOVIMIENTOS</p><h2>Entradas, salidas y transferencias</h2></div><div style={{ display: "flex", gap: 8 }}><button className="outline-action" type="button" onClick={() => setShowTransfer(true)}><ArrowLeftRight size={15} /> Transferencia</button><button className="new-task" type="button" onClick={() => setShowMovimiento(true)}><Plus size={18} /> Nuevo movimiento</button></div></div>{movimientos.length ? <div className="task-list">{movimientos.slice(0, 20).map((mov) => <MovimientoCard key={mov.id} mov={mov} productoNombre={productoById.get(mov.producto_id)?.nombre ?? "Producto"} sucursalNombre={branchById.get(mov.sucursal_id)?.nombre ?? "Sucursal"} />)}</div> : <section className="empty-state"><ArrowLeftRight size={27} /><h3>Sin movimientos</h3><p>Las entradas, salidas y transferencias aparecerán aquí.</p></section>}</section>}
 
-    {showProducto && <ProductoModal empresaId={empresaId} categoriaInicial={categoriaActiva} companies={props.companies} pending={pending} onClose={() => setShowProducto(false)} onSubmit={(form) => runAction(() => crearProductoInventario(form), "Producto creado.")} />}
+    {showProducto && <ProductoModal empresaId={empresaId} categoriaInicial={categoriaActiva} companies={props.companies} branches={branches} pending={pending} onClose={() => setShowProducto(false)} onSubmit={(form) => runAction(() => crearProductoInventario(form), "Producto creado.")} />}
+    {editingProducto && <ProductoModal empresaId={empresaId} categoriaInicial={editingProducto.categoria} companies={props.companies} branches={branches} producto={editingProducto} pending={pending} onClose={() => setEditingProducto(null)} onSubmit={(form) => startTransition(async () => { try { await actualizarProductoInventario(form); setNotice("Producto actualizado."); setEditingProducto(null); } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo actualizar el producto."); } })} />}
     {showMovimiento && <MovimientoModal productos={productosGrupo.filter((p) => p.controla_inventario)} branches={branches} pending={pending} onClose={() => setShowMovimiento(false)} onSubmit={(form) => runAction(() => crearMovimientoInventario(form), "Movimiento registrado.")} />}
     {showTransfer && <TransferModal productos={productosGrupo.filter((p) => p.controla_inventario)} branches={branches} pending={pending} onClose={() => setShowTransfer(false)} onSubmit={(form) => runAction(() => transferirInventario(form), "Transferencia registrada.")} />}
     {showMasivo && <MasivoModal empresaId={empresaId} branches={branches} pending={pending} onClose={() => setShowMasivo(false)} onSubmit={(sucursalId, items) => runAction(() => crearArmazonesMasivo(empresaId, sucursalId, items), "Armazones creados.")} />}
@@ -129,19 +131,60 @@ function MovimientoCard({ mov, productoNombre, sucursalNombre }: { mov: Movimien
   return <article className="task-card"><div className="task-status" /><div className="task-main"><div className="task-meta"><span>{tipoLabel[mov.tipo]}</span><span>{sucursalNombre}</span><span>{formatDate(mov.creado_en)}</span></div><h2>{productoNombre}</h2>{mov.motivo && <p>{mov.motivo}</p>}</div><div className="task-actions"><strong style={{ color: positivo ? "#247658" : "#a24150" }}>{positivo ? "+" : "−"}{Math.abs(mov.cantidad)}</strong></div></article>;
 }
 
-function ProductoModal({ empresaId, categoriaInicial, companies, pending, onClose, onSubmit }: { empresaId: string; categoriaInicial: string; companies: InventarioData["companies"]; pending: boolean; onClose: () => void; onSubmit: (form: FormData) => void }) {
-  return <div className="modal-backdrop"><section className="new-patient-modal" role="dialog" aria-modal="true" aria-labelledby="new-prod-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button><p className="section-label">NUEVO PRODUCTO</p><h2 id="new-prod-title">Agregar al catálogo</h2><form onSubmit={(event) => { event.preventDefault(); onSubmit(new FormData(event.currentTarget)); }}><div className="new-patient-form">
-    <label>Nombre<input name="nombre" required /></label>
-    <label>Categoría<select name="categoria" defaultValue={categoriaInicial}>{categorias.map((c) => <option key={c} value={c}>{categoriaLabel[c]}</option>)}</select></label>
-    <label>Empresa<select name="empresa_id" defaultValue={empresaId}>{companies.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></label>
-    <label>Proveedor<input name="proveedor" placeholder="Ej.: OPTEC, Provisión, Indulentes" /></label>
-    <label>Clasificación<input name="clasificacion" placeholder="Ej.: Fino, Fino con estuche, Exclusivo" /></label>
-    <label>Código<input name="codigo" /></label>
-    <label>Código de la varilla<input name="codigo_barra" placeholder="Código físico del armazón, para resurtir" /></label>
-    <label>Precio de venta<input name="precio_venta" required type="number" min="0" step="0.01" /></label>
-    <label>Costo referencial<input name="costo_referencial" type="number" min="0" step="0.01" /></label>
-    <label>¿Controla stock?<select name="controla_inventario" defaultValue="si"><option value="si">Sí, es un producto físico</option><option value="no">No, es un servicio</option></select></label>
-  </div><div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" disabled={pending} type="submit">{pending ? "Guardando…" : "Guardar producto"}</button></div></form></section></div>;
+function ProductoModal({ empresaId, categoriaInicial, companies, branches, producto, pending, onClose, onSubmit }: { empresaId: string; categoriaInicial: string; companies: InventarioData["companies"]; branches: InventarioData["branches"]; producto?: Producto; pending: boolean; onClose: () => void; onSubmit: (form: FormData) => void }) {
+  const [categoria, setCategoria] = useState(producto?.categoria ?? categoriaInicial);
+  const esMontura = categoria === "montura" || categoria === "gafas_sol";
+  const editando = !!producto;
+  const [marca, setMarca] = useState(producto?.marca ?? "");
+  const [modelo, setModelo] = useState(producto?.modelo ?? "");
+  const [color, setColor] = useState(producto?.color ?? "");
+  const nombreAuto = [marca, modelo, color].filter((v) => v.trim()).join(" ") || (producto?.nombre ?? "");
+  return <div className="modal-backdrop"><section className="new-patient-modal sale-modal-shell" role="dialog" aria-modal="true" aria-labelledby="new-prod-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button><p className="section-label">{editando ? "EDITAR PRODUCTO" : "NUEVO PRODUCTO"}</p><h2 id="new-prod-title">{editando ? producto.nombre : "Agregar al catálogo"}</h2><form onSubmit={(event) => { event.preventDefault(); onSubmit(new FormData(event.currentTarget)); }}>
+    {editando && <input type="hidden" name="producto_id" value={producto.id} />}
+    {esMontura && <input type="hidden" name="nombre" value={nombreAuto} />}
+    <div className="new-patient-form">
+      {!esMontura && <label>Nombre<input name="nombre" defaultValue={producto?.nombre} required /></label>}
+      <label>Categoría<select name="categoria" value={categoria} onChange={(event) => setCategoria(event.target.value)}>{categorias.map((c) => <option key={c} value={c}>{categoriaLabel[c]}</option>)}</select></label>
+      <label>Empresa<select name="empresa_id" defaultValue={producto?.empresa_id ?? empresaId}>{companies.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></label>
+      <label>Proveedor<input name="proveedor" defaultValue={producto?.proveedor ?? ""} placeholder="Ej.: OPTEC, Provisión, Indulentes" /></label>
+    </div>
+
+    {esMontura ? <>
+      <div className="new-patient-form" style={{ marginTop: 10 }}>
+        <label>Marca<input value={marca} onChange={(event) => setMarca(event.target.value)} /></label>
+        <label>Modelo<input value={modelo} onChange={(event) => setModelo(event.target.value)} /></label>
+        <label>Color<input value={color} onChange={(event) => setColor(event.target.value)} /></label>
+        <label>Material<input name="material" defaultValue={producto?.material ?? ""} placeholder="Ej.: Acetato, Metal, TR90" /></label>
+        <label>Tipo<input name="clasificacion" defaultValue={producto?.clasificacion ?? ""} placeholder="Ej.: Oftálmico, Sol" /></label>
+        <label>Barcode<input name="codigo_barra" defaultValue={producto?.codigo_barra ?? ""} placeholder="Dejar en blanco para crear uno automático" /></label>
+        <label>Código<input name="codigo" defaultValue={producto?.codigo ?? ""} /></label>
+        <label className="receta-option-header" style={{ padding: "8px 0" }}><input type="checkbox" name="consignacion" value="si" defaultChecked={producto?.consignacion ?? false} /> Consignación</label>
+      </div>
+      <p className="section-label" style={{ marginTop: 14 }}>PRECIOS</p>
+      <div className="new-patient-form">
+        <label>Costo proveedor predeterminado<input name="costo_referencial" defaultValue={producto?.costo_referencial ?? ""} type="number" min="0" step="0.01" /></label>
+        <label>Precio al público<input name="precio_venta" defaultValue={producto?.precio_venta} required type="number" min="0" step="0.01" /></label>
+        <label>Precio al público 2<input name="precio_venta_2" defaultValue={producto?.precio_venta_2 ?? ""} type="number" min="0" step="0.01" /></label>
+        <label>Precio al público 3<input name="precio_venta_3" defaultValue={producto?.precio_venta_3 ?? ""} type="number" min="0" step="0.01" /></label>
+      </div>
+      <p className="section-label" style={{ marginTop: 14 }}>MEDIDAS Y COMPRA</p>
+      <div className="new-patient-form">
+        <label>Puente<input name="medida_puente" defaultValue={producto?.medida_puente ?? ""} type="number" min="0" step="0.1" /></label>
+        <label>Fecha de compra<input name="fecha_compra" defaultValue={producto?.fecha_compra ?? ""} type="date" /></label>
+        {!editando && <label>Sucursal para el stock inicial<select name="sucursal_id" defaultValue=""><option value="">Sin cargar stock (solo crear catálogo)</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label>}
+        {!editando && <label>Cantidad inicial<input name="cantidad_inicial" type="number" min="0" step="1" placeholder="0" /></label>}
+      </div>
+      <input type="hidden" name="controla_inventario" value="si" />
+    </> : <div className="new-patient-form" style={{ marginTop: 10 }}>
+      <label>Clasificación<input name="clasificacion" defaultValue={producto?.clasificacion ?? ""} placeholder="Ej.: Fino, Fino con estuche, Exclusivo" /></label>
+      <label>Código<input name="codigo" defaultValue={producto?.codigo ?? ""} /></label>
+      <label>Código de la varilla<input name="codigo_barra" defaultValue={producto?.codigo_barra ?? ""} /></label>
+      <label>Precio de venta<input name="precio_venta" defaultValue={producto?.precio_venta} required type="number" min="0" step="0.01" /></label>
+      <label>Costo referencial<input name="costo_referencial" defaultValue={producto?.costo_referencial ?? ""} type="number" min="0" step="0.01" /></label>
+      <label>¿Controla stock?<select name="controla_inventario" defaultValue={producto ? (producto.controla_inventario ? "si" : "no") : "si"}><option value="si">Sí, es un producto físico</option><option value="no">No, es un servicio</option></select></label>
+    </div>}
+  {esMontura && !nombreAuto.trim() && <p className="field-hint">Completa al menos marca, modelo o color para identificar este armazón.</p>}
+  <div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" disabled={pending || (esMontura && !nombreAuto.trim())} type="submit">{pending ? "Guardando…" : editando ? "Guardar cambios" : "Guardar producto"}</button></div></form></section></div>;
 }
 
 function MovimientoModal({ productos, branches, pending, onClose, onSubmit }: { productos: Producto[]; branches: InventarioData["branches"]; pending: boolean; onClose: () => void; onSubmit: (form: FormData) => void }) {
