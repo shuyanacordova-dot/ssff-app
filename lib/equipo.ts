@@ -1,4 +1,5 @@
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
+import { createSupabaseAdminClient, hasSupabaseAdminConfiguration } from "@/lib/supabase/admin";
 
 export type Colaborador = { id: string; auth_user_id: string; nombre: string; email: string; rol: string; activo: boolean; empresa_id: string; empresa_nombre: string; sucursal_id: string | null; sucursal_nombre: string | null };
 export type EquipoData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; colaboradores: Colaborador[] };
@@ -15,11 +16,13 @@ export async function getEquipoData(): Promise<EquipoData> {
     const profile = rawProfile as unknown as { id: string; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null } | null;
     const role = roleName(profile?.roles ?? null);
     if (profileError || !profile?.activo || role !== "superadmin") return { status: "forbidden", message: "Solo la administración general puede gestionar al equipo.", colaboradores: [] };
+    if (!hasSupabaseAdminConfiguration()) return { status: "error", message: "Falta configurar la clave de servicio de Supabase en el servidor.", colaboradores: [] };
 
+    const admin = createSupabaseAdminClient();
     const [usuariosResult, empresasResult, sucursalesResult] = await Promise.all([
-      supabase.from("usuarios").select("id,auth_user_id,nombre,email,activo,empresa_id,sucursal_id,roles(nombre)").order("nombre"),
-      supabase.from("empresas").select("id,nombre"),
-      supabase.from("sucursales").select("id,nombre"),
+      admin.from("usuarios").select("id,auth_user_id,nombre,email,activo,empresa_id,sucursal_id,roles(nombre)").order("nombre"),
+      admin.from("empresas").select("id,nombre"),
+      admin.from("sucursales").select("id,nombre"),
     ]);
     if (usuariosResult.error || empresasResult.error || sucursalesResult.error) return { status: "error", message: "No se pudo cargar el equipo.", colaboradores: [] };
 
