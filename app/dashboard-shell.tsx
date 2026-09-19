@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BarChart3, Banknote, Building2, CalendarDays, ClipboardList, Coins, Glasses, FileBarChart, Landmark, LogOut, Package, Search, ShieldCheck, UserPlus, Wallet } from "lucide-react";
+import { BarChart3, Banknote, Building2, CalendarDays, ClipboardList, Coins, Glasses, FileBarChart, KeyRound, Landmark, LogOut, Package, Search, ShieldCheck, UserPlus, Wallet } from "lucide-react";
 import type { TaskData } from "@/lib/tasks";
 import TaskBoard from "./tareas/task-board";
 import { cerrarSesion } from "./login/actions";
@@ -34,6 +34,7 @@ export default function DashboardShell({ taskData }: { taskData: TaskData }) {
           <Link className="dashboard-nav-item" href="/inventario?grupo=monturas"><Package size={18} /> Inventario de monturas y accesorios</Link>
           <Link className="dashboard-nav-item" href="/inventario?grupo=lunas"><Glasses size={18} /> Inventario de lunas</Link>
           {canVerInformes && <Link className="dashboard-nav-item" href="/informes"><BarChart3 size={18} /> Informes</Link>}
+          {isSuperadmin && <Link className="dashboard-nav-item" href="/equipo"><KeyRound size={18} /> Equipo y contraseñas</Link>}
         </nav>
         <div className="shared-note"><ShieldCheck size={16} /><span>Tu rol define qué módulos puedes usar.</span></div>
       </aside>
