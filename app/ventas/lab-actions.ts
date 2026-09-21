@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { OrdenLaboratorio, OrdenLaboratorioMedidas, OrdenLaboratorioRx, RefraccionOption } from "@/lib/laboratorio";
+import { estadoOrdenLabels, type OrdenLaboratorio, type OrdenLaboratorioMedidas, type OrdenLaboratorioRx, type RefraccionOption } from "@/lib/laboratorio";
 
 export async function getRefraccionesPaciente(pacienteId: string): Promise<RefraccionOption[]> {
   if (!pacienteId) return [];
@@ -71,7 +71,8 @@ export async function getOrdenLaboratorio(ordenId: string): Promise<OrdenLaborat
 export async function cambiarEstadoOrdenLaboratorio(ordenId: string, estado: string) {
   const supabase = await createSupabaseServerClient();
   if (!ordenId) throw new Error("Falta identificar la orden.");
+  if (!(estado in estadoOrdenLabels)) throw new Error("El estado seleccionado no es válido.");
   const { error } = await supabase.from("ordenes_laboratorio").update({ estado, actualizado_en: new Date().toISOString() }).eq("id", ordenId);
   if (error) throw new Error(error.message || "No se pudo actualizar el estado de la orden.");
-  revalidatePath("/ventas"); revalidatePath("/pacientes");
+  revalidatePath("/ventas"); revalidatePath("/pacientes"); revalidatePath("/laboratorio");
 }

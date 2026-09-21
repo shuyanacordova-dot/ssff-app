@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { iniciarSesion } from "./actions";
 
 type LoginPageProps = {
@@ -18,7 +19,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className="login-page">
       <form action={iniciarSesion} className="login-card">
-        <p className="brand-mark"><span className="ring" /> Shuvisión OS</p>
+        <p className="brand-mark"><Image className="login-brand-logo" src="/logos/shuvision-logo.png" alt="Shuvisión" width={42} height={42} priority /> Shuvisión OS</p>
         <h1>Ingresa a tu cuenta</h1>
         <p className="login-copy">Tu rol define qué información puedes ver y qué acciones puedes realizar.</p>
         <input type="hidden" name="next" value={next} />

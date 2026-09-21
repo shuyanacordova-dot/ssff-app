@@ -1,10 +1,12 @@
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
+import { getOperationalContext } from "@/lib/operational-context";
+import { loadBranchIdentities, type BranchIdentity, type CompanyIdentity } from "@/lib/sucursales";
 
 export type SaleStatus = "borrador" | "completada" | "anulada";
 export type PaymentMethod = "efectivo" | "transferencia" | "tarjeta" | "credito" | "otro";
 export type SaleProduct = { id: string; empresa_id: string; nombre: string; categoria: string; precio_venta: number; controla_inventario: boolean };
-export type SaleCompany = { id: string; nombre: string; direccion: string | null; telefono: string | null; email: string | null; logo_url: string | null };
-export type SaleBranch = { id: string; empresa_id: string; nombre: string };
+export type SaleCompany = CompanyIdentity;
+export type SaleBranch = BranchIdentity;
 export type SaleStock = { producto_id: string; sucursal_id: string; cantidad: number };
 export type SaleItem = { id: string; producto_id: string | null; descripcion: string; cantidad: number; precio_unitario: number; descuento: number; total_linea: number };
 export type SalePayment = { id: string; metodo: PaymentMethod; monto: number; referencia: string | null; banco: string | null; creado_en: string };
@@ -31,15 +33,16 @@ export async function getVentasData(): Promise<VentasData> {
     const role = roleName(profile);
     if (profileError || !profile?.activo || !role || !salesRoles.has(role)) return { status: "forbidden", message: "Tu perfil no tiene permiso para ventas.", ...empty };
 
-    const [productsResult, salesResult, companiesResult, branchesResult, patientsResult, empresasConvenioResult] = await Promise.all([
+    const [productsResult, salesResult, companiesResult, branchesResult, patientsResult, empresasConvenioResult, operationalContext] = await Promise.all([
       supabase.from("productos_catalogo").select("id,empresa_id,nombre,categoria,precio_venta,controla_inventario").eq("activo", true).order("nombre").limit(200),
       supabase.from("ventas").select("id,empresa_id,sucursal_id,paciente_id,cliente_nombre,estado,subtotal,descuento,total,pagado,saldo,motivo_anulacion,recibo_token,fecha_entrega_estimada,creado_en,folio,venta_items(id,producto_id,descripcion,cantidad,precio_unitario,descuento,total_linea),pagos_venta(id,metodo,monto,referencia,banco,creado_en)").order("creado_en", { ascending: false }).limit(30),
       supabase.from("empresas").select("id,nombre,direccion,telefono,email,logo_url").eq("activo", true).order("nombre"),
-      supabase.from("sucursales").select("id,empresa_id,nombre").eq("activo", true).order("nombre"),
+      loadBranchIdentities(supabase),
       supabase.from("pacientes_clinicos").select("id,nombres,apellidos,cedula,telefono").order("apellidos").order("nombres").limit(500),
       supabase.from("empresas_convenio").select("id,nombre").eq("activo", true).order("nombre"),
+      getOperationalContext(),
     ]);
-    if (productsResult.error || salesResult.error || companiesResult.error || branchesResult.error) return { status: "error", message: "No se pudo cargar ventas. Revisa la conexión y los permisos.", ...empty };
+    if (productsResult.error || salesResult.error || companiesResult.error) return { status: "error", message: "No se pudo cargar ventas. Revisa la conexión y los permisos.", ...empty };
 
     const productIds = (productsResult.data ?? []).map((product) => product.id);
     const stockResult = productIds.length ? await supabase.from("inventario_stock").select("producto_id,sucursal_id,cantidad").in("producto_id", productIds) : { data: [], error: null };
@@ -53,12 +56,12 @@ export async function getVentasData(): Promise<VentasData> {
 
     return {
       status: "ready",
-      profile: { id: profile.id, empresa_id: profile.empresa_id, sucursal_id: profile.sucursal_id, rol: role },
+      profile: { id: profile.id, empresa_id: operationalContext?.activeCompany.id ?? profile.empresa_id, sucursal_id: operationalContext?.activeBranch.id ?? profile.sucursal_id, rol: role },
       products: (productsResult.data ?? []) as SaleProduct[],
       stock: stockResult.data ?? [],
       sales: (salesResult.data ?? []) as unknown as Sale[],
       companies: (companiesResult.data ?? []) as SaleCompany[],
-      branches: (branchesResult.data ?? []) as SaleBranch[],
+      branches: branchesResult.branches,
       patients: patientsResult.error ? [] : (patientsResult.data ?? []),
       labOrders: labOrdersResult.error ? [] : (labOrdersResult.data ?? []),
       garantias: garantiasResult.error ? [] : ((garantiasResult.data ?? []) as unknown as Garantia[]),

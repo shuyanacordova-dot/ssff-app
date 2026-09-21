@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient, hasSupabaseAdminConfiguration } from "@/lib/supabase/admin";
 import type { ClinicalPhoto, Consultation, PatientRecord, PatientSale } from "@/lib/clinical";
 import type { Garantia, SaleLabOrder } from "@/lib/ventas";
+import { getOperationalContext } from "@/lib/operational-context";
 
 const clinicalRoles = new Set(["superadmin", "admin_sucursal", "optometra"]);
 const text = (data: FormData, name: string) => typeof data.get(name) === "string" ? String(data.get(name)).trim() : "";
@@ -19,7 +21,8 @@ async function currentClinicalProfile() {
   const profile = raw as unknown as UserProfile | null;
   const role = roleName(profile);
   if (!profile?.activo || !role || !clinicalRoles.has(role)) throw new Error("No tienes permiso clínico para esta acción.");
-  return { supabase, profile, role };
+  const context = await getOperationalContext();
+  return { supabase, profile: { ...profile, empresa_id: context?.activeCompany.id ?? profile.empresa_id, sucursal_id: context?.activeBranch.id ?? profile.sucursal_id }, role };
 }
 
 export async function crearPacienteClinico(data: FormData) {
@@ -99,11 +102,19 @@ export async function obtenerHistorialPaciente(pacienteId: string): Promise<{ co
   const { supabase } = await currentClinicalProfile();
   if (!pacienteId) throw new Error("Falta identificar al paciente.");
   const [consultationsResult, photosResult, salesResult] = await Promise.all([
-    supabase.from("consultas_optometricas").select("id,paciente_id,fecha_consulta,motivo_consulta,antecedentes,agudeza_visual,lensometria,queratometria,autorefractor,refraccion,examen_binocular,biomicroscopia,impresion_diagnostica,receta,plan_manejo,observaciones").eq("paciente_id", pacienteId).order("fecha_consulta", { ascending: false }).limit(150),
+    supabase.from("consultas_optometricas").select("id,paciente_id,empresa_atencion_id,sucursal_atencion_id,optometrista_id,fecha_consulta,motivo_consulta,antecedentes,agudeza_visual,lensometria,queratometria,autorefractor,refraccion,examen_binocular,biomicroscopia,impresion_diagnostica,receta,plan_manejo,observaciones").eq("paciente_id", pacienteId).order("fecha_consulta", { ascending: false }).limit(150),
     supabase.from("historia_fotos").select("id,paciente_id,consulta_id,tipo,descripcion,storage_path,creado_en").eq("paciente_id", pacienteId).order("creado_en", { ascending: false }).limit(150),
     supabase.from("ventas").select("id,empresa_id,sucursal_id,paciente_id,cliente_nombre,estado,subtotal,descuento,total,pagado,saldo,motivo_anulacion,recibo_token,fecha_entrega_estimada,creado_en,folio,venta_items(id,producto_id,descripcion,cantidad,precio_unitario,descuento,total_linea),pagos_venta(id,metodo,monto,referencia,banco,creado_en)").eq("paciente_id", pacienteId).order("creado_en", { ascending: false }).limit(150),
   ]);
   if (consultationsResult.error || photosResult.error) throw new Error("No se pudieron leer los detalles clínicos.");
+  const consultationRows = consultationsResult.data ?? [];
+  const optometristaIds = Array.from(new Set(consultationRows.map((consultation) => consultation.optometrista_id).filter(Boolean))) as string[];
+  const optometristasResult = optometristaIds.length
+    ? hasSupabaseAdminConfiguration()
+      ? await createSupabaseAdminClient().from("usuarios").select("id,nombre").in("id", optometristaIds)
+      : await supabase.from("usuarios").select("id,nombre").in("id", optometristaIds)
+    : { data: [] as { id: string; nombre: string }[], error: null };
+  const optometristaNombre = new Map((optometristasResult.data ?? []).map((usuario) => [usuario.id, usuario.nombre]));
   const photoRows = photosResult.data ?? [];
   const signed = photoRows.length ? await supabase.storage.from("historias").createSignedUrls(photoRows.map((photo) => photo.storage_path), 3600) : { data: [] as { path: string; signedUrl: string }[] };
   const urlByPath = new Map((signed.data ?? []).map((item) => [item.path, item.signedUrl]));
@@ -114,7 +125,7 @@ export async function obtenerHistorialPaciente(pacienteId: string): Promise<{ co
     supabase.from("garantias").select("id,venta_id,venta_item_id,tipo,motivo,estado,orden_laboratorio_id,notas,creado_en").in("venta_id", saleIds).order("creado_en", { ascending: false }),
   ]) : [{ data: [], error: null }, { data: [], error: null }];
   return {
-    consultations: (consultationsResult.data ?? []) as unknown as Consultation[],
+    consultations: consultationRows.map((consultation) => ({ ...consultation, optometrista_nombre: consultation.optometrista_id ? optometristaNombre.get(consultation.optometrista_id) ?? null : null })) as unknown as Consultation[],
     photos: photoRows.map((photo) => ({ ...photo, url: urlByPath.get(photo.storage_path) ?? null })) as ClinicalPhoto[],
     sales,
     labOrders: labOrdersResult.error ? [] : (labOrdersResult.data ?? []),

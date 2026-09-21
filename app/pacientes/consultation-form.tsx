@@ -55,9 +55,9 @@ export default function ConsultationModal({ pacienteId, onClose, onSaved }: { pa
     <div className="eye-grid"><EyeRxCard eye="OD" prefix="lens_od" /><EyeRxCard eye="OI" prefix="lens_oi" /></div>
 
     <p className="section-label">QUERATOMETRÍA</p>
-    <div className="new-patient-form">
-      <label>OD K1<input name="quera_od_k1" value={k.odK1} onChange={(event) => setK({ ...k, odK1: event.target.value })} /></label><label>OD K2<input name="quera_od_k2" value={k.odK2} onChange={(event) => setK({ ...k, odK2: event.target.value })} /></label><label>OD eje<input name="quera_od_eje" /></label>
-      <label>OI K1<input name="quera_oi_k1" value={k.oiK1} onChange={(event) => setK({ ...k, oiK1: event.target.value })} /></label><label>OI K2<input name="quera_oi_k2" value={k.oiK2} onChange={(event) => setK({ ...k, oiK2: event.target.value })} /></label><label>OI eje<input name="quera_oi_eje" /></label>
+    <div className="quera-entry-grid">
+      <div className="quera-entry-row"><strong>OD</strong><label>K1<input name="quera_od_k1" value={k.odK1} onChange={(event) => setK({ ...k, odK1: event.target.value })} /></label><label>K2<input name="quera_od_k2" value={k.odK2} onChange={(event) => setK({ ...k, odK2: event.target.value })} /></label><label>Eje<input name="quera_od_eje" /></label></div>
+      <div className="quera-entry-row"><strong>OI</strong><label>K1<input name="quera_oi_k1" value={k.oiK1} onChange={(event) => setK({ ...k, oiK1: event.target.value })} /></label><label>K2<input name="quera_oi_k2" value={k.oiK2} onChange={(event) => setK({ ...k, oiK2: event.target.value })} /></label><label>Eje<input name="quera_oi_eje" /></label></div>
     </div>
     <p className="astig-value">Astigmatismo corneal estimado — OD: {astig(k.odK1, k.odK2) || "—"} · OI: {astig(k.oiK1, k.oiK2) || "—"}</p>
 

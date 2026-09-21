@@ -1,4 +1,5 @@
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
+import { getOperationalContext } from "@/lib/operational-context";
 
 export type AgendaStatus = "programada" | "confirmada" | "atendida" | "cancelada" | "no_asistio";
 export type AgendaPatient = { id: string; nombres: string; apellidos: string; cedula: string | null; telefono: string | null };
@@ -24,18 +25,19 @@ export async function getAgendaData(): Promise<AgendaData> {
     const role = roleName(profile);
     if (profileError || !profile?.activo || !role || !clinicalRoles.has(role)) return { status: "forbidden", message: "Tu perfil no tiene permiso para la agenda clínica.", ...empty };
 
-    const [appointmentsResult, patientsResult, companiesResult, branchesResult, teamResult] = await Promise.all([
+    const [appointmentsResult, patientsResult, companiesResult, branchesResult, teamResult, operationalContext] = await Promise.all([
       supabase.from("citas_agenda").select("id,paciente_id,empresa_atencion_id,sucursal_atencion_id,responsable_id,inicio,duracion_minutos,tipo,motivo,notas_agenda,estado").order("inicio", { ascending: true }).limit(500),
       supabase.from("pacientes_clinicos").select("id,nombres,apellidos,cedula,telefono").order("apellidos").order("nombres").limit(500),
       supabase.from("empresas").select("id,nombre,slug").eq("activo", true).order("nombre"),
       supabase.from("sucursales").select("id,empresa_id,nombre,ciudad").order("nombre"),
       supabase.rpc("directorio_tareas"),
+      getOperationalContext(),
     ]);
     if (appointmentsResult.error || patientsResult.error || companiesResult.error || branchesResult.error || teamResult.error) return { status: "error", message: "No se pudo cargar la agenda. Revisa la conexión y los permisos.", ...empty };
 
     return {
       status: "ready",
-      profile: { id: profile.id, nombre: profile.nombre, empresa_id: profile.empresa_id, sucursal_id: profile.sucursal_id, rol: role },
+      profile: { id: profile.id, nombre: profile.nombre, empresa_id: operationalContext?.activeCompany.id ?? profile.empresa_id, sucursal_id: operationalContext?.activeBranch.id ?? profile.sucursal_id, rol: role },
       appointments: (appointmentsResult.data ?? []) as Appointment[],
       patients: (patientsResult.data ?? []) as AgendaPatient[],
       companies: (companiesResult.data ?? []) as AgendaCompany[],

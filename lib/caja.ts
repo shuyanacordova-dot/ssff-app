@@ -1,4 +1,5 @@
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
+import { getOperationalContext } from "@/lib/operational-context";
 
 export type Banco = "pichincha" | "guayaquil" | "internacional";
 export type CuentaBancaria = { id: string; empresa_id: string; banco: Banco; saldo_actual: number };
@@ -25,12 +26,13 @@ export async function getCajaData(): Promise<CajaData> {
     const role = roleName(profile);
     if (profileError || !profile?.activo || !role || !cajaRoles.has(role)) return { status: "forbidden", message: "Tu perfil no tiene permiso para caja.", ...empty };
 
-    const [companiesResult, branchesResult, cuentasResult, gastosResult, cierresResult] = await Promise.all([
+    const [companiesResult, branchesResult, cuentasResult, gastosResult, cierresResult, operationalContext] = await Promise.all([
       supabase.from("empresas").select("id,nombre").eq("activo", true).order("nombre"),
       supabase.from("sucursales").select("id,empresa_id,nombre").eq("activo", true).order("nombre"),
       supabase.from("cuentas_bancarias").select("id,empresa_id,banco,saldo_actual").eq("activo", true).order("banco"),
       supabase.from("gastos").select("id,empresa_id,sucursal_id,fecha,clasificacion,concepto,monto,origen,cuenta_bancaria_id,observaciones,creado_en").order("fecha", { ascending: false }).limit(100),
       supabase.from("cierres_caja").select("id,empresa_id,sucursal_id,fecha,responsable_id,caja_anterior,caja_fisica,ventas_brutas,cobro_efectivo,cobro_tarjeta,cobro_transferencia_pichincha,cobro_transferencia_guayaquil,cobro_transferencia_internacional,cobro_credito,cobro_otro,egresos_efectivo,egresos_banco,deposito_pichincha,deposito_guayaquil,deposito_internacional,depositos,caja_esperada,diferencia,check_cobros_ventas,check_caja_fisica,cuadre_correcto,observaciones,creado_en").order("fecha", { ascending: false }).limit(60),
+      getOperationalContext(),
     ]);
     if (companiesResult.error || branchesResult.error || cuentasResult.error || gastosResult.error || cierresResult.error) return { status: "error", message: "No se pudo cargar caja. Revisa la conexión y los permisos.", ...empty };
 
@@ -40,7 +42,7 @@ export async function getCajaData(): Promise<CajaData> {
 
     return {
       status: "ready",
-      profile: { id: profile.id, empresa_id: profile.empresa_id, sucursal_id: profile.sucursal_id, rol: role },
+      profile: { id: profile.id, empresa_id: operationalContext?.activeCompany.id ?? profile.empresa_id, sucursal_id: operationalContext?.activeBranch.id ?? profile.sucursal_id, rol: role },
       companies: companiesResult.data ?? [],
       branches: branchesResult.data ?? [],
       cuentas: (cuentasResult.data ?? []) as CuentaBancaria[],

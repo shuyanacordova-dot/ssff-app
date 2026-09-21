@@ -37,16 +37,17 @@ function EyeTable({ data, columns }: { data: Record<string, string> | null | und
   </table>;
 }
 
-export default function ConsultationDetailModal({ consultation, patient, company, onClose }: { consultation: Consultation; patient: PatientRecord; company?: SaleCompany; onClose: () => void }) {
+export default function ConsultationDetailModal({ consultation, patient, company, branchName, onClose }: { consultation: Consultation; patient: PatientRecord; company?: SaleCompany; branchName?: string; onClose: () => void }) {
   const receta = consultation.receta;
   const patientName = `${patient.nombres} ${patient.apellidos}`;
   const edad = calcularEdad(patient.fecha_nacimiento);
   return <div className="modal-backdrop"><section className="new-patient-modal task-modal lab-modal" role="dialog" aria-modal="true" aria-labelledby="consultation-detail-title"><button className="modal-close no-print" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>
     <div className="print-area print-a4">
-      <Letterhead company={company} />
+      <Letterhead company={company} subtitle={branchName} />
       <p className="section-label">REVISIÓN</p>
       <h2 id="consultation-detail-title">{patientName}</h2>
       <p className="field-hint">{formatDate(consultation.fecha_consulta)} · {consultation.motivo_consulta || "Sin motivo registrado"}</p>
+      <p className="consultation-professional"><strong>Examen realizado por:</strong> {consultation.optometrista_nombre || "Profesional no identificado"}</p>
 
       <p className="section-label" style={{ marginTop: 14 }}>DATOS DEL PACIENTE</p>
       <div className="consultation-stats">
