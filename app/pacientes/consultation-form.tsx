@@ -2,6 +2,7 @@
 import { X } from "lucide-react";
 import { useState, useTransition } from "react";
 import { crearConsulta } from "./actions";
+import type { ClinicalOptometrist } from "@/lib/clinical";
 
 const astig = (k1: string, k2: string) => { const a = Number(k1); const b = Number(k2); return k1 !== "" && k2 !== "" && Number.isFinite(a) && Number.isFinite(b) ? `${Math.abs(a - b).toFixed(2)} D estimado` : ""; };
 const hyloSystaneProductos = ["Hylo-Comod", "Hylo-Gel", "Hylo-Forte", "Hylo-Fresh", "Hylo Dual", "Hylo Care", "Systane Ultra", "Systane Balance", "Systane Complete", "Systane Gel", "Systane Hydration", "Systane Ultra PF"];
@@ -22,7 +23,7 @@ function EyeRxCard({ eye, prefix, showDnp, showAv = true }: { eye: "OD" | "OI"; 
   </div>;
 }
 
-export default function ConsultationModal({ pacienteId, onClose, onSaved }: { pacienteId: string; onClose: () => void; onSaved: (message: string) => void }) {
+export default function ConsultationModal({ pacienteId, optometrists, defaultOptometristId, onClose, onSaved }: { pacienteId: string; optometrists: ClinicalOptometrist[]; defaultOptometristId?: string; onClose: () => void; onSaved: (message: string) => void }) {
   const [pending, start] = useTransition();
   const [k, setK] = useState({ odK1: "", odK2: "", oiK1: "", oiK2: "" });
   const [receta, setReceta] = useState({ lagrimas: false, vitaminas: false, terapia: false });
@@ -103,10 +104,14 @@ export default function ConsultationModal({ pacienteId, onClose, onSaved }: { pa
 
     <div className="new-patient-form" style={{ marginTop: 14 }}><label className="task-description">Observaciones<textarea name="observaciones" /></label></div>
 
+    <p className="section-label">PROFESIONAL QUE ATENDIÓ</p>
+    <div className="new-patient-form"><label className="task-description">Revisión realizada por<select name="optometrista_id" required defaultValue={optometrists.some((person) => person.id === defaultOptometristId) ? defaultOptometristId : (optometrists[0]?.id ?? "")}><option value="" disabled>Selecciona un optometrista</option>{optometrists.map((person) => <option key={person.id} value={person.id}>{person.nombre}</option>)}</select></label></div>
+    {!optometrists.length && <p className="notice">No hay optometristas activos disponibles. Activa o registra uno desde Equipo antes de guardar la revisión.</p>}
+
     <p className="section-label">SIGUIENTE CONSULTA</p>
     <div className="new-patient-form"><label>Próximo control<select name="siguiente_control" defaultValue=""><option value="">Sin agendar</option><option value="3m">En 3 meses</option><option value="6m">En 6 meses</option><option value="1a">En 1 año</option></select></label></div>
     <p className="field-hint">Si eliges un plazo, se crea automáticamente una cita programada en la agenda.</p>
 
-    <div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" disabled={pending} type="submit">{pending ? "Guardando…" : "Guardar consulta"}</button></div>
+    <div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" disabled={pending || !optometrists.length} type="submit">{pending ? "Guardando…" : "Guardar consulta"}</button></div>
   </form></section></div>;
 }

@@ -10,12 +10,13 @@ export type Consultation = { id: string; paciente_id: string; empresa_atencion_i
 export type ClinicalPhoto = { id: string; paciente_id: string; consulta_id: string | null; tipo: "foto" | "documento"; descripcion: string | null; storage_path: string; creado_en: string; url: string | null };
 export type PatientSale = Sale;
 export type ClinicalProfile = { id: string; nombre: string; rol: string; empresa_id: string; sucursal_id: string };
-export type ClinicalData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: ClinicalProfile; patients: PatientRecord[]; consultations: Consultation[]; photos: ClinicalPhoto[]; sales: PatientSale[]; companies: SaleCompany[]; products: SaleProduct[]; stock: SaleStock[]; branches: SaleBranch[]; empresasConvenio: EmpresaConvenio[]; labOrders: SaleLabOrder[]; garantias: Garantia[] };
+export type ClinicalOptometrist = { id: string; nombre: string };
+export type ClinicalData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: ClinicalProfile; patients: PatientRecord[]; consultations: Consultation[]; photos: ClinicalPhoto[]; sales: PatientSale[]; companies: SaleCompany[]; products: SaleProduct[]; stock: SaleStock[]; branches: SaleBranch[]; optometrists: ClinicalOptometrist[]; empresasConvenio: EmpresaConvenio[]; labOrders: SaleLabOrder[]; garantias: Garantia[] };
 
 type UserProfile = { id: string; nombre: string; empresa_id: string; sucursal_id: string; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null };
 const clinicalRoles = new Set(["superadmin", "admin_sucursal", "optometra"]);
 const roleName = (profile: UserProfile | null) => Array.isArray(profile?.roles) ? profile.roles[0]?.nombre : profile?.roles?.nombre;
-const empty = { patients: [], consultations: [], photos: [], sales: [], companies: [], products: [], stock: [], branches: [], empresasConvenio: [], labOrders: [], garantias: [] };
+const empty = { patients: [], consultations: [], photos: [], sales: [], companies: [], products: [], stock: [], branches: [], optometrists: [], empresasConvenio: [], labOrders: [], garantias: [] };
 
 export async function getClinicalData(): Promise<ClinicalData> {
   if (!hasSupabaseConfiguration()) return { status: "needs_configuration", message: "Falta configurar la conexión segura de esta copia local.", ...empty };
@@ -33,13 +34,14 @@ export async function getClinicalData(): Promise<ClinicalData> {
     const ids = (patients ?? []).map((patient) => patient.id);
     if (!ids.length) return { status: "ready", profile: { id: profile.id, nombre: profile.nombre, rol: role, empresa_id: profile.empresa_id, sucursal_id: profile.sucursal_id }, ...empty };
 
-    const [consultationsResult, photosResult, salesResult, companiesResult, productsResult, branchesResult, empresasConvenioResult, operationalContext] = await Promise.all([
+    const [consultationsResult, photosResult, salesResult, companiesResult, productsResult, branchesResult, teamResult, empresasConvenioResult, operationalContext] = await Promise.all([
       supabase.from("consultas_optometricas").select("id,paciente_id,empresa_atencion_id,sucursal_atencion_id,optometrista_id,fecha_consulta,motivo_consulta,antecedentes,agudeza_visual,lensometria,queratometria,autorefractor,refraccion,examen_binocular,biomicroscopia,impresion_diagnostica,receta,plan_manejo,observaciones").in("paciente_id", ids).order("fecha_consulta", { ascending: false }).limit(150),
       supabase.from("historia_fotos").select("id,paciente_id,consulta_id,tipo,descripcion,storage_path,creado_en").in("paciente_id", ids).order("creado_en", { ascending: false }).limit(150),
       supabase.from("ventas").select("id,empresa_id,sucursal_id,paciente_id,cliente_nombre,estado,subtotal,descuento,total,pagado,saldo,motivo_anulacion,recibo_token,fecha_entrega_estimada,creado_en,folio,venta_items(id,producto_id,descripcion,cantidad,precio_unitario,descuento,total_linea),pagos_venta(id,metodo,monto,referencia,banco,creado_en)").in("paciente_id", ids).order("creado_en", { ascending: false }).limit(150),
       supabase.from("empresas").select("id,nombre,direccion,telefono,email,logo_url").eq("activo", true).order("nombre"),
       supabase.from("productos_catalogo").select("id,empresa_id,nombre,categoria,precio_venta,controla_inventario").eq("activo", true).order("nombre").limit(200),
       loadBranchIdentities(supabase),
+      supabase.from("usuarios").select("id,nombre,activo,roles(nombre)").eq("activo", true).order("nombre"),
       supabase.from("empresas_convenio").select("id,nombre").eq("activo", true).order("nombre"),
       getOperationalContext(),
     ]);
@@ -77,6 +79,7 @@ export async function getClinicalData(): Promise<ClinicalData> {
       products: productsResult.error ? [] : ((productsResult.data ?? []) as SaleProduct[]),
       stock: stockResult.error ? [] : (stockResult.data ?? []),
       branches: branchesResult.branches as SaleBranch[],
+      optometrists: teamResult.error ? [] : (teamResult.data ?? []).filter((member) => roleName(member as unknown as UserProfile) === "optometra").map((member) => ({ id: member.id, nombre: member.nombre })),
       empresasConvenio: empresasConvenioResult.error ? [] : (empresasConvenioResult.data ?? []),
       labOrders: labOrdersResult.error ? [] : (labOrdersResult.data ?? []),
       garantias: garantiasResult.error ? [] : ((garantiasResult.data ?? []) as unknown as Garantia[]),

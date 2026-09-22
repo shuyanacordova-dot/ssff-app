@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { BarChart3, Banknote, Building2, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Coins, FlaskConical, Glasses, FileBarChart, Landmark, LogOut, Package, Palette, Search, Settings, ShieldCheck, Target, UserPlus, Wallet } from "lucide-react";
+import { BarChart3, Banknote, Building2, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Coins, FlaskConical, Glasses, FileBarChart, Landmark, LogOut, Package, Palette, Search, Settings, ShieldCheck, Sparkles, Target, UserPlus, Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { TaskData } from "@/lib/tasks";
 import type { InformeMensual } from "./informes/actions";
@@ -46,6 +46,7 @@ export default function DashboardShell({ taskData, informeMensual, metasMessage 
           <Link title="Nuevo paciente" className="dashboard-nav-item" href="/pacientes?new=1"><UserPlus size={18} /><span>Nuevo paciente</span></Link>
           <Link title="Buscar paciente" className="dashboard-nav-item" href="/pacientes"><Search size={18} /><span>Buscar paciente</span></Link>
           <Link title="Tareas y supervisión" className="dashboard-nav-item" href="/"><ClipboardList size={18} /><span>Tareas y supervisión</span></Link>
+          <Link title="Asistente Shu" className="dashboard-nav-item dashboard-nav-featured" href="/asistente"><Sparkles size={18} /><span>Asistente Shu</span></Link>
           {isSuperadmin && <Link title="Configuración y equipo" className="dashboard-nav-item dashboard-nav-settings" href="/equipo"><Settings size={18} /><span>Configuración y equipo</span></Link>}
           {isSuperadmin && <Link title="Sucursales e identidad" className="dashboard-nav-item dashboard-nav-settings" href="/configuracion/sucursales"><Palette size={18} /><span>Sucursales e identidad</span></Link>}
           <Link title="Agenda" className="dashboard-nav-item" href="/agenda"><CalendarDays size={18} /><span>Agenda</span></Link>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CircleAlert, FlaskConical, MoreVertical, Plus, Package, ReceiptText, ShieldCheck, Wallet, MessageCircle, X } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { Garantia, Sale, SaleItem, SaleLabOrder, SaleProduct, VentasData } from "@/lib/ventas";
+import { mensajeTicketVirtual } from "@/lib/mensajes";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import Cart from "./cart";
 import LabOrderModal from "./lab-order-modal";
@@ -70,7 +71,7 @@ export default function SalesBoard(props: VentasData) {
 
     {showProduct && <ProductModal companies={props.companies} defaultCompany={props.profile?.empresa_id ?? props.companies[0]?.id ?? ""} onClose={() => setShowProduct(false)} onCreate={createProduct} pending={pending} />}
     {anulling && <AnularModal sale={anulling} pending={pending} onClose={() => setAnulling(null)} onConfirm={(motivo) => anular(anulling, motivo)} />}
-    {labOrderContext && <LabOrderModal sale={labOrderContext.sale} lensItems={labOrderItemsFor(labOrderContext.sale)} productoById={productoById} existingOrderId={labOrderContext.orderId} esGarantia={labOrderContext.esGarantia} patientName={patientNameFor(labOrderContext.sale)} patientPhone={props.patients.find((p) => p.id === labOrderContext.sale.paciente_id)?.telefono} company={branchLetterhead(props.companies.find((c) => c.id === labOrderContext.sale.empresa_id), props.branches.find((b) => b.id === labOrderContext.sale.sucursal_id)) ?? undefined} onClose={() => setLabOrderContext(null)} onCreated={(message) => setNotice(message)} />}
+    {labOrderContext && <LabOrderModal sale={labOrderContext.sale} lensItems={labOrderItemsFor(labOrderContext.sale)} productoById={productoById} existingOrderId={labOrderContext.orderId} esGarantia={labOrderContext.esGarantia} patientName={patientNameFor(labOrderContext.sale)} patientPhone={props.patients.find((p) => p.id === labOrderContext.sale.paciente_id)?.telefono} company={branchLetterhead(props.companies.find((c) => c.id === labOrderContext.sale.empresa_id), props.branches.find((b) => b.id === labOrderContext.sale.sucursal_id)) ?? undefined} branchName={props.branches.find((b) => b.id === labOrderContext.sale.sucursal_id)?.nombre} onClose={() => setLabOrderContext(null)} onCreated={(message) => setNotice(message)} />}
     {reciboSale && <ReciboModal sale={reciboSale} patient={props.patients.find((p) => p.id === reciboSale.paciente_id)} onClose={() => setReciboSale(null)} onSaved={(message) => setNotice(message)} />}
     {detailSale && <VentaDetailModal sale={detailSale} companyName={props.companies.find((c) => c.id === detailSale.empresa_id)?.nombre ?? "Empresa"} patient={props.patients.find((p) => p.id === detailSale.paciente_id)} onClose={() => setDetailSale(null)} />}
     {garantiaModal && <GarantiaModal sales={props.sales.filter((s) => s.estado === "completada")} defaultVentaId={garantiaModal.defaultVentaId} productoById={productoById} patients={props.patients} onClose={() => setGarantiaModal(null)} onCreate={crearGarantiaSubmit} pending={pending} />}
@@ -170,13 +171,15 @@ export function AnularModal({ sale, pending, onClose, onConfirm }: { sale: Sale;
 export function ReciboModal({ sale, patient, onClose, onSaved }: { sale: Sale; patient?: { id: string; nombres: string; apellidos: string; telefono?: string | null }; onClose: () => void; onSaved: (message: string) => void }) {
   const [fecha, setFecha] = useState(sale.fecha_entrega_estimada ?? "");
   const [token, setToken] = useState(sale.recibo_token);
+  const [origin, setOrigin] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
   const link = `${origin}/recibo/${token}`;
   const nombre = patient ? patient.nombres : (sale.cliente_nombre || "Cliente");
-  const mensaje = `Hola ${nombre}! Aquí tienes tu recibo de SHUVISION con el detalle de tu compra y abonos, siempre actualizado: ${link}`;
+  const mensaje = mensajeTicketVirtual({ nombre, ticketUrl: link });
   const wa = enlaceWhatsapp(patient?.telefono, mensaje);
+
+  useEffect(() => { setOrigin(window.location.origin); }, []);
 
   const guardar = async () => {
     setSaving(true); setError("");
@@ -185,13 +188,15 @@ export function ReciboModal({ sale, patient, onClose, onSaved }: { sale: Sale; p
     setSaving(false);
   };
   const copiar = async () => { try { await navigator.clipboard.writeText(link); onSaved("Enlace del recibo copiado."); } catch { setError("No se pudo copiar el enlace."); } };
+  const copiarMensaje = async () => { try { await navigator.clipboard.writeText(mensaje); onSaved("Mensaje del ticket copiado."); } catch { setError("No se pudo copiar el mensaje."); } };
 
   return <div className="modal-backdrop"><section className="new-patient-modal" role="dialog" aria-modal="true" aria-labelledby="recibo-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button><p className="section-label">RECIBO VIRTUAL</p><h2 id="recibo-title">{nombre}</h2><p>Este enlace siempre muestra el estado más reciente de la venta: total, abonos y saldo. No necesitas volver a generarlo después de cada abono, se actualiza solo cada vez que alguien lo abre.</p>
     <div className="new-patient-form"><label>Fecha tentativa de entrega (opcional)<input type="date" value={fecha ?? ""} onChange={(event) => setFecha(event.target.value)} /></label></div>
     <div className="glass clinical-card" style={{ minHeight: "auto", padding: 12, margin: "12px 0", wordBreak: "break-all" }}><p className="section-label">ENLACE DEL RECIBO</p><p style={{ margin: 0 }}>{link}</p></div>
+    <div className="virtual-ticket-message"><p className="section-label">MENSAJE PARA EL PACIENTE</p><p>{mensaje}</p></div>
     {error && <p className="notice">{error}</p>}
     <div className="modal-actions" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-      <div style={{ display: "flex", gap: 8 }}><button className="outline-action" type="button" onClick={copiar}>Copiar enlace</button><button className="outline-action" type="button" onClick={guardar} disabled={saving}>{saving ? "Guardando…" : "Guardar fecha de entrega"}</button></div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button className="outline-action" type="button" onClick={copiar}>Copiar enlace</button><button className="outline-action" type="button" onClick={copiarMensaje}>Copiar mensaje</button><button className="outline-action" type="button" onClick={guardar} disabled={saving}>{saving ? "Guardando…" : "Guardar fecha de entrega"}</button></div>
       {wa ? <a className="new-consultation" href={wa} target="_blank" rel="noreferrer"><MessageCircle size={16} /> Enviar por WhatsApp</a> : <span style={{ color: "#a24150", fontSize: 13, fontWeight: 700 }}>Este paciente no tiene WhatsApp registrado.</span>}
     </div>
   </section></div>;

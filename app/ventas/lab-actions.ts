@@ -9,9 +9,13 @@ export async function getRefraccionesPaciente(pacienteId: string): Promise<Refra
   const supabase = await createSupabaseServerClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error("Tu sesión no es válida.");
-  const { data, error } = await supabase.from("consultas_optometricas").select("id,fecha_consulta,refraccion").eq("paciente_id", pacienteId).order("fecha_consulta", { ascending: false }).limit(30);
+  const { data, error } = await supabase.from("consultas_optometricas").select("id,fecha_consulta,refraccion,optometrista_id").eq("paciente_id", pacienteId).order("fecha_consulta", { ascending: false }).limit(30);
   if (error) return [];
-  return (data ?? []) as unknown as RefraccionOption[];
+  const rows = data ?? [];
+  const professionalIds = [...new Set(rows.map((row) => row.optometrista_id).filter(Boolean))] as string[];
+  const professionals = professionalIds.length ? await supabase.from("usuarios").select("id,nombre").in("id", professionalIds) : { data: [], error: null };
+  const names = new Map((professionals.data ?? []).map((professional) => [professional.id, professional.nombre]));
+  return rows.map((row) => ({ ...row, optometrista_nombre: row.optometrista_id ? names.get(row.optometrista_id) ?? null : null })) as unknown as RefraccionOption[];
 }
 
 export async function crearOrdenLaboratorio(form: FormData) {

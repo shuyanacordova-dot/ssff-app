@@ -6,7 +6,7 @@ import { useMemo, useState, useTransition } from "react";
 import type { LabMonitorData, LabMonitorOrder } from "@/lib/monitor-laboratorio";
 import { estadoOrdenLabels, laboratorioLabels, tipoLenteLabels, type EstadoOrdenLaboratorio } from "@/lib/laboratorio";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
-import Letterhead from "@/app/print-letterhead";
+import LabOrderPrint from "@/app/lab-order-print";
 import { cambiarEstadoOrdenLaboratorio } from "@/app/ventas/lab-actions";
 
 const statusOptions = Object.entries(estadoOrdenLabels) as [EstadoOrdenLaboratorio, string][];
@@ -100,15 +100,15 @@ function OrderCard({ order, pending, onOpen, onStatus }: { order: LabMonitorOrde
 }
 
 function OrderDetail({ order, pending, onClose, onStatus }: { order: LabMonitorOrder; pending: boolean; onClose: () => void; onStatus: (next: EstadoOrdenLaboratorio) => void }) {
-  const eyes = [["OD", order.rx?.od], ["OI", order.rx?.oi]] as const;
   return <div className="modal-backdrop"><section className="new-patient-modal lab-monitor-modal" role="dialog" aria-modal="true" aria-labelledby="lab-order-title"><button className="modal-close no-print" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>
     <div className="print-area print-a4">
-      <Letterhead company={order.membrete} subtitle={`Sucursal ${order.sucursal_nombre} · Orden de laboratorio`} />
+      <LabOrderPrint orderId={order.id} createdAt={order.creado_en} branchName={order.sucursal_nombre} patientName={order.paciente_nombre} patientPhone={order.paciente_telefono} productDescription={order.producto_descripcion} rx={order.rx} medidas={order.medidas} reviewerName={order.reviso_nombre} useLabel={order.uso_calculado === "lejos_y_cerca" ? "Todas" : order.uso_calculado === "cerca" ? "Cerca" : "Lejos"} notes={[`Laboratorio: ${laboratorioLabels[order.laboratorio] ?? order.laboratorio}`, `Tipo de lente: ${tipoLenteLabels[order.tipo_lente] ?? order.tipo_lente}`, order.notas].filter(Boolean).join(". ")} deliveryDate={order.fecha_entrega_estimada} saleFolio={order.venta_folio} company={order.membrete} warranty={order.es_garantia} />
+    </div>
+    <div className="no-print">
       <div className="lab-print-title"><div><p className="section-label">ORDEN DE TRABAJO</p><h2 id="lab-order-title">{order.paciente_nombre}</h2><p>{shortId(order)} · {date(order.creado_en)}</p></div><span className={`lab-status status-${order.estado}`}>{estadoOrdenLabels[order.estado]}</span></div>
       <div className="lab-flow-track" aria-label="Progreso de la orden">{flowStatuses.map((state, index) => { const currentIndex = flowStatuses.indexOf(order.estado); const complete = currentIndex >= index && order.estado !== "rechazado"; return <div key={state} className={`${complete ? "complete" : ""} ${order.estado === state ? "current" : ""}`}><span>{complete ? <CheckCircle2 size={13} /> : index + 1}</span><small>{estadoOrdenLabels[state]}</small></div>; })}</div>
       {order.estado === "rechazado" && <div className="lab-rejected-note"><ShieldAlert size={16} /><span>Esta orden está rechazada{order.motivo_rechazo ? `: ${order.motivo_rechazo}` : "."}</span></div>}
       <div className="lab-detail-grid"><span><strong>Laboratorio</strong>{laboratorioLabels[order.laboratorio] ?? order.laboratorio}</span><span><strong>Tipo de lente</strong>{tipoLenteLabels[order.tipo_lente] ?? order.tipo_lente}</span><span><strong>Sucursal</strong>{order.sucursal_nombre}</span><span><strong>Entrega estimada</strong>{order.fecha_entrega_estimada ? date(order.fecha_entrega_estimada) : "Sin fecha"}</span></div>
-      <table className="lab-rx-table"><thead><tr><th>Ojo</th><th>Esfera</th><th>Cilindro</th><th>Eje</th><th>ADD</th><th>DNP</th></tr></thead><tbody>{eyes.map(([label, eye]) => <tr key={label}><th>{label}</th><td>{eye?.esfera || "—"}</td><td>{eye?.cilindro || "—"}</td><td>{eye?.eje || "—"}</td><td>{eye?.add || "—"}</td><td>{eye?.dnp || "—"}</td></tr>)}</tbody></table>
       <div className="lab-detail-grid lab-measures"><span><strong>Vertical</strong>{order.medidas?.vertical || "—"}</span><span><strong>Horizontal mayor</strong>{order.medidas?.horizontal_mayor || "—"}</span><span><strong>Puente</strong>{order.medidas?.puente || "—"}</span><span><strong>Altura</strong>{order.medidas?.altura || "—"}</span><span><strong>DNP</strong>{order.medidas?.dnp || "—"}</span></div>
       {order.notas && <div className="lab-notes"><strong>Indicaciones</strong><p>{order.notas}</p></div>}
     </div>

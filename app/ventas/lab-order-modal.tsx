@@ -5,7 +5,7 @@ import type { Sale, SaleCompany, SaleItem, SaleProduct } from "@/lib/ventas";
 import { calcularUso, emptyMedidas, emptyRx, estadoOrdenLabels, laboratorioLabels, rxFromRefraccion, tipoLenteDesdeDescripcion, tipoLenteLabels, tipoLenteSugerido, usoCalculadoLabels, usoDesdeTipoLente } from "@/lib/laboratorio";
 import type { EstadoOrdenLaboratorio, LaboratorioProveedor, OrdenLaboratorioMedidas, OrdenLaboratorioRx, RefraccionOption, RxEye, TipoLente, UsoCalculado } from "@/lib/laboratorio";
 import { actualizarOrdenLaboratorio, cambiarEstadoOrdenLaboratorio, crearOrdenLaboratorio, getOrdenLaboratorio, getRefraccionesPaciente } from "./lab-actions";
-import Letterhead from "../print-letterhead";
+import LabOrderPrint from "../lab-order-print";
 
 const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
 const estadoOrder: EstadoOrdenLaboratorio[] = ["pendiente", "enviado", "en_proceso", "recibido", "control_calidad", "listo_entrega", "notificado", "entregado", "rechazado"];
@@ -26,8 +26,9 @@ function RxEyeCard({ eye, value, onChange, disabled }: { eye: "OD" | "OI"; value
   </div>;
 }
 
-export default function LabOrderModal({ sale, lensItems, productoById, patientName, patientPhone, company, existingOrderId, esGarantia, ordenOriginalId, onClose, onCreated }: {
+export default function LabOrderModal({ sale, lensItems, productoById, patientName, patientPhone, company, branchName, existingOrderId, esGarantia, ordenOriginalId, onClose, onCreated }: {
   sale: Sale; lensItems: SaleItem[]; productoById?: Map<string, SaleProduct>; patientName: string; patientPhone?: string | null; company?: SaleCompany;
+  branchName?: string;
   existingOrderId?: string; esGarantia?: boolean; ordenOriginalId?: string | null;
   onClose: () => void; onCreated: (message: string) => void;
 }) {
@@ -35,6 +36,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
   const [step, setStep] = useState<"form" | "created">(existingOrderId ? "created" : "form");
   const [loadingExisting, setLoadingExisting] = useState(!!existingOrderId);
   const [orderId, setOrderId] = useState(existingOrderId ?? "");
+  const [orderCreatedAt, setOrderCreatedAt] = useState(sale.creado_en);
   const [estado, setEstado] = useState<EstadoOrdenLaboratorio>("pendiente");
   const [itemId, setItemId] = useState(lensItems[0]?.id ?? "");
   const [laboratorio, setLaboratorio] = useState<LaboratorioProveedor>("provision");
@@ -58,7 +60,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
     let active = true;
     getOrdenLaboratorio(existingOrderId).then((orden) => {
       if (!active || !orden) return;
-      setEstado(orden.estado); setItemId(orden.venta_item_id ?? lensItems[0]?.id ?? ""); setLaboratorio(orden.laboratorio);
+      setEstado(orden.estado); setItemId(orden.venta_item_id ?? lensItems[0]?.id ?? ""); setLaboratorio(orden.laboratorio); setOrderCreatedAt(orden.creado_en);
       setConsultaId(orden.consulta_id ?? ""); setRx(orden.rx); setMedidas(orden.medidas); setTipoLente(orden.tipo_lente); setNotas(orden.notas ?? "");
     }).finally(() => { if (active) setLoadingExisting(false); });
     return () => { active = false; };
@@ -96,7 +98,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
         else {
           data.set("venta_id", sale.id); data.set("venta_item_id", itemId); data.set("consulta_id", consultaId);
           if (esGarantia) { data.set("es_garantia", "1"); if (ordenOriginalId) data.set("orden_original_id", ordenOriginalId); }
-          const id = await crearOrdenLaboratorio(data); setOrderId(id); onCreated("Orden de laboratorio creada.");
+          const id = await crearOrdenLaboratorio(data); setOrderId(id); setOrderCreatedAt(new Date().toISOString()); onCreated("Orden de laboratorio creada.");
         }
         setStep("created");
       } catch (err) { setError(err instanceof Error ? err.message : "No se pudo guardar la orden de laboratorio."); }
@@ -115,16 +117,14 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
       {lensSaleItems.map((item) => <span key={item.id}><strong>Luna</strong>{item.descripcion}</span>)}
     </div>}
   </>;
+  const selectedRefraction = refracciones.find((option) => option.id === consultaId);
+  const productDescription = [selectedItem?.descripcion, ...frameItems.map((item) => item.descripcion)].filter(Boolean).join(" + ");
 
   if (loadingExisting) return <div className="modal-backdrop"><section className="new-patient-modal task-modal lab-modal" role="dialog" aria-modal="true"><p className="field-hint">Cargando orden…</p></section></div>;
 
   return <div className="modal-backdrop"><section className="new-patient-modal task-modal lab-modal" role="dialog" aria-modal="true" aria-labelledby="lab-order-title"><button className="modal-close no-print" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>
-    <div className={`print-area${step === "created" ? " print-ticket" : ""}`}>
-      {step === "created" && <Letterhead company={company} subtitle={esGarantia ? "Orden de laboratorio · Garantía" : "Detalle de la orden de trabajo"} />}
-      {step === "form" && <p className="section-label">{esGarantia ? "ORDEN DE LABORATORIO · GARANTÍA" : "ORDEN DE LABORATORIO"}</p>}
-      <h2 id="lab-order-title">{patientName}</h2>
-      {step === "created" && patientPhone && <p className="print-center field-hint" style={{ margin: "2px 0" }}>{patientPhone}</p>}
-      {frameLensSummary}
+    <div className={`print-area${step === "created" ? " print-a4" : ""}`}>
+      {step === "form" && <><p className="section-label">{esGarantia ? "ORDEN DE LABORATORIO · GARANTÍA" : "ORDEN DE LABORATORIO"}</p><h2 id="lab-order-title">{patientName}</h2>{frameLensSummary}</>}
 
       {step === "form" ? <>
         {!orderId && <div className="new-patient-form">
@@ -157,28 +157,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
         {error && <p className="notice">{error}</p>}
         <div className="modal-actions no-print"><button className="outline-action" type="button" onClick={() => (orderId ? setStep("created") : onClose())}>Cancelar</button><button className="new-consultation" disabled={pending || (!orderId && !itemId)} type="button" onClick={submit}>{pending ? "Guardando…" : orderId ? "Guardar cambios" : "Crear orden de laboratorio"}</button></div>
       </> : <>
-        <div className="print-dashed" />
-        <p style={{ margin: "4px 0", fontSize: 13 }}>{selectedItem?.descripcion ?? "—"}{frameItems[0] ? ` + ${frameItems[0].descripcion}` : ""}</p>
-        <div className="print-dashed" />
-        <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
-          <thead><tr><th></th><th>Esf</th><th>Cil</th><th>Eje</th><th>Add</th><th>Dnp</th><th>Alt</th></tr></thead>
-          <tbody>
-            <tr><td><strong>OD</strong></td><td>{rx.od.esfera || "—"}</td><td>{rx.od.cilindro || "—"}</td><td>{rx.od.eje || "—"}</td><td>{rx.od.add || "—"}</td><td>{rx.od.dnp || "—"}</td><td>{medidas.altura || "—"}</td></tr>
-            <tr><td><strong>OI</strong></td><td>{rx.oi.esfera || "—"}</td><td>{rx.oi.cilindro || "—"}</td><td>{rx.oi.eje || "—"}</td><td>{rx.oi.add || "—"}</td><td>{rx.oi.dnp || "—"}</td><td>{medidas.altura || "—"}</td></tr>
-          </tbody>
-        </table>
-        <div className="print-dashed" />
-        <p style={{ margin: "3px 0" }}>Distancia de uso <strong style={{ float: "right" }}>{distanciaUsoLabel[uso]}</strong></p>
-        <p style={{ margin: "3px 0" }}>Laboratorio <strong style={{ float: "right" }}>{laboratorioLabels[laboratorio]}</strong></p>
-        <p style={{ margin: "3px 0" }}>Tipo de lente <strong style={{ float: "right" }}>{tipoLenteLabels[tipoLente]}</strong></p>
-        {esGarantia && <p style={{ margin: "3px 0" }}>Garantía <strong style={{ float: "right" }}>Sí</strong></p>}
-        {notas && <><div className="print-dashed" /><p className="section-label">OBSERVACIONES</p><p style={{ fontSize: 13 }}>{notas}</p></>}
-        <div className="print-dashed" />
-        <p className="section-label">MEDIDAS PARA MONTAJE</p>
-        <p style={{ margin: "3px 0", fontSize: 13 }}>A: {medidas.horizontal_mayor || "—"} · B: {medidas.vertical || "—"} · Puente: {medidas.puente || "—"}</p>
-        <div className="print-dashed" />
-        <p style={{ margin: "3px 0" }}>Fecha de entrega <strong style={{ float: "right" }}>{sale.fecha_entrega_estimada ? formatDate(sale.fecha_entrega_estimada) : "No especificada"}</strong></p>
-        {sale.folio != null && <p style={{ margin: "3px 0" }}>Folio de venta <strong style={{ float: "right" }}>#{sale.folio}</strong></p>}
+        <LabOrderPrint orderId={orderId} createdAt={orderCreatedAt} branchName={branchName || "Sucursal"} patientName={patientName} patientPhone={patientPhone} productDescription={productDescription} rx={rx} medidas={medidas} reviewerName={selectedRefraction?.optometrista_nombre} useLabel={distanciaUsoLabel[uso]} notes={[`Laboratorio: ${laboratorioLabels[laboratorio]}`, `Tipo de lente: ${tipoLenteLabels[tipoLente]}`, notas].filter(Boolean).join(". ")} deliveryDate={sale.fecha_entrega_estimada} saleFolio={sale.folio} company={company} warranty={esGarantia} />
 
         {orderId && <div className="new-patient-form no-print" style={{ marginTop: 14, maxWidth: 280 }}><label>Estado de la orden<select value={estado} disabled={pending} onChange={(event) => changeEstado(event.target.value as EstadoOrdenLaboratorio)}>{estadoOrder.map((value) => <option key={value} value={value}>{estadoOrdenLabels[value]}</option>)}</select></label></div>}
         {error && <p className="notice no-print">{error}</p>}

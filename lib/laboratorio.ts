@@ -24,7 +24,7 @@ export type OrdenLaboratorio = {
   creado_en: string;
 };
 
-export type RefraccionOption = { id: string; fecha_consulta: string; refraccion: Record<string, string> };
+export type RefraccionOption = { id: string; fecha_consulta: string; refraccion: Record<string, string>; optometrista_id?: string | null; optometrista_nombre?: string | null };
 
 export const estadoOrdenLabels: Record<EstadoOrdenLaboratorio, string> = {
   pendiente: "Pendiente",

@@ -45,7 +45,12 @@ const monthsFor = { "3m": 3, "6m": 6, "1a": 12 } as const;
 export async function crearConsulta(data: FormData) {
   const { supabase, profile } = await currentClinicalProfile();
   const pacienteId = text(data, "paciente_id");
+  const optometristaId = text(data, "optometrista_id");
   if (!pacienteId) throw new Error("Falta identificar al paciente.");
+  if (!optometristaId) throw new Error("Selecciona quién realizó la revisión.");
+  const { data: rawOptometrist } = await supabase.from("usuarios").select("id,activo,roles(nombre)").eq("id", optometristaId).maybeSingle();
+  const optometrist = rawOptometrist as unknown as UserProfile | null;
+  if (!optometrist?.activo || roleName(optometrist) !== "optometra") throw new Error("La persona seleccionada no es un optometrista activo.");
 
   const antecedentes = { dispositivos_electronicos: text(data, "ante_dispositivos"), horas_dispositivos: text(data, "ante_horas_dispositivos"), hipersensibilidad: text(data, "ante_hipersensibilidad"), ultimo_control: text(data, "ante_ultimo_control"), enfermedades_condiciones: text(data, "ante_enfermedades") };
   const agudezaVisual = { sc_od: text(data, "av_sc_od"), sc_oi: text(data, "av_sc_oi"), scp_od: text(data, "av_scp_od"), scp_oi: text(data, "av_scp_oi") };
@@ -63,7 +68,7 @@ export async function crearConsulta(data: FormData) {
   };
 
   const { data: consulta, error } = await supabase.from("consultas_optometricas").insert({
-    paciente_id: pacienteId, empresa_atencion_id: profile.empresa_id, sucursal_atencion_id: profile.sucursal_id, optometrista_id: profile.id,
+    paciente_id: pacienteId, empresa_atencion_id: profile.empresa_id, sucursal_atencion_id: profile.sucursal_id, optometrista_id: optometristaId,
     motivo_consulta: text(data, "motivo_consulta") || null, antecedentes,
     agudeza_visual: agudezaVisual, lensometria, queratometria, autorefractor, refraccion, examen_binocular: examenBinocular, biomicroscopia,
     impresion_diagnostica: text(data, "impresion_diagnostica") || null, receta, plan_manejo: text(data, "plan_manejo") || null, observaciones: text(data, "observaciones") || null,

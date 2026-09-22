@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, CircleAlert, FileText, Glasses, MessageCircle, MoreVertical, Printer, Wallet, X } from "lucide-react";
+import { AlertTriangle, CircleAlert, Copy, FileText, MessageCircle, MoreVertical, Printer, Wallet, X } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { CuentasCobrarData, DeudaPaciente, EmpresaConvenio } from "@/lib/cuentas-cobrar";
+import { construirMensajeContacto, plantillasContacto, type PlantillaContactoId } from "@/lib/mensajes";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import { crearAcuerdoPago, crearEmpresaConvenio, type AcuerdoPago } from "@/app/ventas/convenio-actions";
 import { activarCobroInsistente, actualizarFrecuenciaCobro } from "./actions";
@@ -27,7 +28,7 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
     catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo actualizar la frecuencia."); }
   });
   const cambiarCobroInsistente = (pacienteId: string, activo: boolean) => startTransition(async () => {
-    try { await activarCobroInsistente(pacienteId, activo); setNotice(activo ? "Cobro insistente activado. Make.com puede enviarle mensajes automáticos diarios." : "Cobro insistente desactivado."); }
+    try { await activarCobroInsistente(pacienteId, activo); setNotice(activo ? "Cobro insistente marcado. La automatización con Make sigue pendiente; todavía no se enviaron mensajes." : "Cobro insistente desactivado."); }
     catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo actualizar el cobro insistente."); }
   });
 
@@ -35,6 +36,7 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
     <header className="agenda-header"><div><Link className="back-link" href="/">← SHUVISION OS</Link><p className="eyebrow">OPERACIÓN COMERCIAL</p><h1>Cuentas por cobrar</h1><p className="subtitle">Pacientes con saldo pendiente, listos para contactar por WhatsApp.</p></div></header>
     <section className="agenda-summary"><article><Wallet size={21} /><strong>{money(totalDeuda)}</strong><span>saldo total pendiente</span></article><article><CircleAlert size={21} /><strong>{props.deudas.length}</strong><span>pacientes con deuda</span></article></section>
     <div className="notice"><CircleAlert size={18} /><span>{notice || "El saldo se calcula solo desde las ventas completadas; los abonos lo actualizan automáticamente."}</span></div>
+    <div className="make-status"><AlertTriangle size={18} /><span><strong>Automatización diaria con Make:</strong> {props.makeConfigured ? "el enlace técnico está configurado, pero el envío de datos permanece pausado hasta tu autorización final." : "pendiente de conectar. Los mensajes manuales por WhatsApp ya se pueden usar y revisar."}</span></div>
 
     <section className="glass agenda-board">
       <p className="section-label">PACIENTES CON SALDO PENDIENTE</p><h2>Cuentas por cobrar</h2>
@@ -46,26 +48,37 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
 
 function DeudaCard({ deuda, pending, onFrecuencia, onCobroInsistente, onConvenio }: { deuda: DeudaPaciente; pending: boolean; onFrecuencia: (frecuencia: string) => void; onCobroInsistente: (activo: boolean) => void; onConvenio: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [origin, setOrigin] = useState("");
+  const [plantilla, setPlantilla] = useState<PlantillaContactoId>(deuda.frecuencia_cobro === "mensual" ? "cobro_mensual" : "cobro_insistente");
+  const [copied, setCopied] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const nombre = `${deuda.nombres} ${deuda.apellidos}`;
-  const mensajeCobro = `Hola ${deuda.nombres}! Te escribimos de ${deuda.empresa_nombre} para recordarte que tienes un saldo pendiente de ${money(deuda.saldo_total)}. ¿Podemos coordinar tu pago?`;
-  const mensajeRetiro = `Hola ${deuda.nombres}! Tus lentes ya están listos para retirar en ${deuda.empresa_nombre}. Te esperamos.`;
-  const waCobro = enlaceWhatsapp(deuda.telefono, mensajeCobro);
-  const waRetiro = enlaceWhatsapp(deuda.telefono, mensajeRetiro);
+  const token = deuda.ventas[0]?.recibo_token;
+  const ticketUrl = origin && token ? `${origin}/recibo/${token}` : null;
+  const mensaje = construirMensajeContacto(plantilla, { nombre: deuda.nombres, empresa: deuda.empresa_nombre, saldo: deuda.saldo_total, ticketUrl });
+  const wa = enlaceWhatsapp(deuda.telefono, mensaje);
   const closeMenu = () => setMenuOpen(false);
+  const copiarMensaje = async () => {
+    try { await navigator.clipboard.writeText(mensaje); setCopied(true); window.setTimeout(() => setCopied(false), 1800); }
+    catch { setCopied(false); }
+  };
+  useEffect(() => { setOrigin(window.location.origin); }, []);
   useEffect(() => { if (!menuOpen) return; const onClick = (event: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(event.target as Node)) closeMenu(); }; document.addEventListener("mousedown", onClick); return () => document.removeEventListener("mousedown", onClick); }, [menuOpen]);
 
   return <article className="task-card"><div className="task-status" /><div className="task-main">
     <div className="task-meta"><span>{deuda.empresa_nombre}</span><span>{deuda.telefono || "Sin WhatsApp registrado"}</span>{deuda.cobro_insistente && <span className="urgente"><AlertTriangle size={11} /> Cobro insistente</span>}</div>
     <h2>{nombre}</h2>
     <p>Deuda: <strong>{money(deuda.saldo_total)}</strong> · {deuda.ventas.length} venta(s) pendiente(s): {deuda.ventas.map((v) => `${formatDate(v.creado_en)} (${money(v.saldo)})`).join(", ")}</p>
-    <div className="new-patient-form" style={{ marginTop: 8, maxWidth: 260 }}><label>Frecuencia de cobro<select defaultValue={deuda.frecuencia_cobro ?? ""} disabled={pending} onChange={(event) => onFrecuencia(event.target.value)}><option value="">Sin definir</option>{Object.entries(frecuenciaLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>
+    <div className="collection-controls">
+      <label>Mensaje a enviar<select value={plantilla} onChange={(event) => setPlantilla(event.target.value as PlantillaContactoId)}>{plantillasContacto.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select></label>
+      <label>Frecuencia de cobro<select defaultValue={deuda.frecuencia_cobro ?? ""} disabled={pending} onChange={(event) => onFrecuencia(event.target.value)}><option value="">Sin definir</option>{Object.entries(frecuenciaLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+    </div>
+    <div className="message-preview"><span>Vista previa</span><p>{mensaje}</p><button className="outline-action" type="button" onClick={copiarMensaje}><Copy size={13} /> {copied ? "Copiado" : "Copiar mensaje"}</button></div>
   </div><div className="task-actions">
-    {waCobro ? <a className="new-consultation" href={waCobro} target="_blank" rel="noreferrer"><MessageCircle size={14} /> Contactar por WhatsApp</a> : <span style={{ color: "#a24150", fontSize: 12, fontWeight: 700 }}>Sin WhatsApp registrado</span>}
+    {wa ? <a className="new-consultation" href={wa} target="_blank" rel="noreferrer"><MessageCircle size={14} /> Enviar mensaje elegido</a> : <span style={{ color: "#a24150", fontSize: 12, fontWeight: 700 }}>Sin WhatsApp registrado</span>}
     <div className="menu-wrap" ref={menuRef}>
       <button className="outline-action" type="button" onClick={() => setMenuOpen((v) => !v)}><MoreVertical size={14} /> Más opciones</button>
       {menuOpen && <div className="menu-dropdown">
-        {waRetiro && <a href={waRetiro} target="_blank" rel="noreferrer" onClick={closeMenu}><Glasses size={14} /> Avisar que vengan a retirar</a>}
         <button type="button" onClick={() => { onConvenio(); closeMenu(); }}><FileText size={14} /> Convenio de pago</button>
         <button type="button" className={deuda.cobro_insistente ? "danger" : ""} onClick={() => { onCobroInsistente(!deuda.cobro_insistente); closeMenu(); }}><AlertTriangle size={14} /> {deuda.cobro_insistente ? "Quitar cobro insistente" : "Activar cobro insistente"}</button>
       </div>}
