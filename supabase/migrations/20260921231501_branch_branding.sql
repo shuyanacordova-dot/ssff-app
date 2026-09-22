@@ -105,3 +105,4 @@ $function$;
 -- explícitamente para evitar que PostgreSQL conceda EXECUTE a PUBLIC.
 revoke all on function public.obtener_recibo_publico(uuid) from public;
 grant execute on function public.obtener_recibo_publico(uuid) to anon, authenticated, service_role;
+;
