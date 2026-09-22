@@ -8,6 +8,7 @@ import { estadoOrdenLabels, laboratorioLabels, tipoLenteLabels, type EstadoOrden
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import LabOrderPrint from "@/app/lab-order-print";
 import { cambiarEstadoOrdenLaboratorio } from "@/app/ventas/lab-actions";
+import { printCurrentDocument } from "@/lib/print-document";
 
 const statusOptions = Object.entries(estadoOrdenLabels) as [EstadoOrdenLaboratorio, string][];
 const flowStatuses: EstadoOrdenLaboratorio[] = ["pendiente", "enviado", "en_proceso", "recibido", "control_calidad", "listo_entrega", "notificado", "entregado"];
@@ -112,6 +113,6 @@ function OrderDetail({ order, pending, onClose, onStatus }: { order: LabMonitorO
       <div className="lab-detail-grid lab-measures"><span><strong>Vertical</strong>{order.medidas?.vertical || "—"}</span><span><strong>Horizontal mayor</strong>{order.medidas?.horizontal_mayor || "—"}</span><span><strong>Puente</strong>{order.medidas?.puente || "—"}</span><span><strong>Altura</strong>{order.medidas?.altura || "—"}</span><span><strong>DNP</strong>{order.medidas?.dnp || "—"}</span></div>
       {order.notas && <div className="lab-notes"><strong>Indicaciones</strong><p>{order.notas}</p></div>}
     </div>
-    <div className="modal-actions no-print"><label className="lab-modal-status">Estado<select value={order.estado} disabled={pending} onChange={(event) => onStatus(event.target.value as EstadoOrdenLaboratorio)}>{statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button className="outline-action" type="button" onClick={() => window.print()}><Printer size={15} /> Imprimir</button><button className="new-consultation" type="button" onClick={onClose}>Cerrar</button></div>
+    <div className="modal-actions no-print"><label className="lab-modal-status">Estado<select value={order.estado} disabled={pending} onChange={(event) => onStatus(event.target.value as EstadoOrdenLaboratorio)}>{statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button className="outline-action" type="button" onClick={printCurrentDocument}><Printer size={15} /> Imprimir</button><button className="new-consultation" type="button" onClick={onClose}>Cerrar</button></div>
   </section></div>;
 }

@@ -31,7 +31,7 @@ export default function SalesBoard(props: VentasData) {
   const canAnular = role === "superadmin";
   const productoById = new Map(props.products.map((product) => [product.id, product]));
   const lensItemsFor = (sale: Sale) => sale.venta_items.filter((item) => item.producto_id && productoById.get(item.producto_id)?.categoria === "lente");
-  const labOrderItemsFor = (sale: Sale) => { const strict = lensItemsFor(sale); return strict.length ? strict : (sale.venta_items ?? []); };
+  const labOrderItemsFor = (sale: Sale) => lensItemsFor(sale);
 
   if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← SHUVISION OS</Link><p className="eyebrow">OPERACIÓN COMERCIAL</p><h1>Cobros</h1><p className="subtitle">{props.message ?? "No se pudo abrir ventas."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/ventas">Iniciar sesión</Link>}</header></div></main>;
 
@@ -93,16 +93,18 @@ export function SaleCard({ sale, companyName, branchName, patient, lensItems, ha
   const waListo = patient && lensItems.length > 0 ? enlaceWhatsapp(patient.telefono, `Hola ${nombrePila}! Tu(s) luna(s)/lente(s) de tu compra en ${companyName} ya está(n) listo(s) para retirar. Te esperamos!`) : null;
   return <article className="task-card" style={{ cursor: "pointer" }} onClick={onDetalle}><div className="task-status"><span className={`status-dot ${statePillClass[sale.estado]}`} /></div><div className="task-main"><div className="task-meta"><span>{companyName}</span>{branchName && <span className="branch-meta">Sucursal {branchName}</span>}{patient && <span>Paciente</span>}<span>{new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(sale.creado_en))}</span></div><h2>{displayName}</h2><p>{resumen}{items.length > 0 && <span className="text-action" style={{ marginLeft: 8 }}>Ver detalle</span>}</p><p>Total: <strong>{money(sale.total)}</strong> · Pagado: {money(sale.pagado)} · Saldo: <strong>{money(sale.saldo)}</strong></p>{sale.estado === "anulada" && sale.motivo_anulacion && <p className="notice">Motivo de anulación: {sale.motivo_anulacion}</p>}
     {labOrders.length > 0 && <div className="lab-order-badges" onClick={(event) => event.stopPropagation()}>{labOrders.map((order) => <button key={order.id} type="button" className="check-badge ok" onClick={() => onViewOrder(order.id)}><FlaskConical size={13} /> {order.laboratorio} · {order.estado}{order.es_garantia ? " · garantía" : ""}</button>)}</div>}
+    {sale.estado === "completada" && <div className="sale-primary-actions" onClick={(event) => event.stopPropagation()}>
+      <button type="button" onClick={onRecibo}><ReceiptText size={14} /> Recibo</button>
+      {patient && hasLabOrderItems && <button type="button" onClick={onCreateLabOrder}><FlaskConical size={14} /> Crear orden</button>}
+      {sale.saldo > 0 && <button type="button" onClick={() => setShowAbono((value) => !value)}><Wallet size={14} /> Registrar abono</button>}
+    </div>}
     {showAbono && <div className="new-patient-form" style={{ marginTop: 10 }} onClick={(event) => event.stopPropagation()}><label>Método<select value={metodo} onChange={(event) => setMetodo(event.target.value)}>{["efectivo", "transferencia", "tarjeta", "credito", "otro"].map((m) => <option key={m} value={m}>{m}</option>)}</select></label><label>Monto<input type="number" min={0} step={0.01} max={sale.saldo} value={monto} onChange={(event) => setMonto(event.target.value)} /></label><button type="button" className="new-consultation" disabled={pending || !Number(monto) || Number(monto) > sale.saldo} onClick={submitAbono}>Confirmar abono</button></div>}
   </div><div className="task-actions" onClick={(event) => event.stopPropagation()}><span className={`state-pill ${statePillClass[sale.estado]}`}>{stateLabel[sale.estado]}</span>
     {sale.estado === "completada" && <div className="menu-wrap" ref={menuRef}>
       <button className="outline-action" type="button" onClick={() => setMenuOpen((v) => !v)}><MoreVertical size={14} /> Más opciones</button>
       {menuOpen && <div className="menu-dropdown">
-        <button type="button" onClick={() => { onRecibo(); closeMenu(); }}><MessageCircle size={14} /> Recibo virtual</button>
         {waListo && <a href={waListo} target="_blank" rel="noreferrer" onClick={closeMenu}><MessageCircle size={14} /> Avisar lente listo</a>}
-        {patient && hasLabOrderItems && <button type="button" onClick={() => { onCreateLabOrder(); closeMenu(); }}><FlaskConical size={14} /> Crear orden de laboratorio</button>}
         <button type="button" onClick={() => { onGarantia(); closeMenu(); }}><ShieldCheck size={14} /> Garantía</button>
-        {sale.saldo > 0 && <button type="button" onClick={() => { setShowAbono(true); closeMenu(); }}>Registrar abono</button>}
         {canAnular && <button type="button" className="danger" disabled={pending} onClick={() => { onRequestAnular(sale); closeMenu(); }}>Cancelar venta</button>}
       </div>}
     </div>}

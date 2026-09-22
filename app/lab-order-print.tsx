@@ -39,23 +39,6 @@ export function labOrderCode(orderId: string, createdAt: string, saleFolio?: num
   return `${stamp}${suffix}`;
 }
 
-function Barcode({ code }: { code: string }) {
-  const bars: { x: number; width: number }[] = [];
-  let x = 2;
-  for (const character of `*${code}*`) {
-    const bits = (character.charCodeAt(0) * 37 + 19).toString(2).padStart(9, "0").slice(-9);
-    for (let index = 0; index < bits.length; index += 1) {
-      const width = bits[index] === "1" ? 2.5 : 1.2;
-      if (index % 2 === 0) bars.push({ x, width });
-      x += width + 0.75;
-    }
-    x += 1.3;
-  }
-  return <svg className="lab-print-barcode" viewBox={`0 0 ${x + 2} 42`} preserveAspectRatio="none" role="img" aria-label={`Código ${code}`}>
-    {bars.map((bar, index) => <rect key={`${bar.x}-${index}`} x={bar.x} y="1" width={bar.width} height="35" fill="currentColor" />)}
-  </svg>;
-}
-
 function EyeLine({ label, eye, altura }: { label: "OD" | "OI"; eye: RxEye; altura: string }) {
   if (!eye.procesar) return <div className="lab-print-rx-row"><strong><Eye size={18} /> {label}</strong><span className="lab-print-no-process">No procesar</span></div>;
   return <div className="lab-print-rx-row">
@@ -97,7 +80,6 @@ export default function LabOrderPrint(props: LabOrderPrintProps) {
         <span>Sucursal: {props.branchName.toUpperCase()}</span>
         {props.warranty && <em>GARANTÍA</em>}
       </div>
-      <Barcode code={code} />
     </header>
 
     <section className="lab-print-patient">

@@ -24,10 +24,17 @@ export async function crearProducto(form: FormData) {
 export async function registrarVenta(form: FormData) {
   const supabase = await createSupabaseServerClient();
   const empresaId = text(form, "empresa_id"); const sucursalId = text(form, "sucursal_id") || null; const cliente = text(form, "cliente_nombre"); const pacienteId = text(form, "paciente_id") || null;
+  const tipoVenta = text(form, "tipo_venta");
   let ventaId: string;
   try {
     const items = JSON.parse(text(form, "items")); const payments = JSON.parse(text(form, "pagos") || "[]");
     if (!Array.isArray(items) || !items.length || !Array.isArray(payments)) throw new Error();
+    const productIds = items.map((item: { producto_id?: string }) => item.producto_id).filter(Boolean);
+    const { data: products, error: productsError } = await supabase.from("productos_catalogo").select("id,categoria,empresa_id").in("id", productIds);
+    if (productsError || (products?.length ?? 0) !== productIds.length || products?.some((product) => product.empresa_id !== empresaId)) throw new Error("Uno de los productos no pertenece al catálogo seleccionado.");
+    if (!new Set(["rapida", "lentes"]).has(tipoVenta)) throw new Error("Selecciona el tipo de venta.");
+    const allowed = tipoVenta === "rapida" ? new Set(["accesorio", "gafas_sol", "servicio"]) : new Set(["montura", "lente"]);
+    if (products?.some((product) => !allowed.has(product.categoria))) throw new Error(tipoVenta === "rapida" ? "La venta rápida solo admite accesorios, gafas de sol y exámenes." : "La venta de lentes solo admite armazones y lunas.");
     const { data, error } = await supabase.rpc("registrar_venta", { p_empresa: empresaId, p_sucursal: sucursalId, p_cliente: cliente, p_items: items, p_pagos: payments, p_paciente: pacienteId });
     if (error) throw new Error(error.message);
     ventaId = data as string;

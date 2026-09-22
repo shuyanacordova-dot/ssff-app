@@ -6,6 +6,7 @@ import { calcularUso, emptyMedidas, emptyRx, estadoOrdenLabels, laboratorioLabel
 import type { EstadoOrdenLaboratorio, LaboratorioProveedor, OrdenLaboratorioMedidas, OrdenLaboratorioRx, RefraccionOption, RxEye, TipoLente, UsoCalculado } from "@/lib/laboratorio";
 import { actualizarOrdenLaboratorio, cambiarEstadoOrdenLaboratorio, crearOrdenLaboratorio, getOrdenLaboratorio, getRefraccionesPaciente } from "./lab-actions";
 import LabOrderPrint from "../lab-order-print";
+import { printCurrentDocument } from "@/lib/print-document";
 
 const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
 const estadoOrder: EstadoOrdenLaboratorio[] = ["pendiente", "enviado", "en_proceso", "recibido", "control_calidad", "listo_entrega", "notificado", "entregado", "rechazado"];
@@ -162,7 +163,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
         {orderId && <div className="new-patient-form no-print" style={{ marginTop: 14, maxWidth: 280 }}><label>Estado de la orden<select value={estado} disabled={pending} onChange={(event) => changeEstado(event.target.value as EstadoOrdenLaboratorio)}>{estadoOrder.map((value) => <option key={value} value={value}>{estadoOrdenLabels[value]}</option>)}</select></label></div>}
         {error && <p className="notice no-print">{error}</p>}
 
-        <div className="modal-actions no-print"><button className="outline-action" type="button" onClick={onClose}>Cerrar</button><button className="outline-action" type="button" onClick={() => setStep("form")}><Pencil size={15} /> Editar</button><button className="new-consultation" type="button" onClick={() => window.print()}><Printer size={15} /> Imprimir</button></div>
+        <div className="modal-actions no-print"><button className="outline-action" type="button" onClick={onClose}>Cerrar</button><button className="outline-action" type="button" onClick={() => setStep("form")}><Pencil size={15} /> Editar</button><button className="new-consultation" type="button" onClick={printCurrentDocument}><Printer size={15} /> Imprimir</button></div>
       </>}
     </div>
   </section></div>;

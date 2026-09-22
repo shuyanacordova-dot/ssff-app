@@ -7,13 +7,26 @@ import type { ClinicalOptometrist } from "@/lib/clinical";
 const astig = (k1: string, k2: string) => { const a = Number(k1); const b = Number(k2); return k1 !== "" && k2 !== "" && Number.isFinite(a) && Number.isFinite(b) ? `${Math.abs(a - b).toFixed(2)} D estimado` : ""; };
 const hyloSystaneProductos = ["Hylo-Comod", "Hylo-Gel", "Hylo-Forte", "Hylo-Fresh", "Hylo Dual", "Hylo Care", "Systane Ultra", "Systane Balance", "Systane Complete", "Systane Gel", "Systane Hydration", "Systane Ultra PF"];
 const vitaminasProductos = ["Luteína", "Zeaxantina", "Omega-3", "Vitamina C", "Vitamina E", "Zinc", "Multivitamínico ocular (AREDS2)"];
+type RxDiagnosticValues = { od_esfera: string; od_cilindro: string; oi_esfera: string; oi_cilindro: string };
+const numberValue = (value: string) => Number(value.replace(",", "."));
+const diagnosticoDesdeRx = (rx: RxDiagnosticValues) => (["od", "oi"] as const).flatMap((eye) => {
+  const esferaText = rx[`${eye}_esfera`];
+  const cilindroText = rx[`${eye}_cilindro`];
+  const esfera = numberValue(esferaText);
+  const cilindro = numberValue(cilindroText);
+  const hallazgos: string[] = [];
+  if (esferaText.trim() && Number.isFinite(esfera) && esfera < 0) hallazgos.push("miopía");
+  if (esferaText.trim() && Number.isFinite(esfera) && esfera > 0) hallazgos.push("hipermetropía");
+  if (cilindroText.trim() && Number.isFinite(cilindro) && Math.abs(cilindro) > 0.001) hallazgos.push("astigmatismo");
+  return hallazgos.length ? [`${eye.toUpperCase()}: ${hallazgos.join(" y ")}`] : [];
+}).join(". ");
 
-function EyeRxCard({ eye, prefix, showDnp, showAv = true }: { eye: "OD" | "OI"; prefix: string; showDnp?: boolean; showAv?: boolean }) {
+function EyeRxCard({ eye, prefix, showDnp, showAv = true, onRxChange }: { eye: "OD" | "OI"; prefix: string; showDnp?: boolean; showAv?: boolean; onRxChange?: (field: "esfera" | "cilindro", value: string) => void }) {
   return <div className="eye-card">
     <div className="eye-card-header">{eye}</div>
     <div className="eye-card-body">
-      <label>Esf<input name={`${prefix}_esfera`} placeholder="0.00" /></label>
-      <label>Cil<input name={`${prefix}_cilindro`} placeholder="0.00" /></label>
+      <label>Esf<input name={`${prefix}_esfera`} placeholder="0.00" onChange={(event) => onRxChange?.("esfera", event.target.value)} /></label>
+      <label>Cil<input name={`${prefix}_cilindro`} placeholder="0.00" onChange={(event) => onRxChange?.("cilindro", event.target.value)} /></label>
       <label>Eje<input name={`${prefix}_eje`} /></label>
       {showAv && <label>Av lejos c/rx<input name={`${prefix}_av_lejos`} placeholder="20/20" /></label>}
       <label>Add<input name={`${prefix}_add`} placeholder="0.00" /></label>
@@ -27,6 +40,14 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
   const [pending, start] = useTransition();
   const [k, setK] = useState({ odK1: "", odK2: "", oiK1: "", oiK2: "" });
   const [receta, setReceta] = useState({ lagrimas: false, vitaminas: false, terapia: false });
+  const [rxDiagnostico, setRxDiagnostico] = useState<RxDiagnosticValues>({ od_esfera: "", od_cilindro: "", oi_esfera: "", oi_cilindro: "" });
+  const [diagnostico, setDiagnostico] = useState("");
+  const [diagnosticoManual, setDiagnosticoManual] = useState(false);
+  const updateFinalRx = (eye: "od" | "oi", field: "esfera" | "cilindro", value: string) => {
+    const next = { ...rxDiagnostico, [`${eye}_${field}`]: value };
+    setRxDiagnostico(next);
+    if (!diagnosticoManual) setDiagnostico(diagnosticoDesdeRx(next));
+  };
   const submit = (form: HTMLFormElement) => start(async () => {
     const data = new FormData(form); data.set("paciente_id", pacienteId);
     try { await crearConsulta(data); onSaved("Consulta registrada en la historia clínica."); onClose(); }
@@ -72,8 +93,12 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
     <p className="field-hint">Las imágenes de lámpara de hendidura se adjuntan después de guardar, desde la pestaña “Fotos y documentos” vinculándolas a esta consulta.</p>
     <div className="new-patient-form"><label>Ojo derecho<input name="biom_od" placeholder="Párpados, conjuntiva, córnea, cámara anterior" /></label><label>Ojo izquierdo<input name="biom_oi" placeholder="Párpados, conjuntiva, córnea, cámara anterior" /></label></div>
 
+    <p className="section-label">RX FINAL</p>
+    <p className="field-hint">Al ingresar esfera y cilindro se sugiere automáticamente miopía, hipermetropía y astigmatismo. El profesional puede corregir el texto antes de guardar.</p>
+    <div className="eye-grid"><EyeRxCard eye="OD" prefix="ref_od" showDnp onRxChange={(field, value) => updateFinalRx("od", field, value)} /><EyeRxCard eye="OI" prefix="ref_oi" showDnp onRxChange={(field, value) => updateFinalRx("oi", field, value)} /></div>
+
     <p className="section-label">DIAGNÓSTICO</p>
-    <div className="new-patient-form"><label className="task-description"><textarea name="impresion_diagnostica" /></label></div>
+    <div className="new-patient-form"><label className="task-description"><textarea name="impresion_diagnostica" value={diagnostico} onChange={(event) => { setDiagnostico(event.target.value); setDiagnosticoManual(true); }} placeholder="Se completa con la RX final y puedes editarlo" /></label></div>
 
     <p className="section-label">RECETA</p>
     <div className="receta-list">
@@ -99,9 +124,6 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
       </div>
     </div>
     <div className="new-patient-form"><label className="task-description">Instrucciones adicionales<textarea name="plan_manejo" placeholder="Otras indicaciones para el paciente" /></label></div>
-    <p className="field-hint" style={{ marginTop: 10 }}>Rx final</p>
-    <div className="eye-grid"><EyeRxCard eye="OD" prefix="ref_od" showDnp /><EyeRxCard eye="OI" prefix="ref_oi" showDnp /></div>
-
     <div className="new-patient-form" style={{ marginTop: 14 }}><label className="task-description">Observaciones<textarea name="observaciones" /></label></div>
 
     <p className="section-label">PROFESIONAL QUE ATENDIÓ</p>

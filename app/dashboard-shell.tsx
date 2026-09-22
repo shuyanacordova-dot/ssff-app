@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { BarChart3, Banknote, Building2, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Coins, FlaskConical, Glasses, FileBarChart, Landmark, LogOut, Package, Palette, Search, Settings, ShieldCheck, Sparkles, Target, UserPlus, Wallet } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Banknote, CalendarDays, FlaskConical, LockKeyhole, LogOut, Target, UserPlus } from "lucide-react";
 import type { TaskData } from "@/lib/tasks";
 import type { InformeMensual } from "./informes/actions";
 import TaskBoard from "./tareas/task-board";
@@ -14,17 +13,8 @@ const money = (value: number) => new Intl.NumberFormat("es-EC", { style: "curren
 const pct = (actual: number, meta: number) => meta > 0 ? Math.round((actual / meta) * 100) : 0;
 
 export default function DashboardShell({ taskData, informeMensual, metasMessage }: { taskData: TaskData; informeMensual: InformeMensual | null; metasMessage?: string }) {
-  const [menuCollapsed, setMenuCollapsed] = useState(false);
   const role = taskData.profile?.rol;
-  const isSuperadmin = role === "superadmin";
-  const canVerInformes = isSuperadmin || role === "admin_sucursal";
-
-  useEffect(() => { setMenuCollapsed(window.localStorage.getItem("shu-dashboard-menu") === "collapsed"); }, []);
-  const toggleMenu = () => setMenuCollapsed((current) => {
-    const next = !current;
-    window.localStorage.setItem("shu-dashboard-menu", next ? "collapsed" : "expanded");
-    return next;
-  });
+  const canVerInformes = role === "superadmin" || role === "admin_sucursal";
 
   return <main className="page dashboard-page"><div className="container dashboard-shell">
     <header className="dashboard-header">
@@ -37,38 +27,13 @@ export default function DashboardShell({ taskData, informeMensual, metasMessage 
       <Link href="/ventas"><span className="quick-icon blue"><Banknote size={21} /></span><span><strong>Nueva venta</strong><small>Cobrar o registrar pedido</small></span></Link>
       <Link href="/laboratorio"><span className="quick-icon amber"><FlaskConical size={21} /></span><span><strong>Laboratorio</strong><small>Revisar órdenes pendientes</small></span></Link>
       <Link href="/agenda"><span className="quick-icon lilac"><CalendarDays size={21} /></span><span><strong>Agenda</strong><small>Ver citas de hoy</small></span></Link>
+      {role === "superadmin" && <Link href="/mi-espacio"><span className="quick-icon blue"><LockKeyhole size={21} /></span><span><strong>Mi espacio</strong><small>Deudas privadas por sucursal</small></span></Link>}
     </section>
 
-    <div className={`dashboard-layout ${menuCollapsed ? "menu-collapsed" : ""}`}>
-      <aside className={`dashboard-sidebar ${menuCollapsed ? "is-collapsed" : ""}`}>
-        <div className="dashboard-menu-heading"><p className="section-label">MENÚ</p><button type="button" onClick={toggleMenu} aria-label={menuCollapsed ? "Expandir menú" : "Contraer menú"} aria-expanded={!menuCollapsed}>{menuCollapsed ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}</button></div>
-        <nav className="dashboard-nav">
-          <Link title="Nuevo paciente" className="dashboard-nav-item" href="/pacientes?new=1"><UserPlus size={18} /><span>Nuevo paciente</span></Link>
-          <Link title="Buscar paciente" className="dashboard-nav-item" href="/pacientes"><Search size={18} /><span>Buscar paciente</span></Link>
-          <Link title="Tareas y supervisión" className="dashboard-nav-item" href="/"><ClipboardList size={18} /><span>Tareas y supervisión</span></Link>
-          <Link title="Asistente Shu" className="dashboard-nav-item dashboard-nav-featured" href="/asistente"><Sparkles size={18} /><span>Asistente Shu</span></Link>
-          {isSuperadmin && <Link title="Configuración y equipo" className="dashboard-nav-item dashboard-nav-settings" href="/equipo"><Settings size={18} /><span>Configuración y equipo</span></Link>}
-          {isSuperadmin && <Link title="Sucursales e identidad" className="dashboard-nav-item dashboard-nav-settings" href="/configuracion/sucursales"><Palette size={18} /><span>Sucursales e identidad</span></Link>}
-          <Link title="Agenda" className="dashboard-nav-item" href="/agenda"><CalendarDays size={18} /><span>Agenda</span></Link>
-          <Link title="Órdenes de laboratorio" className="dashboard-nav-item dashboard-nav-featured" href="/laboratorio"><FlaskConical size={18} /><span>Órdenes de laboratorio</span></Link>
-          <Link title="Resumen del día" className="dashboard-nav-item" href="/resumen-dia"><FileBarChart size={18} /><span>Resumen del día</span></Link>
-          <Link title="Cuadre de caja diario" className="dashboard-nav-item" href="/caja"><Banknote size={18} /><span>Cuadre de caja diario</span></Link>
-          {isSuperadmin && <Link title="Bancos y caja global" className="dashboard-nav-item" href="/caja"><Landmark size={18} /><span>Cuentas de bancos y cuadre de caja global</span></Link>}
-          <Link title="Salidas de caja chica" className="dashboard-nav-item" href="/caja?gasto=1"><Coins size={18} /><span>Salidas de caja chica</span></Link>
-          <Link title="Cuentas por cobrar" className="dashboard-nav-item" href="/cuentas-cobrar"><Wallet size={18} /><span>Cuentas por cobrar</span></Link>
-          <Link title="Convenios" className="dashboard-nav-item" href="/convenios"><Building2 size={18} /><span>Convenios</span></Link>
-          <Link title="Inventario de monturas y accesorios" className="dashboard-nav-item" href="/inventario?grupo=monturas"><Package size={18} /><span>Inventario de monturas y accesorios</span></Link>
-          <Link title="Inventario de lunas" className="dashboard-nav-item" href="/inventario?grupo=lunas"><Glasses size={18} /><span>Inventario de lunas</span></Link>
-          {canVerInformes && <Link title="Informes" className="dashboard-nav-item" href="/informes"><BarChart3 size={18} /><span>Informes</span></Link>}
-        </nav>
-        <div className="shared-note"><ShieldCheck size={16} /><span>Tu rol define qué módulos puedes usar.</span></div>
-      </aside>
-
-      <section className="dashboard-main">
-        {canVerInformes && <MetasDashboard informe={informeMensual} message={metasMessage} />}
-        <TaskBoard {...taskData} embedded />
-      </section>
-    </div>
+    <section className="dashboard-main dashboard-main-wide">
+      {canVerInformes && <MetasDashboard informe={informeMensual} message={metasMessage} />}
+      <TaskBoard {...taskData} embedded />
+    </section>
   </div></main>;
 }
 

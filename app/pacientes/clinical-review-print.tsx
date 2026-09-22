@@ -43,6 +43,15 @@ function ReviewFinding({ title, text }: { title: string; text?: string | null })
 
 export default function ClinicalReviewPrint({ consultation, patient, company, branchName }: Props) {
   const age = ageAt(patient.fecha_nacimiento, consultation.fecha_consulta);
+  const patientDetails = [
+    patient.sexo ? ["Género", sex[patient.sexo] ?? patient.sexo] : null,
+    patient.fecha_nacimiento ? ["Fecha de nacimiento", dateLabel(patient.fecha_nacimiento)] : null,
+    age !== null ? ["Edad", `${age} años`] : null,
+    shown(patient.cedula) ? ["Cédula", patient.cedula] : null,
+    shown(patient.telefono) ? ["Celular", patient.telefono] : null,
+    shown(patient.email) ? ["Email", patient.email] : null,
+    shown(patient.ocupacion) ? ["Ocupación", patient.ocupacion] : null,
+  ].filter(Boolean) as [string, string][];
   const observations = [consultation.plan_manejo, consultation.observaciones].filter(Boolean).join("\n");
   const receta = consultation.receta;
   const prescriptions = [
@@ -61,12 +70,7 @@ export default function ClinicalReviewPrint({ consultation, patient, company, br
     <h2 className="clinical-print-title" id="consultation-detail-title">Revisión</h2>
     <div className="clinical-print-patient-row"><strong>Paciente: {patient.nombres} {patient.apellidos}</strong><span>{dateLabel(consultation.fecha_consulta)}</span></div>
 
-    <section className="clinical-print-demographics">
-      <p>Género: <strong>{patient.sexo ? sex[patient.sexo] ?? patient.sexo : "—"}</strong></p><p>Fecha de nacimiento: <strong>{patient.fecha_nacimiento ? dateLabel(patient.fecha_nacimiento) : "—"}</strong></p><p>Edad: <strong>{age !== null ? `${age} años` : "—"}</strong></p>
-      <p>Número local: <strong>{display(patient.cedula)}</strong></p><p>Celular: <strong>{display(patient.telefono)}</strong></p><p>Email: <strong>{display(patient.email)}</strong></p>
-      <p>Calle y número: <strong>{display(patient.direccion)}</strong></p><p>C.P.: <strong>—</strong></p><p>Colonia: <strong>—</strong></p>
-      <p>Municipio: <strong>—</strong></p><p>Estado: <strong>—</strong></p><p>Ocupación: <strong>{display(patient.ocupacion)}</strong></p>
-    </section>
+    {patientDetails.length > 0 && <section className="clinical-print-demographics">{patientDetails.map(([label, value]) => <p key={label}>{label}: <strong>{value}</strong></p>)}</section>}
 
     <section className="clinical-print-section"><h3>Enfermedades o condiciones</h3><p>{display(consultation.antecedentes?.enfermedades_condiciones)}</p><h3>Motivo de consulta</h3><p>{display(consultation.motivo_consulta)}</p></section>
 

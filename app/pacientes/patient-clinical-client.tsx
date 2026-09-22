@@ -105,7 +105,7 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
   const companyName = (id: string) => props.companies.find((company) => company.id === id)?.nombre ?? "Empresa";
   const productoById = useMemo(() => new Map(props.products.map((product) => [product.id, product])), [props.products]);
   const lensItemsFor = (sale: PatientSale) => sale.venta_items.filter((item) => item.producto_id && productoById.get(item.producto_id)?.categoria === "lente");
-  const labOrderItemsFor = (sale: PatientSale) => { const strict = lensItemsFor(sale); return strict.length ? strict : (sale.venta_items ?? []); };
+  const labOrderItemsFor = (sale: PatientSale) => lensItemsFor(sale);
   const canAnular = props.profile?.rol === "superadmin";
   const abonar = (sale: PatientSale, data: FormData) => start(async () => { data.set("venta_id", sale.id); try { await registrarAbono(data); setNotice("Abono registrado."); } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo registrar el abono."); } });
   const anular = (sale: PatientSale, motivo: string) => start(async () => { const data = new FormData(); data.set("venta_id", sale.id); data.set("motivo", motivo); try { await anularVenta(data); setNotice("Venta anulada."); setAnulling(null); } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo anular la venta."); } });

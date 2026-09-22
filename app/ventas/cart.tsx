@@ -27,13 +27,13 @@ export default function Cart({ products, stock, companies, branches, patients, e
   const [showNuevaConvenio, setShowNuevaConvenio] = useState(false);
   const [nuevaConvenioNombre, setNuevaConvenioNombre] = useState("");
   const [acuerdo, setAcuerdo] = useState<AcuerdoPago | null>(null);
-  const [buscando, setBuscando] = useState<"" | "montura" | "lunas">("");
+  const [buscando, setBuscando] = useState<"" | "rapida" | "montura" | "lunas">("");
 
   const stockFor = (productoId: string, sucursalId: string) => stock.find((s) => s.producto_id === productoId && s.sucursal_id === sucursalId)?.cantidad ?? 0;
   const branchesForCompany = branches.filter((b) => b.empresa_id === company);
   const empresaProducts = products.filter((p) => p.empresa_id === company);
   const stockOk = (p: SaleProduct) => { if ((p.categoria !== "montura" && p.categoria !== "gafas_sol") || !p.controla_inventario || !branch) return true; return stockFor(p.id, branch) > 0; };
-  const availableRapida = empresaProducts.filter((p) => p.categoria !== "montura" && p.categoria !== "lente").filter(stockOk);
+  const availableRapida = empresaProducts.filter((p) => ["accesorio", "gafas_sol", "servicio"].includes(p.categoria)).filter(stockOk);
   const availableArmazon = empresaProducts.filter((p) => p.categoria === "montura").filter(stockOk);
   const availableLunas = empresaProducts.filter((p) => p.categoria === "lente");
   const available = modo === "lentes" ? [...availableArmazon, ...availableLunas] : availableRapida;
@@ -63,6 +63,7 @@ export default function Cart({ products, stock, companies, branches, patients, e
     if (convenioActivo && (!empresaConvenioId || !Number(cuotas))) { setNotice("Elige la empresa del convenio y el número de cuotas."); return; }
     start(async () => {
       const data = new FormData(form);
+      data.set("tipo_venta", modo);
       data.set("items", JSON.stringify(items.map((item) => ({ producto_id: item.producto_id, cantidad: item.cantidad, descuento: item.descuento }))));
       data.set("pagos", JSON.stringify(payments.filter((p) => Number(p.monto) > 0).map((p) => ({ metodo: p.metodo, monto: Number(p.monto), referencia: p.referencia || null, banco: p.banco || null }))));
       try {
@@ -97,9 +98,8 @@ export default function Cart({ products, stock, companies, branches, patients, e
         <label>Cliente<input name="cliente_nombre" placeholder="Opcional" value={pacienteId ? "" : cliente} disabled={!!pacienteId} onChange={(event) => setCliente(event.target.value)} /></label>
         {modo === "rapida" && <label>Agregar producto<select defaultValue="" onChange={(event) => { addProduct(event.target.value); event.currentTarget.value = ""; }}><option value="">Selecciona un producto</option>{availableRapida.map((p) => <option key={p.id} value={p.id}>{p.nombre} · {money(Number(p.precio_venta))}</option>)}</select></label>}
       </div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-        <button type="button" className="outline-action" onClick={() => setBuscando("montura")}><Search size={15} /> Buscar montura</button>
-        <button type="button" className="outline-action" onClick={() => setBuscando("lunas")}><Search size={15} /> Buscar lunas</button>
+      <div className="sale-search-actions">
+        {modo === "rapida" ? <button type="button" className="outline-action" onClick={() => setBuscando("rapida")}><Search size={15} /> Buscar accesorios, gafas o exámenes</button> : <><button type="button" className="outline-action" onClick={() => setBuscando("montura")}><Search size={15} /> Buscar armazón</button><button type="button" className="outline-action" onClick={() => setBuscando("lunas")}><Search size={15} /> Buscar lunas</button></>}
       </div>
       <div className="task-list">{items.map((item) => { const product = available.find((p) => p.id === item.producto_id); if (!product) return null; return <article className="task-card" key={item.producto_id}><div className="task-status" /><div className="task-main"><h2>{product.nombre}</h2><div className="task-meta"><span>{money(Number(product.precio_venta))} c/u</span><label>Cant. <input type="number" min={1} step={1} value={item.cantidad} onChange={(event) => updateItem(item.producto_id, { cantidad: Math.max(1, Number(event.target.value) || 1) })} style={{ width: 52 }} /></label><label>Desc. $<input type="number" min={0} step={0.01} value={item.descuento} onChange={(event) => updateItem(item.producto_id, { descuento: Math.max(0, Number(event.target.value) || 0) })} style={{ width: 68 }} /></label></div><p>Subtotal línea: {money(lineTotal(item))}</p></div><div className="task-actions"><button type="button" className="outline-action" onClick={() => setItems(items.filter((x) => x.producto_id !== item.producto_id))}>Quitar</button></div></article>; })}</div>
       <p className="subtitle">Total: <strong>{money(subtotal)}</strong></p>
@@ -121,7 +121,7 @@ export default function Cart({ products, stock, companies, branches, patients, e
       <button disabled={!items.length || pending} className="new-consultation" type="submit">{pending ? "Guardando…" : convenioActivo ? "Firmar acuerdo de pago" : "Cerrar venta"}</button>
     </form>
     {showNuevaConvenio && <div className="modal-backdrop"><section className="new-patient-modal" role="dialog" aria-modal="true"><p className="section-label">NUEVA EMPRESA DE CONVENIO</p><h2>Agregar empresa</h2><div className="new-patient-form"><label className="task-description">Nombre<input value={nuevaConvenioNombre} onChange={(event) => setNuevaConvenioNombre(event.target.value)} placeholder="Ej.: Municipio de Shushufindi" /></label></div><div className="modal-actions"><button className="outline-action" type="button" onClick={() => setShowNuevaConvenio(false)}>Cancelar</button><button className="new-consultation" type="button" disabled={pending || !nuevaConvenioNombre.trim()} onClick={crearConvenio}>{pending ? "Guardando…" : "Guardar empresa"}</button></div></section></div>}
-    {buscando && <ProductSearchModal title={buscando === "montura" ? "BUSCAR MONTURA" : "BUSCAR LUNAS"} products={buscando === "montura" ? availableArmazon : availableLunas} branch={branch} stockFor={stockFor} onSelect={addProduct} onClose={() => setBuscando("")} />}
+    {buscando && <ProductSearchModal title={buscando === "rapida" ? "BUSCAR ACCESORIOS, GAFAS O EXÁMENES" : buscando === "montura" ? "BUSCAR ARMAZÓN" : "BUSCAR LUNAS"} products={buscando === "rapida" ? availableRapida : buscando === "montura" ? availableArmazon : availableLunas} branch={branch} stockFor={stockFor} onSelect={addProduct} onClose={() => setBuscando("")} />}
   </section>;
 }
 
