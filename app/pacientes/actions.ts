@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient, hasSupabaseAdminConfiguration } from "@/lib/supabase/admin";
-import type { ClinicalPhoto, Consultation, PatientRecord, PatientSale } from "@/lib/clinical";
+import { enrichPatientRecords, type ClinicalPhoto, type Consultation, type PatientRecord, type PatientSale } from "@/lib/clinical";
 import type { Garantia, SaleLabOrder } from "@/lib/ventas";
 import { getOperationalContext } from "@/lib/operational-context";
 import { isAdditionalOptometrist } from "@/lib/clinical-professionals";
@@ -36,8 +36,14 @@ export async function crearPacienteClinico(data: FormData) {
     p_ocupacion: text(data, "ocupacion") || null, p_responsable_id: text(data, "responsable_id") || null,
   });
   if (error) throw new Error(error.message || "No se pudo registrar el paciente.");
+  const saved = result as { paciente_id: string; ya_existia: boolean };
+  const { data: patientRow, error: patientError } = await supabase.from("pacientes_clinicos")
+    .select("id,nombres,apellidos,cedula,telefono,email,direccion,sexo,ocupacion,responsable_id,fecha_nacimiento,frecuencia_cobro,empresa_origen_id,actualizado_en")
+    .eq("id", saved.paciente_id).single();
+  if (patientError || !patientRow) throw new Error("La ficha se guardó, pero no se pudo volver a cargar.");
+  const [patient] = await enrichPatientRecords(supabase, [patientRow]);
   revalidatePath("/pacientes");
-  return result as { paciente_id: string; ya_existia: boolean };
+  return { ...saved, patient };
 }
 
 const astigmatismo = (k1: string, k2: string) => { const a = Number(k1); const b = Number(k2); return Number.isFinite(a) && Number.isFinite(b) && k1 !== "" && k2 !== "" ? Math.abs(a - b).toFixed(2) : ""; };
@@ -116,7 +122,7 @@ export async function buscarPacientesClinicos(query: string): Promise<PatientRec
     .select("id,nombres,apellidos,cedula,telefono,email,direccion,sexo,ocupacion,responsable_id,fecha_nacimiento,frecuencia_cobro,empresa_origen_id,actualizado_en")
     .or(`${nameFilter},${cedulaFilter}`).order("actualizado_en", { ascending: false }).limit(30);
   if (error) throw new Error("No se pudo buscar pacientes.");
-  return data ?? [];
+  return enrichPatientRecords(supabase, data ?? []);
 }
 
 export async function obtenerHistorialPaciente(pacienteId: string): Promise<{ consultations: Consultation[]; photos: ClinicalPhoto[]; sales: PatientSale[]; labOrders: SaleLabOrder[]; garantias: Garantia[] }> {

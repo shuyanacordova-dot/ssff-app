@@ -1,4 +1,5 @@
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
+import { createSupabaseAdminClient, hasSupabaseAdminConfiguration } from "@/lib/supabase/admin";
 import { getOperationalContext } from "@/lib/operational-context";
 import { loadBranchIdentities, type BranchIdentity, type CompanyIdentity } from "@/lib/sucursales";
 
@@ -16,13 +17,13 @@ export type SalesProfile = { id: string; empresa_id: string; sucursal_id: string
 export type SaleLabOrder = { id: string; venta_id: string; venta_item_id: string | null; estado: string; laboratorio: string; es_garantia: boolean };
 export type EmpresaConvenio = { id: string; nombre: string };
 export type Garantia = { id: string; venta_id: string; venta_item_id: string | null; tipo: "armazon" | "luna"; motivo: string; estado: "abierta" | "resuelta" | "rechazada"; orden_laboratorio_id: string | null; notas: string | null; creado_en: string };
-export type VentasData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: SalesProfile; products: SaleProduct[]; stock: SaleStock[]; sales: Sale[]; companies: SaleCompany[]; branches: SaleBranch[]; patients: SalePatient[]; labOrders: SaleLabOrder[]; garantias: Garantia[]; empresasConvenio: EmpresaConvenio[] };
+export type VentasData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: SalesProfile; products: SaleProduct[]; stock: SaleStock[]; sales: Sale[]; companies: SaleCompany[]; branches: SaleBranch[]; accessibleBranches: SaleBranch[]; patients: SalePatient[]; labOrders: SaleLabOrder[]; garantias: Garantia[]; empresasConvenio: EmpresaConvenio[] };
 
 const salesRoles = new Set(["superadmin", "admin_sucursal", "vendedor", "caja", "optometra"]);
 const roleName = (profile: { roles: { nombre: string } | { nombre: string }[] | null } | null) => Array.isArray(profile?.roles) ? profile.roles[0]?.nombre : profile?.roles?.nombre;
 
 export async function getVentasData(): Promise<VentasData> {
-  const empty = { products: [], stock: [], sales: [], companies: [], branches: [], patients: [], labOrders: [], garantias: [], empresasConvenio: [] };
+  const empty = { products: [], stock: [], sales: [], companies: [], branches: [], accessibleBranches: [], patients: [], labOrders: [], garantias: [], empresasConvenio: [] };
   if (!hasSupabaseConfiguration()) return { status: "needs_configuration", message: "Falta configurar la conexión segura de esta copia local.", ...empty };
   try {
     const supabase = await createSupabaseServerClient();
@@ -33,16 +34,30 @@ export async function getVentasData(): Promise<VentasData> {
     const role = roleName(profile);
     if (profileError || !profile?.activo || !role || !salesRoles.has(role)) return { status: "forbidden", message: "Tu perfil no tiene permiso para ventas.", ...empty };
 
-    const [productsResult, salesResult, companiesResult, branchesResult, patientsResult, empresasConvenioResult, operationalContext] = await Promise.all([
+    const [productsResult, salesResult, companiesResult, branchesResult, empresasConvenioResult, operationalContext] = await Promise.all([
       supabase.from("productos_catalogo").select("id,empresa_id,nombre,categoria,precio_venta,controla_inventario").eq("activo", true).order("nombre").limit(200),
       supabase.from("ventas").select("id,empresa_id,sucursal_id,paciente_id,cliente_nombre,estado,subtotal,descuento,total,pagado,saldo,motivo_anulacion,recibo_token,fecha_entrega_estimada,creado_en,folio,venta_items(id,producto_id,descripcion,cantidad,precio_unitario,descuento,total_linea),pagos_venta(id,metodo,monto,referencia,banco,creado_en)").order("creado_en", { ascending: false }).limit(30),
       supabase.from("empresas").select("id,nombre,direccion,telefono,email,logo_url").eq("activo", true).order("nombre"),
       loadBranchIdentities(supabase),
-      supabase.from("pacientes_clinicos").select("id,nombres,apellidos,cedula,telefono").order("apellidos").order("nombres").limit(500),
       supabase.from("empresas_convenio").select("id,nombre").eq("activo", true).order("nombre"),
       getOperationalContext(),
     ]);
     if (productsResult.error || salesResult.error || companiesResult.error) return { status: "error", message: "No se pudo cargar ventas. Revisa la conexión y los permisos.", ...empty };
+
+    // El directorio comercial puede estar limitado por RLS, pero cada venta debe
+    // conservar el nombre de su paciente. La lectura administrativa ocurre solo
+    // después de validar que la sesión tenga un rol autorizado para Ventas.
+    const patientReader = hasSupabaseAdminConfiguration() ? createSupabaseAdminClient() : supabase;
+    const salePatientIds = Array.from(new Set((salesResult.data ?? []).map((sale) => sale.paciente_id).filter(Boolean))) as string[];
+    const [patientDirectoryResult, salePatientsResult] = await Promise.all([
+      patientReader.from("pacientes_clinicos").select("id,nombres,apellidos,cedula,telefono").order("apellidos").order("nombres").limit(500),
+      salePatientIds.length
+        ? patientReader.from("pacientes_clinicos").select("id,nombres,apellidos,cedula,telefono").in("id", salePatientIds)
+        : Promise.resolve({ data: [] as SalePatient[], error: null }),
+    ]);
+    const patientMap = new Map<string, SalePatient>();
+    (patientDirectoryResult.data ?? []).forEach((patient) => patientMap.set(patient.id, patient));
+    (salePatientsResult.data ?? []).forEach((patient) => patientMap.set(patient.id, patient));
 
     const productIds = (productsResult.data ?? []).map((product) => product.id);
     const stockResult = productIds.length ? await supabase.from("inventario_stock").select("producto_id,sucursal_id,cantidad").in("producto_id", productIds) : { data: [], error: null };
@@ -62,7 +77,8 @@ export async function getVentasData(): Promise<VentasData> {
       sales: (salesResult.data ?? []) as unknown as Sale[],
       companies: (companiesResult.data ?? []) as SaleCompany[],
       branches: branchesResult.branches,
-      patients: patientsResult.error ? [] : (patientsResult.data ?? []),
+      accessibleBranches: operationalContext?.accessibleBranches ?? branchesResult.branches,
+      patients: Array.from(patientMap.values()),
       labOrders: labOrdersResult.error ? [] : (labOrdersResult.data ?? []),
       garantias: garantiasResult.error ? [] : ((garantiasResult.data ?? []) as unknown as Garantia[]),
       empresasConvenio: empresasConvenioResult.error ? [] : (empresasConvenioResult.data ?? []),

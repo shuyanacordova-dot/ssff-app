@@ -86,7 +86,7 @@ export default function AppNavigation() {
   return <>
     <header className="app-topbar no-print">
       <div className="app-topbar-inner">
-        <Link className="app-nav-brand" href="/" aria-label="Ir al inicio"><Image src="/logos/shuvision-logo.png" alt="ShuVisión" width={36} height={36} priority /><span><strong>ShuVisión</strong><small>Sistema óptico</small></span></Link>
+        <Link className="app-nav-brand" href="/" aria-label="Ir al inicio"><Image src="/logos/shuvision-logo.png" alt="Revelio" width={36} height={36} priority /><span><strong>Revelio</strong><small>Sistema óptico</small></span></Link>
         <nav className="app-primary-nav" aria-label="Navegación principal">{primaryItems.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} className={isActive(item.href) ? "active" : ""}><Icon size={17} /><span>{item.label}</span></Link>; })}</nav>
         <button className="app-menu-trigger" type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label="Abrir menú completo"><Menu size={19} /><span>Menú</span><kbd>⌘K</kbd></button>
       </div>

@@ -13,7 +13,7 @@ export default async function ActualizarContrasenaPage({ searchParams }: PagePro
   return (
     <main className="login-page">
       <form action={actualizarContrasena} className="login-card">
-        <p className="brand-mark"><span className="ring" /> Shuvisión OS</p>
+        <p className="brand-mark"><span className="ring" /> Revelio</p>
         <h1>Crea tu nueva contraseña</h1>
         <p className="login-copy">Elige una contraseña nueva de al menos 8 caracteres.</p>
         <label className="login-field">

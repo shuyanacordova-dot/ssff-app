@@ -31,14 +31,14 @@ type Recibo = {
 export default async function ReciboPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
 
-  if (!hasSupabaseConfiguration()) return <main className="login-page"><section className="glass login-card"><p className="eyebrow">SHUVISION OS</p><h1>Recibo no disponible</h1><p className="login-copy">Esta copia no tiene la conexión configurada.</p></section></main>;
+  if (!hasSupabaseConfiguration()) return <main className="login-page"><section className="glass login-card"><p className="eyebrow">REVELIO</p><h1>Recibo no disponible</h1><p className="login-copy">Esta copia no tiene la conexión configurada.</p></section></main>;
 
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("obtener_recibo_publico", { p_token: token });
-  if (error || !data) return <main className="login-page"><section className="glass login-card"><p className="eyebrow">SHUVISION OS</p><h1>Recibo no encontrado</h1><p className="login-copy">Este enlace no es válido. Pide a la óptica que te comparta el recibo nuevamente.</p></section></main>;
+  if (error || !data) return <main className="login-page"><section className="glass login-card"><p className="eyebrow">REVELIO</p><h1>Recibo no encontrado</h1><p className="login-copy">Este enlace no es válido. Pide a la óptica que te comparta el recibo nuevamente.</p></section></main>;
 
   const recibo = data as Recibo;
-  const company = { nombre: recibo.empresa_nombre ?? "SHUVISION OS", direccion: recibo.empresa_direccion, telefono: recibo.empresa_telefono, email: recibo.empresa_email, logo_url: recibo.empresa_logo_url };
+  const company = { nombre: recibo.empresa_nombre ?? "REVELIO", direccion: recibo.empresa_direccion, telefono: recibo.empresa_telefono, email: recibo.empresa_email, logo_url: recibo.empresa_logo_url };
 
   return <main className="login-page"><section className="glass login-card print-area print-ticket" style={{ width: "min(400px, 100%)" }}>
     <Letterhead company={company} subtitle={recibo.sucursal_nombre ?? undefined} />

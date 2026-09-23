@@ -21,7 +21,7 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean }) {
   const role = props.profile?.rol;
   const canSaldos = role === "superadmin" || role === "admin_sucursal" || role === "caja";
 
-  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← SHUVISION OS</Link><p className="eyebrow">FINANZAS</p><h1>Cuadre de caja</h1><p className="subtitle">{props.message ?? "No se pudo abrir caja."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/caja">Iniciar sesión</Link>}</header></div></main>;
+  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← REVELIO</Link><p className="eyebrow">FINANZAS</p><h1>Cuadre de caja</h1><p className="subtitle">{props.message ?? "No se pudo abrir caja."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/caja">Iniciar sesión</Link>}</header></div></main>;
 
   const branches = props.branches.filter((branch) => branch.empresa_id === empresaId);
   const cuentas = props.cuentas.filter((cuenta) => cuenta.empresa_id === empresaId);
@@ -35,7 +35,7 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean }) {
   });
 
   return <main className="page agenda-page"><div className="container agenda-shell">
-    <header className="agenda-header"><div><Link className="back-link" href="/">← SHUVISION OS</Link><p className="eyebrow">FINANZAS</p><h1>Cuadre de caja</h1><p className="subtitle">Cuadre diario y gastos, separados por empresa.</p></div><div className="tabs">{props.companies.map((company) => <button key={company.id} className={company.id === empresaId ? "active" : ""} onClick={() => setEmpresaId(company.id)}>{company.nombre}</button>)}</div></header>
+    <header className="agenda-header"><div><Link className="back-link" href="/">← REVELIO</Link><p className="eyebrow">FINANZAS</p><h1>Cuadre de caja</h1><p className="subtitle">Cuadre diario y gastos, separados por empresa.</p></div><div className="tabs">{props.companies.map((company) => <button key={company.id} className={company.id === empresaId ? "active" : ""} onClick={() => setEmpresaId(company.id)}>{company.nombre}</button>)}</div></header>
     <section className="agenda-summary"><article><Receipt size={21} /><strong>{gastos.length}</strong><span>gastos registrados</span></article><article><Banknote size={21} /><strong>{cierres.filter((c) => c.cuadre_correcto).length}/{cierres.length}</strong><span>cuadres correctos</span></article></section>
     <div className="notice"><AlertCircle size={18} /><span>{notice || "Un cuadre solo puede registrarse una vez por sucursal y fecha; verifica los datos antes de guardar."}</span></div>
 

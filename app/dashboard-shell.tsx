@@ -7,7 +7,7 @@ import type { TaskData } from "@/lib/tasks";
 import type { InformeMensual } from "./informes/actions";
 import TaskBoard from "./tareas/task-board";
 import { cerrarSesion } from "./login/actions";
-import BranchSelector from "./branch-selector";
+import BranchSelector, { BranchDirectory } from "./branch-selector";
 
 const money = (value: number) => new Intl.NumberFormat("es-EC", { style: "currency", currency: "USD" }).format(value);
 const pct = (actual: number, meta: number) => meta > 0 ? Math.round((actual / meta) * 100) : 0;
@@ -18,9 +18,11 @@ export default function DashboardShell({ taskData, informeMensual, metasMessage 
 
   return <main className="page dashboard-page"><div className="container dashboard-shell">
     <header className="dashboard-header">
-      <div><p className="brand-mark"><Image className="dashboard-logo" src={taskData.profile?.logoUrl || "/logos/shuvision-logo.png"} alt={taskData.profile?.empresaNombre || "Shuvisión OS"} width={36} height={36} priority /> {taskData.profile?.empresaNombre ?? "Shuvisión OS"}</p><h1>Hola, {taskData.profile?.nombre ?? "equipo"}</h1>{taskData.profile && <><p className="dashboard-branch">{taskData.profile.sucursalNombre}</p><BranchSelector activeId={taskData.profile.sucursalId} branches={taskData.profile.accessibleBranches} /></>}</div>
+      <div><p className="brand-mark"><Image className="dashboard-logo" src={taskData.profile?.logoUrl || "/logos/shuvision-logo.png"} alt={taskData.profile?.empresaNombre || "Revelio"} width={36} height={36} priority /> {taskData.profile?.empresaNombre ?? "Revelio"}</p><h1>Hola, {taskData.profile?.nombre ?? "equipo"}</h1>{taskData.profile && <><p className="dashboard-branch">{taskData.profile.sucursalNombre}</p><BranchSelector activeId={taskData.profile.sucursalId} branches={taskData.profile.accessibleBranches} /></>}</div>
       <form action={cerrarSesion}><button className="outline-action" type="submit"><LogOut size={15} /> Cerrar sesión</button></form>
     </header>
+
+    {taskData.profile && <BranchDirectory activeId={taskData.profile.sucursalId} branches={taskData.profile.accessibleBranches} />}
 
     <section className="operations-quick-grid" aria-label="Acciones frecuentes">
       <Link href="/pacientes?new=1"><span className="quick-icon teal"><UserPlus size={21} /></span><span><strong>Nuevo paciente</strong><small>Crear ficha clínica</small></span></Link>

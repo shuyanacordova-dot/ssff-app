@@ -12,7 +12,7 @@ export default function ConveniosBoard(props: ConveniosData) {
   const [showNueva, setShowNueva] = useState(false);
   const [nombre, setNombre] = useState("");
 
-  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← SHUVISION OS</Link><p className="eyebrow">OPERACIÓN COMERCIAL</p><h1>Convenios</h1><p className="subtitle">{props.message ?? "No se pudo abrir convenios."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/convenios">Iniciar sesión</Link>}</header></div></main>;
+  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← REVELIO</Link><p className="eyebrow">OPERACIÓN COMERCIAL</p><h1>Convenios</h1><p className="subtitle">{props.message ?? "No se pudo abrir convenios."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/convenios">Iniciar sesión</Link>}</header></div></main>;
 
   const crear = () => start(async () => {
     try { await crearEmpresaConvenio(nombre); setNotice("Empresa de convenio registrada."); setShowNueva(false); setNombre(""); }
@@ -24,7 +24,7 @@ export default function ConveniosBoard(props: ConveniosData) {
   });
 
   return <main className="page agenda-page"><div className="container agenda-shell">
-    <header className="agenda-header"><div><Link className="back-link" href="/">← SHUVISION OS</Link><p className="eyebrow">OPERACIÓN COMERCIAL</p><h1>Convenios</h1><p className="subtitle">Empresas con las que se firman acuerdos de pago por descuento a rol de pagos.</p></div><button className="new-task" type="button" onClick={() => setShowNueva(true)}><Plus size={18} /> Nueva empresa</button></header>
+    <header className="agenda-header"><div><Link className="back-link" href="/">← REVELIO</Link><p className="eyebrow">OPERACIÓN COMERCIAL</p><h1>Convenios</h1><p className="subtitle">Empresas con las que se firman acuerdos de pago por descuento a rol de pagos.</p></div><button className="new-task" type="button" onClick={() => setShowNueva(true)}><Plus size={18} /> Nueva empresa</button></header>
     <div className="notice"><CircleAlert size={18} /><span>{notice || "Estas empresas aparecen al firmar un convenio de pago, en Ventas o en Cuentas por cobrar."}</span></div>
 
     <section className="glass agenda-board">

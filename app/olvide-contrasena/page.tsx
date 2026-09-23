@@ -15,7 +15,7 @@ export default async function OlvideContrasenaPage({ searchParams }: PageProps) 
   return (
     <main className="login-page">
       <form action={solicitarRecuperacion} className="login-card">
-        <p className="brand-mark"><span className="ring" /> Shuvisión OS</p>
+        <p className="brand-mark"><span className="ring" /> Revelio</p>
         <h1>Recupera tu contraseña</h1>
         <p className="login-copy">Ingresa el correo con el que inicias sesión; te enviaremos un enlace para crear una contraseña nueva.</p>
         {enviado ? (

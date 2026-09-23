@@ -7,8 +7,8 @@ const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-display", weig
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-body", weight: ["400", "600", "700", "800"] });
 
 export const metadata: Metadata = {
-  title: "SSFF | Sistema Óptico",
-  description: "Sistema de gestión de ShuVision y Focus",
+  title: "Revelio | Sistema Óptico",
+  description: "Revelio, el sistema de gestión de Shuvisión y Focus",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
