@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { AlertCircle, Banknote, CheckCircle2, Plus, Receipt, XCircle, X } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
-import type { CajaData, CierreCaja } from "@/lib/caja";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import type { CajaData, CajaBranch, CierreCaja } from "@/lib/caja";
 import { crearCierreCaja, crearGasto, previsualizarCierre, type ResultadoCierre, type VistaCierre } from "./actions";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
@@ -39,6 +39,8 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean }) {
     <section className="agenda-summary"><article><Receipt size={21} /><strong>{gastos.length}</strong><span>gastos registrados</span></article><article><Banknote size={21} /><strong>{cierres.filter((c) => c.cuadre_correcto).length}/{cierres.length}</strong><span>cuadres correctos</span></article></section>
     <div className="notice"><AlertCircle size={18} /><span>{notice || "Un cuadre solo puede registrarse una vez por sucursal y fecha; verifica los datos antes de guardar."}</span></div>
 
+    <ResumenCajaHoy empresaId={empresaId} branches={branches} cierres={cierres} defaultSucursalId={props.profile?.sucursal_id ?? ""} onNuevoCuadre={() => setShowCierre(true)} />
+
     <section className="glass agenda-board" style={{ marginBottom: 18 }}><div className="agenda-toolbar"><div><p className="section-label">EGRESOS</p><h2>Gastos recientes</h2></div><button className="new-task" type="button" onClick={() => setShowGasto(true)}><Plus size={18} /> Nuevo gasto</button></div>{gastos.length ? <div className="task-list">{gastos.slice(0, 15).map((gasto) => <article className="task-card" key={gasto.id}><div className="task-status"><span className="status-dot" /></div><div className="task-main"><div className="task-meta"><span>{clasificacionLabel[gasto.clasificacion]}</span><span>{gasto.origen === "banco" ? bancoLabel[cuentaById.get(gasto.cuenta_bancaria_id ?? "")?.banco ?? ""] || "Banco" : "Efectivo"}</span><span>{formatDate(gasto.fecha)}</span></div><h2>{gasto.concepto}</h2>{gasto.observaciones && <p>{gasto.observaciones}</p>}</div><div className="task-actions"><strong>{money(gasto.monto)}</strong></div></article>)}</div> : <section className="empty-state"><Receipt size={27} /><h3>Aún no hay gastos</h3><p>Registra el primer egreso de esta empresa.</p></section>}</section>
 
     <section className="glass agenda-board"><div className="agenda-toolbar"><div><p className="section-label">CIERRE DIARIO</p><h2>Cuadre de caja</h2></div><button className="new-task" type="button" onClick={() => setShowCierre(true)}><Plus size={18} /> Nuevo cuadre</button></div>{cierres.length ? <div className="task-list">{cierres.map((cierre) => <CierreCard key={cierre.id} cierre={cierre} sucursalNombre={props.branches.find((b) => b.id === cierre.sucursal_id)?.nombre ?? "Sucursal"} />)}</div> : <section className="empty-state"><Banknote size={27} /><h3>Sin cuadres registrados</h3><p>El primer cierre diario aparecerá aquí.</p></section>}</section>
@@ -46,6 +48,43 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean }) {
     {showGasto && <GastoModal empresaId={empresaId} branches={branches} cuentas={cuentas} canSaldos={canSaldos} pending={pending} onClose={() => setShowGasto(false)} onSubmit={(form) => runAction(() => crearGasto(form), "Gasto registrado.")} />}
     {showCierre && <CierreModal empresaId={empresaId} branches={branches} onClose={(message) => { setShowCierre(false); if (message) setNotice(message); }} />}
   </div></main>;
+}
+
+function ResumenCajaHoy({ empresaId, branches, cierres, defaultSucursalId, onNuevoCuadre }: { empresaId: string; branches: CajaBranch[]; cierres: CierreCaja[]; defaultSucursalId: string; onNuevoCuadre: () => void }) {
+  const [sucursalId, setSucursalId] = useState(() => (branches.some((b) => b.id === defaultSucursalId) ? defaultSucursalId : branches[0]?.id ?? ""));
+  useEffect(() => { if (!branches.some((b) => b.id === sucursalId)) setSucursalId(branches[0]?.id ?? ""); }, [branches, sucursalId]);
+  const [vista, setVista] = useState<VistaCierre | null>(null);
+  const [error, setError] = useState("");
+  const [loading, startLoading] = useTransition();
+  const fecha = today();
+
+  useEffect(() => {
+    if (!sucursalId) { setVista(null); return; }
+    startLoading(async () => {
+      const result = await previsualizarCierre(empresaId, sucursalId, fecha);
+      if ("error" in result) { setError(result.error); setVista(null); } else { setError(""); setVista(result); }
+    });
+  }, [empresaId, sucursalId, fecha]);
+
+  const cierreDeHoy = useMemo(() => cierres.find((c) => c.sucursal_id === sucursalId && c.fecha === fecha), [cierres, sucursalId, fecha]);
+  const transferencias = vista ? vista.cobro_transferencia_pichincha + vista.cobro_transferencia_guayaquil + vista.cobro_transferencia_internacional : 0;
+
+  return <section className="glass agenda-board caja-resumen-hoy" style={{ marginBottom: 18 }}>
+    <div className="agenda-toolbar">
+      <div><p className="section-label">HOY · {formatDate(fecha)}</p><h2>Resumen de caja</h2></div>
+      {branches.length > 1 && <select value={sucursalId} onChange={(event) => setSucursalId(event.target.value)}>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select>}
+    </div>
+    {!sucursalId ? <p className="field-hint">No hay sucursales para revisar.</p> : loading ? <p className="field-hint">Calculando…</p> : error ? <p className="notice">{error}</p> : vista && <>
+      {cierreDeHoy ? <div className={`caja-estado ${cierreDeHoy.cuadre_correcto ? "ok" : "fail"}`}>{cierreDeHoy.cuadre_correcto ? <CheckCircle2 size={19} /> : <XCircle size={19} />}<span>{cierreDeHoy.cuadre_correcto ? "Caja cuadrada" : `Caja no cuadrada · Diferencia ${money(cierreDeHoy.diferencia)}`}</span></div> : <div className="caja-estado pending"><AlertCircle size={19} /><span>Aún no se ha cerrado la caja de hoy — estos son los valores registrados hasta el momento.</span></div>}
+      <div className="caja-resumen-grid">
+        <div><span className="section-label">Caja del día anterior</span><strong>{money(vista.caja_anterior)}</strong></div>
+        <div><span className="section-label">Efectivo de hoy</span><strong>{money(cierreDeHoy ? cierreDeHoy.declarado_efectivo : vista.cobro_efectivo)}</strong></div>
+        <div><span className="section-label">Tarjetas</span><strong>{money(cierreDeHoy ? cierreDeHoy.declarado_tarjeta : vista.cobro_tarjeta)}</strong></div>
+        <div><span className="section-label">Transferencias (todos los bancos)</span><strong>{money(cierreDeHoy ? (cierreDeHoy.declarado_transferencia_pichincha + cierreDeHoy.declarado_transferencia_guayaquil + cierreDeHoy.declarado_transferencia_internacional) : transferencias)}</strong></div>
+      </div>
+      {!cierreDeHoy && <button className="outline-action" type="button" style={{ marginTop: 10 }} onClick={onNuevoCuadre}>Cerrar caja de hoy</button>}
+    </>}
+  </section>;
 }
 
 function CheckBadge({ label, value }: { label: string; value: boolean | null }) {
