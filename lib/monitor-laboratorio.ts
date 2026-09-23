@@ -1,7 +1,7 @@
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 import { getOperationalContext } from "@/lib/operational-context";
 import { branchLetterhead, type BranchIdentity, type CompanyIdentity } from "@/lib/sucursales";
-import type { EstadoOrdenLaboratorio, LaboratorioProveedor, OrdenLaboratorioMedidas, OrdenLaboratorioRx, TipoLente, UsoCalculado } from "@/lib/laboratorio";
+import { normalizarEstadoOrden, type EstadoOrdenLaboratorio, type LaboratorioProveedor, type OrdenLaboratorioMedidas, type OrdenLaboratorioRx, type TipoLente, type UsoCalculado } from "@/lib/laboratorio";
 
 export type LabMonitorOrder = {
   id: string;
@@ -93,6 +93,7 @@ export async function getLabMonitorData(): Promise<LabMonitorData> {
       const branch = branches.get(order.sucursal_id);
       return {
         ...order,
+        estado: normalizarEstadoOrden(order.estado),
         paciente_nombre: patient ? [patient.nombres, patient.apellidos].map((part) => part?.trim()).filter(Boolean).join(" ") || "Paciente" : "Paciente",
         paciente_telefono: patient?.telefono ?? null,
         venta_folio: sale?.folio ?? null,

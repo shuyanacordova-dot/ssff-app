@@ -1,7 +1,7 @@
 export type LaboratorioProveedor = "provision" | "optec" | "indulentes" | "importlens" | "otro";
 export type UsoCalculado = "lejos" | "cerca" | "lejos_y_cerca";
 export type TipoLente = "monofocal_lejos" | "monofocal_cerca" | "bifocal" | "progresivo";
-export type EstadoOrdenLaboratorio = "pendiente" | "enviado" | "en_proceso" | "recibido" | "control_calidad" | "listo_entrega" | "notificado" | "entregado" | "rechazado";
+export type EstadoOrdenLaboratorio = "pendiente" | "enviado" | "recibido" | "notificado" | "entregado" | "rechazado";
 
 export type RxEye = { esfera: string; cilindro: string; eje: string; add: string; dnp: string; procesar: boolean };
 export type OrdenLaboratorioRx = { od: RxEye; oi: RxEye };
@@ -29,14 +29,18 @@ export type RefraccionOption = { id: string; fecha_consulta: string; refraccion:
 export const estadoOrdenLabels: Record<EstadoOrdenLaboratorio, string> = {
   pendiente: "Pendiente",
   enviado: "Enviado al laboratorio",
-  en_proceso: "En proceso",
-  recibido: "Recibido en óptica",
-  control_calidad: "Control de calidad",
-  listo_entrega: "Listo para entrega",
+  recibido: "Recibido",
   notificado: "Paciente notificado",
   entregado: "Entregado",
   rechazado: "Rechazado",
 };
+
+// Convierte estados antiguos (de antes de simplificar el flujo) al paso equivalente más cercano.
+const legacyEstadoMap: Record<string, EstadoOrdenLaboratorio> = { en_proceso: "enviado", control_calidad: "recibido", listo_entrega: "recibido" };
+export function normalizarEstadoOrden(estado: string): EstadoOrdenLaboratorio {
+  if (estado in estadoOrdenLabels) return estado as EstadoOrdenLaboratorio;
+  return legacyEstadoMap[estado] ?? "pendiente";
+}
 
 export const laboratorioLabels: Record<LaboratorioProveedor, string> = {
   provision: "Provisión Laboratorio",

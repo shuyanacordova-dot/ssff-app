@@ -9,7 +9,7 @@ import LabOrderPrint from "../lab-order-print";
 import { printCurrentDocument } from "@/lib/print-document";
 
 const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
-const estadoOrder: EstadoOrdenLaboratorio[] = ["pendiente", "enviado", "en_proceso", "recibido", "control_calidad", "listo_entrega", "notificado", "entregado", "rechazado"];
+const estadoOrder = Object.keys(estadoOrdenLabels) as EstadoOrdenLaboratorio[];
 const distanciaUsoLabel: Record<UsoCalculado, string> = { lejos: "Lejos", cerca: "Cerca", lejos_y_cerca: "Todas" };
 
 function RxEyeCard({ eye, value, onChange, disabled }: { eye: "OD" | "OI"; value: RxEye; onChange: (v: RxEye) => void; disabled?: boolean }) {

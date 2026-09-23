@@ -25,8 +25,10 @@ export async function getAgendaData(): Promise<AgendaData> {
     const role = roleName(profile);
     if (profileError || !profile?.activo || !role || !clinicalRoles.has(role)) return { status: "forbidden", message: "Tu perfil no tiene permiso para la agenda clínica.", ...empty };
 
+    const rangeStart = new Date(); rangeStart.setDate(rangeStart.getDate() - 120);
+    const rangeEnd = new Date(); rangeEnd.setDate(rangeEnd.getDate() + 180);
     const [appointmentsResult, patientsResult, companiesResult, branchesResult, teamResult, operationalContext] = await Promise.all([
-      supabase.from("citas_agenda").select("id,paciente_id,empresa_atencion_id,sucursal_atencion_id,responsable_id,inicio,duracion_minutos,tipo,motivo,notas_agenda,estado").order("inicio", { ascending: true }).limit(500),
+      supabase.from("citas_agenda").select("id,paciente_id,empresa_atencion_id,sucursal_atencion_id,responsable_id,inicio,duracion_minutos,tipo,motivo,notas_agenda,estado").gte("inicio", rangeStart.toISOString()).lte("inicio", rangeEnd.toISOString()).order("inicio", { ascending: true }).limit(2000),
       supabase.from("pacientes_clinicos").select("id,nombres,apellidos,cedula,telefono").order("apellidos").order("nombres").limit(500),
       supabase.from("empresas").select("id,nombre,slug").eq("activo", true).order("nombre"),
       supabase.from("sucursales").select("id,empresa_id,nombre,ciudad").order("nombre"),

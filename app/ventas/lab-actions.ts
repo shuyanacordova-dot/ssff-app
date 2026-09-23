@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { estadoOrdenLabels, type OrdenLaboratorio, type OrdenLaboratorioMedidas, type OrdenLaboratorioRx, type RefraccionOption } from "@/lib/laboratorio";
+import { estadoOrdenLabels, normalizarEstadoOrden, type OrdenLaboratorio, type OrdenLaboratorioMedidas, type OrdenLaboratorioRx, type RefraccionOption } from "@/lib/laboratorio";
 
 export async function getRefraccionesPaciente(pacienteId: string): Promise<RefraccionOption[]> {
   if (!pacienteId) return [];
@@ -69,7 +69,7 @@ export async function getOrdenLaboratorio(ordenId: string): Promise<OrdenLaborat
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.from("ordenes_laboratorio").select("id,venta_id,venta_item_id,consulta_id,estado,laboratorio,uso_calculado,tipo_lente,rx,medidas,notas,es_garantia,orden_original_id,creado_en").eq("id", ordenId).maybeSingle();
   if (error || !data) return null;
-  return data as unknown as OrdenLaboratorio;
+  return { ...data, estado: normalizarEstadoOrden(data.estado) } as unknown as OrdenLaboratorio;
 }
 
 export async function cambiarEstadoOrdenLaboratorio(ordenId: string, estado: string) {

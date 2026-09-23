@@ -11,9 +11,9 @@ import { cambiarEstadoOrdenLaboratorio } from "@/app/ventas/lab-actions";
 import { printCurrentDocument } from "@/lib/print-document";
 
 const statusOptions = Object.entries(estadoOrdenLabels) as [EstadoOrdenLaboratorio, string][];
-const flowStatuses: EstadoOrdenLaboratorio[] = ["pendiente", "enviado", "en_proceso", "recibido", "control_calidad", "listo_entrega", "notificado", "entregado"];
+const flowStatuses: EstadoOrdenLaboratorio[] = ["pendiente", "enviado", "recibido", "notificado", "entregado"];
 const closedStatuses = new Set<EstadoOrdenLaboratorio>(["entregado", "rechazado"]);
-const readyStatuses = new Set<EstadoOrdenLaboratorio>(["listo_entrega", "notificado"]);
+const readyStatuses = new Set<EstadoOrdenLaboratorio>(["recibido"]);
 const date = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value.length === 10 ? `${value}T12:00:00` : value));
 const shortId = (order: LabMonitorOrder) => order.venta_folio ? `Venta #${order.venta_folio}` : `Orden ${order.id.slice(0, 8).toUpperCase()}`;
 const overdue = (order: LabMonitorOrder) => !!order.fecha_entrega_estimada && new Date(`${order.fecha_entrega_estimada}T23:59:59`) < new Date() && !closedStatuses.has(order.estado);
@@ -107,7 +107,7 @@ function OrderDetail({ order, pending, onClose, onStatus }: { order: LabMonitorO
     </div>
     <div className="no-print">
       <div className="lab-print-title"><div><p className="section-label">ORDEN DE TRABAJO</p><h2 id="lab-order-title">{order.paciente_nombre}</h2><p>{shortId(order)} · {date(order.creado_en)}</p></div><span className={`lab-status status-${order.estado}`}>{estadoOrdenLabels[order.estado]}</span></div>
-      <div className="lab-flow-track" aria-label="Progreso de la orden">{flowStatuses.map((state, index) => { const currentIndex = flowStatuses.indexOf(order.estado); const complete = currentIndex >= index && order.estado !== "rechazado"; return <div key={state} className={`${complete ? "complete" : ""} ${order.estado === state ? "current" : ""}`}><span>{complete ? <CheckCircle2 size={13} /> : index + 1}</span><small>{estadoOrdenLabels[state]}</small></div>; })}</div>
+      <ul className="lab-checklist" aria-label="Progreso de la orden">{flowStatuses.map((state, index) => { const currentIndex = flowStatuses.indexOf(order.estado); const complete = currentIndex >= index && order.estado !== "rechazado"; const isCurrent = order.estado === state; return <li key={state} className={`${complete ? "complete" : ""} ${isCurrent ? "current" : ""}`}><button type="button" disabled={pending} onClick={() => onStatus(state)}><span className="lab-checklist-mark">{complete ? <CheckCircle2 size={15} /> : <span className="lab-checklist-dot" />}</span><span>{estadoOrdenLabels[state]}</span></button></li>; })}</ul>
       {order.estado === "rechazado" && <div className="lab-rejected-note"><ShieldAlert size={16} /><span>Esta orden está rechazada{order.motivo_rechazo ? `: ${order.motivo_rechazo}` : "."}</span></div>}
       <div className="lab-detail-grid"><span><strong>Laboratorio</strong>{laboratorioLabels[order.laboratorio] ?? order.laboratorio}</span><span><strong>Tipo de lente</strong>{tipoLenteLabels[order.tipo_lente] ?? order.tipo_lente}</span><span><strong>Sucursal</strong>{order.sucursal_nombre}</span><span><strong>Entrega estimada</strong>{order.fecha_entrega_estimada ? date(order.fecha_entrega_estimada) : "Sin fecha"}</span></div>
       <div className="lab-detail-grid lab-measures"><span><strong>Vertical</strong>{order.medidas?.vertical || "—"}</span><span><strong>Horizontal mayor</strong>{order.medidas?.horizontal_mayor || "—"}</span><span><strong>Puente</strong>{order.medidas?.puente || "—"}</span><span><strong>Altura</strong>{order.medidas?.altura || "—"}</span><span><strong>DNP</strong>{order.medidas?.dnp || "—"}</span></div>
