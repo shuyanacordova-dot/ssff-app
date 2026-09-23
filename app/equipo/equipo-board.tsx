@@ -169,14 +169,14 @@ function NewCollaboratorModal({ empresas, sucursales, roles, onClose }: { empres
 export default function EquipoBoard(props: EquipoData) {
   const [nuevoAbierto, setNuevoAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState("");
-  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← REVELIO</Link><p className="eyebrow">CONFIGURACIÓN</p><h1>Equipo y accesos</h1><p className="subtitle">{props.message ?? "No se pudo abrir el equipo."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/equipo">Iniciar sesión</Link>}</header></div></main>;
+  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">CONFIGURACIÓN</p><h1>Equipo y accesos</h1><p className="subtitle">{props.message ?? "No se pudo abrir el equipo."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/equipo">Iniciar sesión</Link>}</header></div></main>;
 
   const termino = busqueda.trim().toLowerCase();
   const colaboradores = props.colaboradores.filter((colaborador) => !termino || [colaborador.nombre, colaborador.email, colaborador.empresa_nombre, colaborador.sucursal_nombre, colaborador.rol].some((value) => value.toLowerCase().includes(termino)));
   const activos = props.colaboradores.filter((colaborador) => colaborador.activo).length;
 
   return <main className="page agenda-page team-page"><div className="container agenda-shell">
-    <header className="agenda-header"><div><Link className="back-link" href="/">← REVELIO</Link><p className="eyebrow">CONFIGURACIÓN</p><h1>Equipo y accesos</h1><p className="subtitle">Crea usuarios, define su rol y sucursal, cambia contraseñas o desactiva accesos.</p></div><button className="new-task" type="button" disabled={!props.canManageAuth} title={!props.canManageAuth ? "Requiere la clave administrativa en el servidor" : undefined} onClick={() => setNuevoAbierto(true)}><UserPlus size={17} /> Añadir integrante</button></header>
+    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">CONFIGURACIÓN</p><h1>Equipo y accesos</h1><p className="subtitle">Crea usuarios, define su rol y sucursal, cambia contraseñas o desactiva accesos.</p></div><button className="new-task" type="button" disabled={!props.canManageAuth} title={!props.canManageAuth ? "Requiere la clave administrativa en el servidor" : undefined} onClick={() => setNuevoAbierto(true)}><UserPlus size={17} /> Añadir integrante</button></header>
 
     <div className="team-summary">
       <article><strong>{props.colaboradores.length}</strong><span>Integrantes registrados</span></article>

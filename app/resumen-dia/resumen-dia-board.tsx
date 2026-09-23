@@ -13,7 +13,7 @@ const clasificacionLabel: Record<string, string> = { salarios: "Salarios", pago_
 export default function ResumenDiaBoard(props: ResumenDiaData & { fecha: string }) {
   const router = useRouter();
 
-  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← REVELIO</Link><p className="eyebrow">OPERACIÓN DEL DÍA</p><h1>Resumen del día</h1><p className="subtitle">{props.message ?? "No se pudo abrir el resumen."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/resumen-dia">Iniciar sesión</Link>}</header></div></main>;
+  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN DEL DÍA</p><h1>Resumen del día</h1><p className="subtitle">{props.message ?? "No se pudo abrir el resumen."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/resumen-dia">Iniciar sesión</Link>}</header></div></main>;
 
   const empresaId = props.profile?.empresa_id ?? props.companies[0]?.id ?? "";
   const irA = (fecha: string, empresa: string) => router.push(`/resumen-dia?fecha=${fecha}&empresa=${empresa}`);
@@ -26,7 +26,7 @@ export default function ResumenDiaBoard(props: ResumenDiaData & { fecha: string 
 
   return <main className="page agenda-page"><div className="container agenda-shell">
     <header className="agenda-header no-print">
-      <div><Link className="back-link" href="/">← REVELIO</Link><p className="eyebrow">OPERACIÓN DEL DÍA</p><h1>Resumen del día</h1><p className="subtitle">Ventas, abonos y salidas del día — la base para cerrar la <Link href="/caja" className="text-action" style={{ display: "inline" }}>caja diaria</Link>.</p></div>
+      <div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN DEL DÍA</p><h1>Resumen del día</h1><p className="subtitle">Ventas, abonos y salidas del día — la base para cerrar la <Link href="/caja" className="text-action" style={{ display: "inline" }}>caja diaria</Link>.</p></div>
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <input type="date" value={props.fecha} onChange={(event) => irA(event.target.value, empresaId)} />
         <button className="outline-action" type="button" onClick={() => window.print()}><Printer size={15} /> Imprimir</button>

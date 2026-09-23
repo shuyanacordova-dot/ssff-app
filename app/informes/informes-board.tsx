@@ -31,7 +31,7 @@ export default function InformesBoard(props: InformesData) {
     });
   }, [empresaId, mes, props.status, todoElNegocio]);
 
-  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← REVELIO</Link><p className="eyebrow">DIRECCIÓN</p><h1>Informes</h1><p className="subtitle">{props.message ?? "No se pudo abrir informes."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/informes">Iniciar sesión</Link>}</header></div></main>;
+  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">DIRECCIÓN</p><h1>Informes</h1><p className="subtitle">{props.message ?? "No se pudo abrir informes."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/informes">Iniciar sesión</Link>}</header></div></main>;
 
   const guardarMeta = (row: InformeSucursal, monto: number) => startLoading(async () => {
     try { await establecerMetaVenta(row.empresa_id, row.sucursal_id, `${mes}-01`, monto); setInforme(await obtenerInformeMensual(todoElNegocio ? null : empresaId, `${mes}-01`)); setNotice("Meta actualizada."); }
@@ -41,7 +41,7 @@ export default function InformesBoard(props: InformesData) {
   const cumplimientoTotal = informe ? pct(informe.totales.ventas_total, informe.totales.meta_total) : 0;
 
   return <main className="page agenda-page"><div className="container agenda-shell">
-    <header className="agenda-header no-print"><div><Link className="back-link" href="/">← REVELIO</Link><p className="eyebrow">DIRECCIÓN</p><h1>Informes</h1><p className="subtitle">Metas, ventas por sucursal e informe mensual del negocio.</p></div>
+    <header className="agenda-header no-print"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">DIRECCIÓN</p><h1>Informes</h1><p className="subtitle">Metas, ventas por sucursal e informe mensual del negocio.</p></div>
       <div className="tabs">{props.companies.map((c) => <button key={c.id} className={c.id === empresaId ? "active" : ""} onClick={() => setEmpresaId(c.id)}>{c.nombre}</button>)}{isSuperadmin && <button className={todoElNegocio ? "active" : ""} onClick={() => setEmpresaId("__todo__")}>Todo el negocio</button>}</div>
     </header>
     <div className="new-patient-form no-print" style={{ maxWidth: 220, marginBottom: 12 }}><label>Mes del informe<input type="month" value={mes} onChange={(event) => setMes(event.target.value)} /></label></div>

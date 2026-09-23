@@ -45,9 +45,9 @@ function BranchCard({ branch, company, schemaReady }: { branch: BranchIdentity; 
 }
 
 export default function SucursalesBoard(props: SucursalesConfigData) {
-  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← REVELIO</Link><p className="eyebrow">CONFIGURACIÓN</p><h1>Sucursales e identidad</h1><p className="subtitle">{props.message}</p></div></header></div></main>;
+  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">CONFIGURACIÓN</p><h1>Sucursales e identidad</h1><p className="subtitle">{props.message}</p></div></header></div></main>;
   return <main className="page agenda-page branch-config-page"><div className="container agenda-shell">
-    <header className="agenda-header"><div><Link className="back-link" href="/">← REVELIO</Link><p className="eyebrow">CONFIGURACIÓN</p><h1>Sucursales e identidad</h1><p className="subtitle">Cada documento utilizará la identidad de la sucursal donde se originó, manteniendo una sola base compartida.</p></div><Building2 size={34} /></header>
+    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">CONFIGURACIÓN</p><h1>Sucursales e identidad</h1><p className="subtitle">Cada documento utilizará la identidad de la sucursal donde se originó, manteniendo una sola base compartida.</p></div><Building2 size={34} /></header>
     {!props.schemaReady && <div className="team-live-warning"><CircleAlert size={18} /><div><strong>Vista previa lista; migración todavía no aplicada</strong><span>Puedes revisar la interfaz. Los botones de guardar se habilitarán cuando autorices agregar los campos de identidad a tu Supabase actual.</span></div></div>}
     <section className="branch-config-grid">{props.branches.map((branch) => <BranchCard key={branch.id} branch={branch} company={props.companies.find((company) => company.id === branch.empresa_id)} schemaReady={props.schemaReady} />)}</section>
   </div></main>;

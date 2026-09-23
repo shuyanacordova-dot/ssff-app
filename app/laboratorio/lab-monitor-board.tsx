@@ -50,10 +50,10 @@ export default function LabMonitorBoard(props: LabMonitorData) {
     }
   });
 
-  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/"><ArrowLeft size={15} /> REVELIO</Link><p className="eyebrow">OPERACIÓN</p><h1>Laboratorio</h1><p className="subtitle">{props.message ?? "No se pudo abrir el monitor."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/laboratorio">Iniciar sesión</Link>}</header></div></main>;
+  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/"><ArrowLeft size={15} /> LUMOS</Link><p className="eyebrow">OPERACIÓN</p><h1>Laboratorio</h1><p className="subtitle">{props.message ?? "No se pudo abrir el monitor."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/laboratorio">Iniciar sesión</Link>}</header></div></main>;
 
   return <main className="page agenda-page lab-monitor-page"><div className="container agenda-shell">
-    <header className="agenda-header"><div><Link className="back-link" href="/"><ArrowLeft size={15} /> REVELIO</Link><p className="eyebrow">CONTROL CENTRAL</p><h1>Órdenes de laboratorio</h1><p className="subtitle">Seguimiento por paciente, laboratorio y sucursal hasta la entrega.</p></div><Link className="new-task" href="/ventas"><FlaskConical size={17} /> Crear desde una venta</Link></header>
+    <header className="agenda-header"><div><Link className="back-link" href="/"><ArrowLeft size={15} /> LUMOS</Link><p className="eyebrow">CONTROL CENTRAL</p><h1>Órdenes de laboratorio</h1><p className="subtitle">Seguimiento por paciente, laboratorio y sucursal hasta la entrega.</p></div><Link className="new-task" href="/ventas"><FlaskConical size={17} /> Crear desde una venta</Link></header>
 
     <section className="lab-summary">
       <article><Clock3 size={21} /><strong>{pendingCount}</strong><span>órdenes activas</span></article>

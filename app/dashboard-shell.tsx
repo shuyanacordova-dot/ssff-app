@@ -18,7 +18,7 @@ export default function DashboardShell({ taskData, informeMensual, metasMessage 
 
   return <main className="page dashboard-page"><div className="container dashboard-shell">
     <header className="dashboard-header">
-      <div><p className="brand-mark"><Image className="dashboard-logo" src={taskData.profile?.logoUrl || "/logos/shuvision-logo.png"} alt={taskData.profile?.empresaNombre || "Revelio"} width={36} height={36} priority /> {taskData.profile?.empresaNombre ?? "Revelio"}</p><h1>Hola, {taskData.profile?.nombre ?? "equipo"}</h1>{taskData.profile && <><p className="dashboard-branch">{taskData.profile.sucursalNombre}</p><BranchSelector activeId={taskData.profile.sucursalId} branches={taskData.profile.accessibleBranches} /></>}</div>
+      <div><p className="brand-mark"><Image className="dashboard-logo" src={taskData.profile?.logoUrl || "/logos/lumos-logo.png"} alt={taskData.profile?.empresaNombre || "LumOS"} width={36} height={36} priority /> {taskData.profile?.empresaNombre ?? "LumOS"}</p><h1>Hola, {taskData.profile?.nombre ?? "equipo"}</h1>{taskData.profile && <><p className="dashboard-branch">{taskData.profile.sucursalNombre}</p><BranchSelector activeId={taskData.profile.sucursalId} branches={taskData.profile.accessibleBranches} /></>}</div>
       <form action={cerrarSesion}><button className="outline-action" type="submit"><LogOut size={15} /> Cerrar sesión</button></form>
     </header>
 
