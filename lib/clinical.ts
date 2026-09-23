@@ -17,7 +17,7 @@ export type ClinicalData = { status: "ready" | "needs_configuration" | "needs_lo
 
 type UserProfile = { id: string; nombre: string; empresa_id: string; sucursal_id: string; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null };
 type DirectoryMember = { id: string; nombre: string; rol: string };
-const clinicalRoles = new Set(["superadmin", "admin_sucursal", "optometra"]);
+const clinicalRoles = new Set(["superadmin", "admin_sucursal", "optometra", "vendedor"]);
 const roleName = (profile: UserProfile | null) => Array.isArray(profile?.roles) ? profile.roles[0]?.nombre : profile?.roles?.nombre;
 const empty = { patients: [], consultations: [], photos: [], sales: [], companies: [], products: [], stock: [], branches: [], optometrists: [], empresasConvenio: [], labOrders: [], garantias: [] };
 

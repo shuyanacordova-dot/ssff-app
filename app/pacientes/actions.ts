@@ -8,26 +8,29 @@ import type { Garantia, SaleLabOrder } from "@/lib/ventas";
 import { getOperationalContext } from "@/lib/operational-context";
 import { isAdditionalOptometrist } from "@/lib/clinical-professionals";
 
+// Autoría clínica (exámenes, fotos): solo personal clínico.
 const clinicalRoles = new Set(["superadmin", "admin_sucursal", "optometra"]);
+// Carpetas de pacientes (buscar, registrar, ver historial): también vendedores, que las usan para ventas y órdenes de laboratorio.
+const folderRoles = new Set(["superadmin", "admin_sucursal", "optometra", "vendedor"]);
 const text = (data: FormData, name: string) => typeof data.get(name) === "string" ? String(data.get(name)).trim() : "";
 const normalizarWhatsapp = (raw: string) => { const digits = raw.replace(/\D/g, ""); const local = digits.startsWith("593") ? digits.slice(3) : digits.startsWith("0") ? digits.slice(1) : digits; return local ? `+593 ${local}` : ""; };
 type UserProfile = { id: string; empresa_id: string; sucursal_id: string | null; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null };
 const roleName = (profile: UserProfile | null) => Array.isArray(profile?.roles) ? profile.roles[0]?.nombre : profile?.roles?.nombre;
 
-async function currentClinicalProfile() {
+async function currentClinicalProfile(allowedRoles: Set<string> = clinicalRoles) {
   const supabase = await createSupabaseServerClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error("Tu sesión no es válida.");
   const { data: raw } = await supabase.from("usuarios").select("id,empresa_id,sucursal_id,activo,roles(nombre)").eq("auth_user_id", auth.user.id).maybeSingle();
   const profile = raw as unknown as UserProfile | null;
   const role = roleName(profile);
-  if (!profile?.activo || !role || !clinicalRoles.has(role)) throw new Error("No tienes permiso clínico para esta acción.");
+  if (!profile?.activo || !role || !allowedRoles.has(role)) throw new Error("No tienes permiso clínico para esta acción.");
   const context = await getOperationalContext();
   return { supabase, profile: { ...profile, empresa_id: context?.activeCompany.id ?? profile.empresa_id, sucursal_id: context?.activeBranch.id ?? profile.sucursal_id }, role };
 }
 
 export async function crearPacienteClinico(data: FormData) {
-  const { supabase } = await currentClinicalProfile();
+  const { supabase } = await currentClinicalProfile(folderRoles);
   const nombres = text(data, "nombres"); const apellidos = text(data, "apellidos");
   if (!nombres || !apellidos) throw new Error("Ingresa nombres y apellidos.");
   const { data: result, error } = await supabase.rpc("registrar_paciente_clinico", {
@@ -108,7 +111,7 @@ export async function crearConsulta(data: FormData) {
 }
 
 export async function buscarPacientesClinicos(query: string): Promise<PatientRecord[]> {
-  const { supabase } = await currentClinicalProfile();
+  const { supabase } = await currentClinicalProfile(folderRoles);
   const q = query.trim();
   if (q.length < 2) return [];
   const esc = (s: string) => s.replace(/[%,()]/g, " ").trim();
@@ -126,7 +129,7 @@ export async function buscarPacientesClinicos(query: string): Promise<PatientRec
 }
 
 export async function obtenerHistorialPaciente(pacienteId: string): Promise<{ consultations: Consultation[]; photos: ClinicalPhoto[]; sales: PatientSale[]; labOrders: SaleLabOrder[]; garantias: Garantia[] }> {
-  const { supabase } = await currentClinicalProfile();
+  const { supabase } = await currentClinicalProfile(folderRoles);
   if (!pacienteId) throw new Error("Falta identificar al paciente.");
   const [consultationsResult, photosResult, salesResult] = await Promise.all([
     supabase.from("consultas_optometricas").select("id,paciente_id,empresa_atencion_id,sucursal_atencion_id,optometrista_id,fecha_consulta,motivo_consulta,antecedentes,agudeza_visual,lensometria,queratometria,autorefractor,refraccion,examen_binocular,biomicroscopia,impresion_diagnostica,receta,plan_manejo,observaciones").eq("paciente_id", pacienteId).order("fecha_consulta", { ascending: false }).limit(150),
