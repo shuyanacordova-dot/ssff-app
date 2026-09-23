@@ -28,8 +28,8 @@ export async function crearMovimientoBancario(form: FormData) {
   revalidatePath("/caja");
 }
 
-export type VistaCierre = { ya_existe: boolean; caja_anterior: number; ventas_brutas: number; cobro_efectivo: number; cobro_tarjeta: number; cobro_transferencia_pichincha: number; cobro_transferencia_guayaquil: number; cobro_transferencia_internacional: number; cobro_credito: number; cobro_otro: number; egresos_efectivo: number; egresos_banco: number };
-export type ResultadoCierre = { id: string; cuadre_correcto: boolean; diferencia: number; caja_esperada: number; caja_fisica: number; check_cobros_ventas: boolean };
+export type VistaCierre = { ya_existe: boolean; fecha_caja_anterior: string | null; caja_anterior: number; ventas_brutas: number; cobro_efectivo: number; cobro_tarjeta: number; cobro_transferencia_pichincha: number; cobro_transferencia_guayaquil: number; cobro_transferencia_internacional: number; cobro_credito: number; cobro_otro: number; egresos_efectivo: number; egresos_banco: number };
+export type ResultadoCierre = { id: string; cuadre_correcto: boolean; diferencia: number; diferencia_cobros_declarados: number; caja_esperada: number; caja_fisica: number; check_cobros_ventas: boolean; check_metodos_pago: boolean };
 
 export async function previsualizarCierre(empresaId: string, sucursalId: string, fecha: string): Promise<VistaCierre | { error: string }> {
   if (!empresaId || !sucursalId) return { error: "Elige empresa y sucursal." };
@@ -43,13 +43,20 @@ export async function crearCierreCaja(form: FormData) {
   const supabase = await createSupabaseServerClient();
   const empresaId = text(form, "empresa_id"); const sucursalId = text(form, "sucursal_id"); const fecha = text(form, "fecha") || null;
   const cajaFisica = Number(text(form, "caja_fisica"));
+  const declaradoEfectivo = Number(text(form, "declarado_efectivo"));
+  const declaradoTarjeta = Number(text(form, "declarado_tarjeta"));
+  const declaradoPichincha = Number(text(form, "declarado_transferencia_pichincha"));
+  const declaradoGuayaquil = Number(text(form, "declarado_transferencia_guayaquil"));
+  const declaradoInternacional = Number(text(form, "declarado_transferencia_internacional"));
   const depositoPichincha = Number(text(form, "deposito_pichincha") || "0");
   const depositoGuayaquil = Number(text(form, "deposito_guayaquil") || "0");
   const depositoInternacional = Number(text(form, "deposito_internacional") || "0");
   const observaciones = text(form, "observaciones");
   if (!empresaId || !sucursalId) throw new Error("Elige empresa y sucursal.");
   if (!Number.isFinite(cajaFisica) || cajaFisica < 0) throw new Error("Indica el efectivo contado en caja.");
-  const { data, error } = await supabase.rpc("registrar_cierre_caja", { p_empresa: empresaId, p_sucursal: sucursalId, p_fecha: fecha, p_caja_fisica: cajaFisica, p_deposito_pichincha: depositoPichincha, p_deposito_guayaquil: depositoGuayaquil, p_deposito_internacional: depositoInternacional, p_observaciones: observaciones || null });
+  const declarados = [declaradoEfectivo, declaradoTarjeta, declaradoPichincha, declaradoGuayaquil, declaradoInternacional];
+  if (declarados.some((value) => !Number.isFinite(value) || value < 0)) throw new Error("Ingresa valores válidos para efectivo, tarjetas y transferencias.");
+  const { data, error } = await supabase.rpc("registrar_cierre_caja", { p_empresa: empresaId, p_sucursal: sucursalId, p_fecha: fecha, p_declarado_efectivo: declaradoEfectivo, p_declarado_tarjeta: declaradoTarjeta, p_declarado_transferencia_pichincha: declaradoPichincha, p_declarado_transferencia_guayaquil: declaradoGuayaquil, p_declarado_transferencia_internacional: declaradoInternacional, p_caja_fisica: cajaFisica, p_deposito_pichincha: depositoPichincha, p_deposito_guayaquil: depositoGuayaquil, p_deposito_internacional: depositoInternacional, p_observaciones: observaciones || null });
   if (error) throw new Error(error.message.includes("cierres_caja_empresa_id_sucursal_id_fecha_key") ? "Ya existe un cuadre registrado para esa sucursal y fecha." : (error.message || "No se pudo registrar el cuadre."));
   revalidatePath("/caja");
   return data as ResultadoCierre;

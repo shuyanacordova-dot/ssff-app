@@ -3,6 +3,7 @@ import { createSupabaseAdminClient, hasSupabaseAdminConfiguration } from "@/lib/
 import type { EmpresaConvenio, Garantia, Sale, SaleBranch, SaleCompany, SaleLabOrder, SaleProduct, SaleStock } from "@/lib/ventas";
 import { getOperationalContext } from "@/lib/operational-context";
 import { loadBranchIdentities } from "@/lib/sucursales";
+import { isAdditionalOptometrist } from "@/lib/clinical-professionals";
 
 export type PatientRecord = { id: string; nombres: string; apellidos: string; cedula: string | null; telefono: string | null; email: string | null; direccion: string | null; sexo: string | null; ocupacion: string | null; responsable_id: string | null; fecha_nacimiento: string | null; frecuencia_cobro: string | null; empresa_origen_id: string | null; actualizado_en: string };
 export type Receta = { lagrimas_artificiales: boolean; lagrimas_productos: string[]; lagrimas_otro: string; lagrimas_frecuencia: string; vitaminas: boolean; vitaminas_productos: string[]; vitaminas_otro: string; vitaminas_frecuencia: string; terapia_visual: boolean; terapia_instrucciones: string };
@@ -14,6 +15,7 @@ export type ClinicalOptometrist = { id: string; nombre: string };
 export type ClinicalData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: ClinicalProfile; patients: PatientRecord[]; consultations: Consultation[]; photos: ClinicalPhoto[]; sales: PatientSale[]; companies: SaleCompany[]; products: SaleProduct[]; stock: SaleStock[]; branches: SaleBranch[]; optometrists: ClinicalOptometrist[]; empresasConvenio: EmpresaConvenio[]; labOrders: SaleLabOrder[]; garantias: Garantia[] };
 
 type UserProfile = { id: string; nombre: string; empresa_id: string; sucursal_id: string; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null };
+type DirectoryMember = { id: string; nombre: string; rol: string };
 const clinicalRoles = new Set(["superadmin", "admin_sucursal", "optometra"]);
 const roleName = (profile: UserProfile | null) => Array.isArray(profile?.roles) ? profile.roles[0]?.nombre : profile?.roles?.nombre;
 const empty = { patients: [], consultations: [], photos: [], sales: [], companies: [], products: [], stock: [], branches: [], optometrists: [], empresasConvenio: [], labOrders: [], garantias: [] };
@@ -41,7 +43,9 @@ export async function getClinicalData(): Promise<ClinicalData> {
       supabase.from("empresas").select("id,nombre,direccion,telefono,email,logo_url").eq("activo", true).order("nombre"),
       supabase.from("productos_catalogo").select("id,empresa_id,nombre,categoria,precio_venta,controla_inventario").eq("activo", true).order("nombre").limit(200),
       loadBranchIdentities(supabase),
-      supabase.from("usuarios").select("id,nombre,activo,roles(nombre)").eq("activo", true).order("nombre"),
+      hasSupabaseAdminConfiguration()
+        ? createSupabaseAdminClient().from("usuarios").select("id,nombre,activo,roles(nombre)").eq("activo", true).order("nombre")
+        : supabase.rpc("directorio_tareas"),
       supabase.from("empresas_convenio").select("id,nombre").eq("activo", true).order("nombre"),
       getOperationalContext(),
     ]);
@@ -79,7 +83,9 @@ export async function getClinicalData(): Promise<ClinicalData> {
       products: productsResult.error ? [] : ((productsResult.data ?? []) as SaleProduct[]),
       stock: stockResult.error ? [] : (stockResult.data ?? []),
       branches: branchesResult.branches as SaleBranch[],
-      optometrists: teamResult.error ? [] : (teamResult.data ?? []).filter((member) => roleName(member as unknown as UserProfile) === "optometra").map((member) => ({ id: member.id, nombre: member.nombre })),
+      optometrists: teamResult.error ? [] : ((teamResult.data ?? []) as unknown as DirectoryMember[]).filter((member) => {
+        return member.rol === "optometra" || roleName(member as unknown as UserProfile) === "optometra" || isAdditionalOptometrist(member.id);
+      }).map((member) => ({ id: member.id, nombre: member.nombre.trim() })),
       empresasConvenio: empresasConvenioResult.error ? [] : (empresasConvenioResult.data ?? []),
       labOrders: labOrdersResult.error ? [] : (labOrdersResult.data ?? []),
       garantias: garantiasResult.error ? [] : ((garantiasResult.data ?? []) as unknown as Garantia[]),

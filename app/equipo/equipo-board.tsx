@@ -8,6 +8,19 @@ import type { Colaborador, EmpresaEquipo, EquipoData, RolEquipo, SucursalEquipo 
 import { actualizarAsignacionColaborador, cambiarContrasenaColaborador, cambiarEstadoColaborador, crearColaborador } from "./actions";
 
 const rolLabel: Record<string, string> = { superadmin: "Administración general", admin_sucursal: "Administración de sucursal", vendedor: "Vendedor", optometra: "Optómetra", caja: "Caja" };
+const roleCapabilities: Record<string, { summary: string; items: string[] }> = {
+  superadmin: { summary: "Control total del sistema", items: ["Equipo y configuraciones", "Historias clínicas", "Ventas, caja e inventario", "Todas las sucursales"] },
+  admin_sucursal: { summary: "Administra la operación de su sucursal", items: ["Pacientes e historias clínicas", "Ventas e inventario", "Caja e informes de sucursal"] },
+  optometra: { summary: "Atención clínica y agenda", items: ["Crear y editar historias clínicas", "Registrar revisiones y recetas", "Aparece automáticamente como profesional"] },
+  vendedor: { summary: "Atención comercial sin acceso clínico", items: ["Pacientes comerciales", "Ventas y cobros", "Sin acceso a historias clínicas"] },
+  caja: { summary: "Cobros y movimiento diario", items: ["Ventas y cobros", "Caja de sucursal", "Sin acceso a historias clínicas"] },
+};
+
+function RolePreview({ roleName }: { roleName?: string }) {
+  const capability = roleCapabilities[roleName ?? ""];
+  if (!capability) return null;
+  return <div className="role-preview"><strong>{capability.summary}</strong><div>{capability.items.map((item) => <span key={item}>{item}</span>)}</div></div>;
+}
 
 function CollaboratorCard({ colaborador, empresas, sucursales, roles, canManageAuth }: { colaborador: Colaborador; empresas: EmpresaEquipo[]; sucursales: SucursalEquipo[]; roles: RolEquipo[]; canManageAuth: boolean }) {
   const router = useRouter();
@@ -21,6 +34,7 @@ function CollaboratorCard({ colaborador, empresas, sucursales, roles, canManageA
   const [mensaje, setMensaje] = useState("");
   const [pending, start] = useTransition();
   const sucursalesDisponibles = sucursales.filter((sucursal) => sucursal.empresa_id === empresaId);
+  const selectedRole = roles.find((role) => role.id === rolId)?.nombre;
 
   const cambiarEmpresa = (id: string) => {
     setEmpresaId(id);
@@ -80,6 +94,7 @@ function CollaboratorCard({ colaborador, empresas, sucursales, roles, canManageA
       <label>Empresa<select value={empresaId} disabled={pending || !canManageAuth} onChange={(event) => cambiarEmpresa(event.target.value)}>{empresas.map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nombre}</option>)}</select></label>
       <label>Sucursal principal<select value={sucursalId} disabled={pending || !canManageAuth} required onChange={(event) => { setSucursalId(event.target.value); setMensaje(""); }}>{sucursalesDisponibles.map((sucursal) => <option key={sucursal.id} value={sucursal.id}>{sucursal.nombre}</option>)}</select></label>
     </div>
+    <RolePreview roleName={selectedRole} />
     <p className="field-hint team-branch-note">El acceso a varias sucursales se configurará en el bloque de permisos.</p>
 
     {contrasenaAbierta && <div className="team-password-panel">
@@ -110,6 +125,7 @@ function NewCollaboratorModal({ empresas, sucursales, roles, onClose }: { empres
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
   const sucursalesDisponibles = sucursales.filter((sucursal) => sucursal.empresa_id === empresaId);
+  const selectedRole = roles.find((role) => role.id === rolId)?.nombre;
 
   const cambiarEmpresa = (id: string) => {
     setEmpresaId(id);
@@ -139,10 +155,11 @@ function NewCollaboratorModal({ empresas, sucursales, roles, onClose }: { empres
         <label className="team-field-full">Correo de acceso<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="off" required /></label>
         <label>Contraseña inicial<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} autoComplete="new-password" required /></label>
         <label>Confirmar contraseña<input type="password" value={confirmacion} onChange={(event) => setConfirmacion(event.target.value)} minLength={8} autoComplete="new-password" required /></label>
-        <label>Rol<select value={rolId} onChange={(event) => setRolId(event.target.value)} required>{roles.map((rol) => <option key={rol.id} value={rol.id}>{rolLabel[rol.nombre] ?? rol.nombre}</option>)}</select></label>
+        <label>Rol que cumple<select value={rolId} onChange={(event) => setRolId(event.target.value)} required>{roles.map((rol) => <option key={rol.id} value={rol.id}>{rolLabel[rol.nombre] ?? rol.nombre}</option>)}</select></label>
         <label>Empresa<select value={empresaId} onChange={(event) => cambiarEmpresa(event.target.value)} required>{empresas.map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nombre}</option>)}</select></label>
         <label className="team-field-full">Sucursal principal<select value={sucursalId} onChange={(event) => setSucursalId(event.target.value)} required>{sucursalesDisponibles.map((sucursal) => <option key={sucursal.id} value={sucursal.id}>{sucursal.nombre}</option>)}</select></label>
       </div>
+      <RolePreview roleName={selectedRole} />
       {error && <p className="login-error" role="alert">{error}</p>}
       <div className="modal-actions"><button className="outline-action" type="button" disabled={pending} onClick={onClose}>Cancelar</button><button className="new-consultation" type="button" disabled={pending || !sucursalId} onClick={guardar}>{pending ? "Creando…" : "Crear acceso"}</button></div>
     </section>

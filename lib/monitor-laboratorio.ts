@@ -93,7 +93,7 @@ export async function getLabMonitorData(): Promise<LabMonitorData> {
       const branch = branches.get(order.sucursal_id);
       return {
         ...order,
-        paciente_nombre: patient ? `${patient.apellidos}, ${patient.nombres}` : "Paciente",
+        paciente_nombre: patient ? [patient.nombres, patient.apellidos].map((part) => part?.trim()).filter(Boolean).join(" ") || "Paciente" : "Paciente",
         paciente_telefono: patient?.telefono ?? null,
         venta_folio: sale?.folio ?? null,
         fecha_entrega_estimada: sale?.fecha_entrega_estimada ?? null,

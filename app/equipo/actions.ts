@@ -69,6 +69,7 @@ export async function crearColaborador(input: CrearColaboradorInput) {
     throw new Error("No se pudo completar el perfil del integrante: " + profileError.message);
   }
   revalidatePath("/equipo");
+  revalidatePath("/pacientes");
 }
 
 export async function actualizarAsignacionColaborador(input: ActualizarAsignacionInput) {
@@ -79,6 +80,7 @@ export async function actualizarAsignacionColaborador(input: ActualizarAsignacio
   const { error } = await admin.from("usuarios").update({ rol_id: input.rolId, empresa_id: input.empresaId, sucursal_id: input.sucursalId }).eq("id", input.colaboradorId);
   if (error) throw new Error("No se pudo actualizar el acceso: " + error.message);
   revalidatePath("/equipo");
+  revalidatePath("/pacientes");
 }
 
 export async function cambiarEstadoColaborador(colaboradorId: string, activo: boolean) {
@@ -107,6 +109,7 @@ export async function cambiarEstadoColaborador(colaboradorId: string, activo: bo
     }
   }
   revalidatePath("/equipo");
+  revalidatePath("/pacientes");
 }
 
 export async function cambiarContrasenaColaborador(authUserId: string, password: string) {

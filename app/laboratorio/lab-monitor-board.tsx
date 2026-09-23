@@ -82,7 +82,7 @@ export default function LabMonitorBoard(props: LabMonitorData) {
 }
 
 function OrderCard({ order, pending, onOpen, onStatus }: { order: LabMonitorOrder; pending: boolean; onOpen: () => void; onStatus: (next: EstadoOrdenLaboratorio) => void }) {
-  const whatsapp = enlaceWhatsapp(order.paciente_telefono, `Hola ${order.paciente_nombre.split(",")[1]?.trim() || ""}. Tu pedido de ${order.empresa_nombre} - ${order.sucursal_nombre} está listo para retirar. Te esperamos.`);
+  const whatsapp = enlaceWhatsapp(order.paciente_telefono, `Hola ${order.paciente_nombre.trim().split(/\s+/)[0] || ""}. Tu pedido de ${order.empresa_nombre} - ${order.sucursal_nombre} está listo para retirar. Te esperamos.`);
   const next = nextStatus(order.estado);
   return <article className={`lab-order-card ${overdue(order) ? "is-overdue" : ""}`}>
     <button className="lab-card-main" type="button" onClick={onOpen}>

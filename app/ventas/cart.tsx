@@ -14,6 +14,7 @@ const bancos = [{ value: "pichincha", label: "Banco Pichincha" }, { value: "guay
 const money = (n: number) => `$${n.toFixed(2)}`;
 const primeraCuotaFecha = () => { const d = new Date(); d.setMonth(d.getMonth() + 1); d.setDate(1); return d; };
 const formatFecha = (d: Date) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "long", year: "numeric" }).format(d);
+const productCategoryLabel: Record<string, string> = { montura: "Armazón", lente: "Luna", accesorio: "Accesorio", gafas_sol: "Gafas", servicio: "Examen" };
 
 export default function Cart({ products, stock, companies, branches, patients, empresasConvenio, defaultCompany, defaultBranch, defaultPacienteId, lockPatient, onDone }: { products: SaleProduct[]; stock: SaleStock[]; companies: SaleCompany[]; branches: SaleBranch[]; patients: SalePatient[]; empresasConvenio: EmpresaConvenio[]; defaultCompany: string; defaultBranch: string; defaultPacienteId?: string; lockPatient?: boolean; onDone: (message: string) => void }) {
   const [modo, setModo] = useState<Modo>("");
@@ -128,9 +129,9 @@ export default function Cart({ products, stock, companies, branches, patients, e
 function ProductSearchModal({ title, products, branch, stockFor, onSelect, onClose }: { title: string; products: SaleProduct[]; branch: string; stockFor: (productoId: string, sucursalId: string) => number; onSelect: (id: string) => void; onClose: () => void }) {
   const [query, setQuery] = useState("");
   const visible = products.filter((p) => p.nombre.toLowerCase().includes(query.toLowerCase()));
-  return <div className="modal-backdrop"><section className="new-patient-modal" role="dialog" aria-modal="true" aria-labelledby="product-search-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button><p className="section-label">{title}</p><h2 id="product-search-title">Buscar producto</h2>
+  return <div className="modal-backdrop"><section className="new-patient-modal product-search-modal" role="dialog" aria-modal="true" aria-labelledby="product-search-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button><p className="section-label">{title}</p><h2 id="product-search-title">Buscar producto</h2>
     <label className="patient-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre del producto" autoFocus /></label>
-    <div className="patient-list">{visible.map((p) => <button key={p.id} type="button" className="patient-row" onClick={() => { onSelect(p.id); onClose(); }}><span className="patient-row-text"><strong>{p.nombre}</strong><small>{money(Number(p.precio_venta))}{p.controla_inventario && branch ? ` · ${stockFor(p.id, branch)} disponibles` : ""}</small></span></button>)}
+    <div className="product-search-list">{visible.map((p) => <button key={p.id} type="button" className="product-search-row" onClick={() => { onSelect(p.id); onClose(); }} title={p.nombre}><strong>{p.nombre}</strong><span className="product-category-pill">{productCategoryLabel[p.categoria] ?? "Producto"}</span><span className="product-result-price">{money(Number(p.precio_venta))}</span><span className="product-result-stock">{p.controla_inventario && branch ? `${stockFor(p.id, branch)} disponibles` : "Disponible"}</span></button>)}
     {visible.length === 0 && <p className="empty-patients">No se encontraron productos.</p>}</div>
   </section></div>;
 }

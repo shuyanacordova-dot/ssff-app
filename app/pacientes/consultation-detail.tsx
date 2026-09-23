@@ -2,9 +2,11 @@
 
 import { Printer, X } from "lucide-react";
 import type { Consultation, PatientRecord } from "@/lib/clinical";
+import { complementaryExamsFrom } from "@/lib/clinical-format";
 import type { SaleCompany } from "@/lib/ventas";
-import { printCurrentDocument } from "@/lib/print-document";
+import { printDocumentById } from "@/lib/print-document";
 import ClinicalReviewPrint from "./clinical-review-print";
+import ClinicalPrescriptionPrint, { hasClinicalPrescription } from "./clinical-prescription-print";
 
 const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${value.slice(0, 10)}T12:00:00`));
 const prettyKey = (key: string) => key.replaceAll("_", " ").replace(/^./, (character) => character.toUpperCase());
@@ -23,7 +25,7 @@ function calcularEdad(fechaISO: string | null) {
 }
 
 function FieldGrid({ data }: { data: Record<string, string> | null | undefined }) {
-  const entries = Object.entries(data ?? {}).filter(([, value]) => String(value ?? "").trim());
+  const entries = Object.entries(data ?? {}).filter(([key, value]) => key !== "complementarios" && String(value ?? "").trim());
   if (!entries.length) return <p className="field-hint">Sin datos registrados.</p>;
   return <div className="consultation-stats">{entries.map(([key, value]) => <span key={key}><strong>{prettyKey(key)}</strong>{String(value)}</span>)}</div>;
 }
@@ -44,6 +46,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function ConsultationDetailModal({ consultation, patient, company, branchName, onClose }: { consultation: Consultation; patient: PatientRecord; company?: SaleCompany; branchName?: string; onClose: () => void }) {
   const receta = consultation.receta;
   const edad = calcularEdad(patient.fecha_nacimiento);
+  const complementaryExams = complementaryExamsFrom(consultation);
+  const hasPrescription = hasClinicalPrescription(consultation);
   return <div className="modal-backdrop"><section className="new-patient-modal clinical-review-modal" role="dialog" aria-modal="true" aria-labelledby="consultation-detail-title">
     <button className="modal-close no-print" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>
 
@@ -61,12 +65,14 @@ export default function ConsultationDetailModal({ consultation, patient, company
       <Section title="AUTORREFRACTOR"><EyeTable data={consultation.autorefractor} columns={AUTO_COLUMNS} /></Section>
       <Section title="RX FINAL"><EyeTable data={consultation.refraccion} columns={RX_COLUMNS} /></Section>
       <Section title="VISIÓN BINOCULAR"><FieldGrid data={consultation.examen_binocular} /></Section>
+      <Section title="EXÁMENES COMPLEMENTARIOS">{complementaryExams.length ? <div className="consultation-stats">{complementaryExams.map((exam, index) => <span key={`${exam.name}-${index}`}><strong>{exam.name || "Examen"}</strong>{exam.result || "Sin resultado"}</span>)}</div> : <p className="field-hint">Sin exámenes complementarios registrados.</p>}</Section>
       <Section title="BIOMICROSCOPÍA"><FieldGrid data={consultation.biomicroscopia} /></Section>
       <Section title="DIAGNÓSTICO"><p>{consultation.impresion_diagnostica || "Sin diagnóstico registrado."}</p></Section>
       <Section title="RECETA E INDICACIONES"><div className="consultation-stats"><span><strong>Lágrimas</strong>{receta?.lagrimas_artificiales ? [...(receta.lagrimas_productos ?? []), receta.lagrimas_otro, receta.lagrimas_frecuencia].filter(Boolean).join(" · ") || "Sí" : "No"}</span><span><strong>Vitaminas</strong>{receta?.vitaminas ? [...(receta.vitaminas_productos ?? []), receta.vitaminas_otro, receta.vitaminas_frecuencia].filter(Boolean).join(" · ") || "Sí" : "No"}</span><span><strong>Terapia visual</strong>{receta?.terapia_visual ? receta.terapia_instrucciones || "Sí" : "No"}</span></div>{consultation.plan_manejo && <p>{consultation.plan_manejo}</p>}{consultation.observaciones && <p>{consultation.observaciones}</p>}</Section>
     </div>
 
-    <div className="print-area print-a4 print-only"><ClinicalReviewPrint consultation={consultation} patient={patient} company={company} branchName={branchName} /></div>
-    <div className="modal-actions no-print"><button className="outline-action" type="button" onClick={onClose}>Cerrar</button><button className="new-consultation" type="button" onClick={printCurrentDocument}><Printer size={16} /> Imprimir revisión</button></div>
+    <div id="clinical-review-print" className="print-area print-a4 print-only"><ClinicalReviewPrint consultation={consultation} patient={patient} company={company} branchName={branchName} /></div>
+    <div id="clinical-prescription-print" className="print-area print-a4 print-only"><ClinicalPrescriptionPrint consultation={consultation} patient={patient} company={company} branchName={branchName} /></div>
+    <div className="modal-actions no-print"><button className="outline-action" type="button" onClick={onClose}>Cerrar</button>{hasPrescription && <button className="outline-action" type="button" onClick={() => printDocumentById("clinical-prescription-print")}><Printer size={16} /> Imprimir receta</button>}<button className="new-consultation" type="button" onClick={() => printDocumentById("clinical-review-print")}><Printer size={16} /> Imprimir revisión</button></div>
   </section></div>;
 }

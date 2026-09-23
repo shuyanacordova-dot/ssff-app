@@ -1,4 +1,5 @@
 import type { Consultation, PatientRecord } from "@/lib/clinical";
+import { complementaryExamsFrom } from "@/lib/clinical-format";
 import type { SaleCompany } from "@/lib/ventas";
 
 type Props = { consultation: Consultation; patient: PatientRecord; company?: SaleCompany; branchName?: string };
@@ -60,6 +61,7 @@ export default function ClinicalReviewPrint({ consultation, patient, company, br
     receta?.terapia_visual && `Terapia visual: ${receta.terapia_instrucciones || "Sí"}`,
   ].filter(Boolean).join(". ");
   const hasOldRx = Object.values(consultation.lensometria ?? {}).some(Boolean);
+  const complementaryExams = complementaryExamsFrom(consultation);
 
   return <article className="clinical-review-print" aria-label="Informe de revisión optométrica">
     <header className="clinical-print-letterhead">
@@ -80,7 +82,8 @@ export default function ClinicalReviewPrint({ consultation, patient, company, br
       <ReviewFinding title="Izquierdo/CÓRNEA" text={shown(consultation.queratometria?.oi_k1) || shown(consultation.queratometria?.oi_k2) ? `QUERATOMETRÍA: ${display(consultation.queratometria?.oi_k1)}/${display(consultation.queratometria?.oi_k2)} X ${display(consultation.queratometria?.oi_eje)}` : ""} />
       <ReviewFinding title="Derecho/BIOMICROSCOPÍA" text={consultation.biomicroscopia?.od} /><ReviewFinding title="Izquierdo/BIOMICROSCOPÍA" text={consultation.biomicroscopia?.oi} />
       <ReviewFinding title="Derecho/AUTORREFRACTOR" text={compactValues(consultation.autorefractor, "od")} /><ReviewFinding title="Izquierdo/AUTORREFRACTOR" text={compactValues(consultation.autorefractor, "oi")} />
-      <ReviewFinding title="Visión binocular" text={Object.entries(consultation.examen_binocular ?? {}).filter(([, val]) => shown(val)).map(([key, val]) => `${key.replaceAll("_", " ")}: ${val}`).join(" · ")} />
+      <ReviewFinding title="Visión binocular" text={Object.entries(consultation.examen_binocular ?? {}).filter(([key, val]) => key !== "complementarios" && shown(val)).map(([key, val]) => `${key.replaceAll("_", " ")}: ${val}`).join(" · ")} />
+      {complementaryExams.length > 0 && <ReviewFinding title="Exámenes complementarios" text={complementaryExams.map((exam) => `${exam.name || "Examen"}: ${exam.result || "sin resultado"}`).join(" · ")} />}
     </section>
 
     <section className="clinical-print-section">

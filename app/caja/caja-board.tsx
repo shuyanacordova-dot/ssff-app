@@ -55,7 +55,8 @@ function CheckBadge({ label, value }: { label: string; value: boolean | null }) 
 }
 
 function CierreCard({ cierre, sucursalNombre }: { cierre: CierreCaja; sucursalNombre: string }) {
-  return <article className="task-card"><div className="task-status"><span className={`status-dot ${cierre.cuadre_correcto ? "aprobada" : "devuelta"}`} /></div><div className="task-main"><div className="task-meta"><span>{sucursalNombre}</span><span>{formatDate(cierre.fecha)}</span></div><h2>Caja física: {money(cierre.caja_fisica)} · Esperada: {money(cierre.caja_esperada)}</h2><p>Ventas: {money(cierre.ventas_brutas)} · Egresos efectivo: {money(cierre.egresos_efectivo)} · Depósitos: {money(cierre.depositos)} · Diferencia: {money(cierre.diferencia)}</p><div className="check-badges"><CheckBadge label="Cobros=ventas" value={cierre.check_cobros_ventas} /><CheckBadge label="Caja física" value={cierre.check_caja_fisica} /></div></div><div className="task-actions"><span className={`state-pill ${cierre.cuadre_correcto ? "aprobada" : "devuelta"}`}>{cierre.cuadre_correcto ? "Cuadre correcto" : "Con diferencias"}</span></div></article>;
+  const transferencias = cierre.declarado_transferencia_pichincha + cierre.declarado_transferencia_guayaquil + cierre.declarado_transferencia_internacional;
+  return <article className="task-card"><div className="task-status"><span className={`status-dot ${cierre.cuadre_correcto ? "aprobada" : "devuelta"}`} /></div><div className="task-main"><div className="task-meta"><span>{sucursalNombre}</span><span>{formatDate(cierre.fecha)}</span></div><h2>Caja física: {money(cierre.caja_fisica)} · Esperada: {money(cierre.caja_esperada)}</h2><p>Caja anterior: {money(cierre.caja_anterior)} · Efectivo declarado: {money(cierre.declarado_efectivo)} · Tarjetas: {money(cierre.declarado_tarjeta)} · Transferencias: {money(transferencias)}</p><p>Egresos efectivo: {money(cierre.egresos_efectivo)} · Depósitos: {money(cierre.depositos)} · Diferencia de caja: {money(cierre.diferencia)}</p><div className="check-badges"><CheckBadge label="Métodos de pago" value={cierre.check_metodos_pago} /><CheckBadge label="Efectivo en caja" value={cierre.check_caja_fisica} /></div></div><div className="task-actions"><span className={`state-pill ${cierre.cuadre_correcto ? "aprobada" : "devuelta"}`}>{cierre.cuadre_correcto ? "Caja cuadrada" : "Caja no cuadrada"}</span></div></article>;
 }
 
 function GastoModal({ empresaId, branches, cuentas, canSaldos, pending, onClose, onSubmit }: { empresaId: string; branches: CajaData["branches"]; cuentas: CajaData["cuentas"]; canSaldos: boolean; pending: boolean; onClose: () => void; onSubmit: (form: FormData) => void }) {
@@ -75,6 +76,11 @@ function GastoModal({ empresaId, branches, cuentas, canSaldos, pending, onClose,
 function CierreModal({ empresaId, branches, onClose }: { empresaId: string; branches: CajaData["branches"]; onClose: (message?: string) => void }) {
   const [sucursalId, setSucursalId] = useState("");
   const [fecha, setFecha] = useState(today());
+  const [declaradoEfectivo, setDeclaradoEfectivo] = useState("");
+  const [declaradoTarjeta, setDeclaradoTarjeta] = useState("");
+  const [declaradoPichincha, setDeclaradoPichincha] = useState("");
+  const [declaradoGuayaquil, setDeclaradoGuayaquil] = useState("");
+  const [declaradoInternacional, setDeclaradoInternacional] = useState("");
   const [cajaFisica, setCajaFisica] = useState("");
   const [depositoPichincha, setDepositoPichincha] = useState("");
   const [depositoGuayaquil, setDepositoGuayaquil] = useState("");
@@ -99,6 +105,16 @@ function CierreModal({ empresaId, branches, onClose }: { empresaId: string; bran
   const cajaEsperadaPreview = vista ? vista.caja_anterior + vista.cobro_efectivo - vista.egresos_efectivo - depositosTotal : null;
   const diferenciaPreview = cajaEsperadaPreview !== null && cajaFisica !== "" ? Number(cajaFisica) - cajaEsperadaPreview : null;
   const abonosTotal = vista ? vista.cobro_efectivo + vista.cobro_tarjeta + vista.cobro_transferencia_pichincha + vista.cobro_transferencia_guayaquil + vista.cobro_transferencia_internacional + vista.cobro_credito + vista.cobro_otro : 0;
+  const metodosCompletos = [declaradoEfectivo, declaradoTarjeta, declaradoPichincha, declaradoGuayaquil, declaradoInternacional].every((value) => value !== "");
+  const metodosCoinciden = !!vista && metodosCompletos && [
+    [declaradoEfectivo, vista.cobro_efectivo],
+    [declaradoTarjeta, vista.cobro_tarjeta],
+    [declaradoPichincha, vista.cobro_transferencia_pichincha],
+    [declaradoGuayaquil, vista.cobro_transferencia_guayaquil],
+    [declaradoInternacional, vista.cobro_transferencia_internacional],
+  ].every(([declarado, sistema]) => Math.abs(Number(declarado) - Number(sistema)) < 0.01);
+  const cierreCompleto = metodosCompletos && cajaFisica !== "";
+  const cierreCuadrado = cierreCompleto && metodosCoinciden && diferenciaPreview !== null && Math.abs(diferenciaPreview) < 0.01;
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -111,13 +127,13 @@ function CierreModal({ empresaId, branches, onClose }: { empresaId: string; bran
     setGuardando(false);
   };
 
-  if (resultado) return <div className="modal-backdrop"><section className="new-patient-modal" role="dialog" aria-modal="true"><button className="modal-close" onClick={() => onClose(resultado.cuadre_correcto ? "Cuadre de caja exitoso." : "Cuadre guardado con diferencias — revísalo.")} aria-label="Cerrar"><X size={19} /></button>
-    {resultado.cuadre_correcto ? <div style={{ display: "grid", justifyItems: "center", gap: 10, padding: "20px 0" }}><CheckCircle2 size={48} color="#247658" /><h2 style={{ margin: 0 }}>Cuadre de caja exitoso</h2><p className="field-hint">El efectivo contado coincide con lo esperado.</p></div>
-      : <div style={{ display: "grid", justifyItems: "center", gap: 10, padding: "20px 0" }}><XCircle size={48} color="#a24150" /><h2 style={{ margin: 0 }}>Cuadre guardado con diferencias</h2><p className="field-hint">Diferencia: <strong>{money(resultado.diferencia)}</strong> (esperado {money(resultado.caja_esperada)}, contado {money(resultado.caja_fisica)}). El cuadre quedó registrado para revisarlo.</p></div>}
-    <div className="modal-actions"><button className="new-consultation" type="button" onClick={() => onClose(resultado.cuadre_correcto ? "Cuadre de caja exitoso." : "Cuadre guardado con diferencias — revísalo.")}>Listo</button></div>
+  if (resultado) return <div className="modal-backdrop"><section className="new-patient-modal" role="dialog" aria-modal="true"><button className="modal-close" onClick={() => onClose(resultado.cuadre_correcto ? "Caja cuadrada." : "Caja no cuadrada — revisa las diferencias.")} aria-label="Cerrar"><X size={19} /></button>
+    {resultado.cuadre_correcto ? <div style={{ display: "grid", justifyItems: "center", gap: 10, padding: "20px 0" }}><CheckCircle2 size={48} color="#247658" /><h2 style={{ margin: 0 }}>Caja cuadrada</h2><p className="field-hint">El efectivo, las tarjetas y las transferencias coinciden con el sistema.</p></div>
+      : <div style={{ display: "grid", justifyItems: "center", gap: 10, padding: "20px 0" }}><XCircle size={48} color="#a24150" /><h2 style={{ margin: 0 }}>Caja no cuadrada</h2><p className="field-hint">Diferencia en efectivo: <strong>{money(resultado.diferencia)}</strong>. Diferencia en métodos de pago: <strong>{money(resultado.diferencia_cobros_declarados)}</strong>. El cierre quedó registrado para revisión.</p></div>}
+    <div className="modal-actions"><button className="new-consultation" type="button" onClick={() => onClose(resultado.cuadre_correcto ? "Caja cuadrada." : "Caja no cuadrada — revisa las diferencias.")}>Listo</button></div>
   </section></div>;
 
-  return <div className="modal-backdrop"><section className="new-patient-modal task-modal" role="dialog" aria-modal="true" aria-labelledby="new-cierre-title"><button className="modal-close" onClick={() => onClose()} aria-label="Cerrar"><X size={19} /></button><p className="section-label">NUEVO CUADRE</p><h2 id="new-cierre-title">Cierre de caja diario</h2><p>Las ventas, abonos y egresos del día se cargan solos desde el Resumen del día. Solo cuenta el efectivo y compara.</p><form onSubmit={submit}><input type="hidden" name="empresa_id" value={empresaId} /><div className="new-patient-form">
+  return <div className="modal-backdrop"><section className="new-patient-modal task-modal" role="dialog" aria-modal="true" aria-labelledby="new-cierre-title"><button className="modal-close" onClick={() => onClose()} aria-label="Cerrar"><X size={19} /></button><p className="section-label">CIERRE DE CAJA</p><h2 id="new-cierre-title">Cierre de caja diario</h2><p>Ingresa lo recibido por cada método de pago y el efectivo contado. El sistema lo comparará con las ventas registradas.</p><form onSubmit={submit}><input type="hidden" name="empresa_id" value={empresaId} /><div className="new-patient-form">
     <label>Sucursal<select name="sucursal_id" required value={sucursalId} onChange={(event) => setSucursalId(event.target.value)}><option value="" disabled>Selecciona la sucursal</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label>
     <label>Fecha<input name="fecha" type="date" value={fecha} onChange={(event) => setFecha(event.target.value)} /></label>
   </div>
@@ -131,19 +147,25 @@ function CierreModal({ empresaId, branches, onClose }: { empresaId: string; bran
       <p className="section-label">RESUMEN DEL DÍA</p>
       <div className="consultation-stats"><span><strong>Abonos del día</strong>{money(abonosTotal)}</span><span><strong>Egresos del día</strong>{money(vista.egresos_efectivo)}</span></div>
 
-      <p className="section-label" style={{ marginTop: 14 }}>VALOR EN CAJA DÍA ANTERIOR</p>
-      <div className="consultation-stats"><span><strong>Caja anterior</strong>{money(vista.caja_anterior)}</span></div>
+      <p className="section-label" style={{ marginTop: 14 }}>CAJA DEL CIERRE ANTERIOR</p>
+      <div className="consultation-stats"><span><strong>{vista.fecha_caja_anterior ? `Cierre del ${formatDate(vista.fecha_caja_anterior)}` : "Sin cierre anterior"}</strong>{money(vista.caja_anterior)}</span></div>
 
-      <p className="section-label" style={{ marginTop: 14 }}>PAGO EN TRANSFERENCIAS</p>
-      <div className="consultation-stats"><span><strong>Banco Pichincha</strong>{money(vista.cobro_transferencia_pichincha)}</span><span><strong>Banco Guayaquil</strong>{money(vista.cobro_transferencia_guayaquil)}</span><span><strong>Banco Internacional</strong>{money(vista.cobro_transferencia_internacional)}</span></div>
+      <p className="section-label" style={{ marginTop: 14 }}>VALORES REGISTRADOS EN EL SISTEMA</p>
+      <div className="consultation-stats"><span><strong>Efectivo</strong>{money(vista.cobro_efectivo)}</span><span><strong>Tarjetas</strong>{money(vista.cobro_tarjeta)}</span><span><strong>Pichincha</strong>{money(vista.cobro_transferencia_pichincha)}</span><span><strong>Guayaquil</strong>{money(vista.cobro_transferencia_guayaquil)}</span><span><strong>Internacional</strong>{money(vista.cobro_transferencia_internacional)}</span></div>
 
-      <p className="section-label" style={{ marginTop: 14 }}>PAGO CON TARJETAS DE CRÉDITO</p>
-      <div className="consultation-stats"><span><strong>Tarjeta</strong>{money(vista.cobro_tarjeta)}</span>{(vista.cobro_credito > 0 || vista.cobro_otro > 0) && <span><strong>Crédito / otro</strong>{money(vista.cobro_credito + vista.cobro_otro)}</span>}</div>
-
-      <p className="section-label" style={{ marginTop: 14 }}>DINERO EN EFECTIVO</p>
-      <div className="consultation-stats"><span><strong>Cobrado en efectivo</strong>{money(vista.cobro_efectivo)}</span></div>
+      {(vista.cobro_credito > 0 || vista.cobro_otro > 0) && <div className="consultation-stats" style={{ marginTop: 8 }}><span><strong>Crédito / otro</strong>{money(vista.cobro_credito + vista.cobro_otro)}</span></div>}
     </>}
   </div>}
+
+  <p className="section-label" style={{ marginTop: 14 }}>VALORES RECIBIDOS SEGÚN EL CIERRE</p>
+  <div className="new-patient-form">
+    <label>Efectivo recibido<input name="declarado_efectivo" type="number" min="0" step="0.01" required placeholder={vista ? `Sistema: ${money(vista.cobro_efectivo)}` : "0.00"} value={declaradoEfectivo} onChange={(event) => setDeclaradoEfectivo(event.target.value)} /></label>
+    <label>Tarjetas<input name="declarado_tarjeta" type="number" min="0" step="0.01" required placeholder={vista ? `Sistema: ${money(vista.cobro_tarjeta)}` : "0.00"} value={declaradoTarjeta} onChange={(event) => setDeclaradoTarjeta(event.target.value)} /></label>
+    <label>Transferencia · Banco Pichincha<input name="declarado_transferencia_pichincha" type="number" min="0" step="0.01" required placeholder={vista ? `Sistema: ${money(vista.cobro_transferencia_pichincha)}` : "0.00"} value={declaradoPichincha} onChange={(event) => setDeclaradoPichincha(event.target.value)} /></label>
+    <label>Transferencia · Banco Guayaquil<input name="declarado_transferencia_guayaquil" type="number" min="0" step="0.01" required placeholder={vista ? `Sistema: ${money(vista.cobro_transferencia_guayaquil)}` : "0.00"} value={declaradoGuayaquil} onChange={(event) => setDeclaradoGuayaquil(event.target.value)} /></label>
+    <label>Transferencia · Banco Internacional<input name="declarado_transferencia_internacional" type="number" min="0" step="0.01" required placeholder={vista ? `Sistema: ${money(vista.cobro_transferencia_internacional)}` : "0.00"} value={declaradoInternacional} onChange={(event) => setDeclaradoInternacional(event.target.value)} /></label>
+  </div>
+  {metodosCompletos && <p className="notice" style={{ marginTop: 8 }}><span className={`check-badge ${metodosCoinciden ? "ok" : "fail"}`}>{metodosCoinciden ? "Los métodos de pago coinciden" : "Hay diferencias en los métodos de pago"}</span></p>}
 
   <p className="section-label" style={{ marginTop: 14 }}>DEPÓSITO EN CADA BANCO (SI APLICA)</p>
   <div className="new-patient-form">
@@ -157,9 +179,9 @@ function CierreModal({ empresaId, branches, onClose }: { empresaId: string; bran
     <label>¿Cuánto dinero hay en efectivo?<input name="caja_fisica" type="number" min="0" step="0.01" required value={cajaFisica} onChange={(event) => setCajaFisica(event.target.value)} /></label>
     {cajaEsperadaPreview !== null && <label>Caja esperada<input value={money(cajaEsperadaPreview)} disabled /></label>}
   </div>
-  {diferenciaPreview !== null && <p className="notice" style={{ marginTop: 8 }}><span className={`check-badge ${Math.abs(diferenciaPreview) < 0.01 ? "ok" : "fail"}`}>{Math.abs(diferenciaPreview) < 0.01 ? "El valor coincide" : `Diferencia de ${money(diferenciaPreview)}`}</span></p>}
+  {cierreCompleto && <p className="notice" style={{ marginTop: 8 }}><span className={`check-badge ${cierreCuadrado ? "ok" : "fail"}`}>{cierreCuadrado ? "Caja cuadrada" : `Caja no cuadrada${diferenciaPreview !== null && Math.abs(diferenciaPreview) >= 0.01 ? ` · Diferencia en efectivo: ${money(diferenciaPreview)}` : ""}`}</span></p>}
 
   <div className="new-patient-form" style={{ marginTop: 14 }}><label className="task-description">Observaciones<textarea name="observaciones" value={observaciones} onChange={(event) => setObservaciones(event.target.value)} /></label></div>
   {guardarError && <p className="notice">{guardarError}</p>}
-  <div className="modal-actions"><button className="outline-action" type="button" onClick={() => onClose()}>Cancelar</button><button className="new-consultation" disabled={guardando || !sucursalId} type="submit">{guardando ? "Guardando…" : "Registrar cuadre"}</button></div></form></section></div>;
+  <div className="modal-actions"><button className="outline-action" type="button" onClick={() => onClose()}>Cancelar</button><button className="new-consultation" disabled={guardando || loadingVista || !vista || vista.ya_existe} type="submit">{guardando ? "Guardando…" : vista?.ya_existe ? "Cierre ya registrado" : "Registrar cierre"}</button></div></form></section></div>;
 }
