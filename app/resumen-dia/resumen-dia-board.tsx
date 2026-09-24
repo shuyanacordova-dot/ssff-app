@@ -1,4 +1,5 @@
 "use client";
+import { printDocumentById } from "@/lib/print-document";
 import Link from "next/link";
 import { Fragment } from "react";
 import { useRouter } from "next/navigation";
@@ -29,12 +30,12 @@ export default function ResumenDiaBoard(props: ResumenDiaData & { fecha: string 
       <div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN DEL DÍA</p><h1>Resumen del día</h1><p className="subtitle">Ventas, abonos y salidas del día — la base para cerrar la <Link href="/caja" className="text-action" style={{ display: "inline" }}>caja diaria</Link>.</p></div>
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <input type="date" value={props.fecha} onChange={(event) => irA(event.target.value, empresaId)} />
-        <button className="outline-action" type="button" onClick={() => window.print()}><Printer size={15} /> Imprimir</button>
+        <button className="outline-action" type="button" onClick={() => printDocumentById("daily-summary-print")}><Printer size={15} /> Imprimir</button>
       </div>
     </header>
     <div className="tabs no-print">{props.companies.map((company) => <button key={company.id} className={company.id === empresaId ? "active" : ""} onClick={() => irA(props.fecha, company.id)}>{company.nombre}</button>)}</div>
 
-    <div className="print-area">
+    <div id="daily-summary-print" className="print-area">
       <section className="glass agenda-board" style={{ marginTop: 14, marginBottom: 18 }}>
         <p className="section-label">RESUMEN DE VENTAS</p><h2>Ventas del día</h2>
         {props.ventas.length ? <table className="resumen-table"><thead><tr><th>Hora</th><th>Subtotal</th><th>Descuento</th><th>Total</th><th>Paciente</th><th>Autor(a)</th></tr></thead><tbody>

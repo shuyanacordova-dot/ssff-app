@@ -40,7 +40,7 @@ export default async function ReciboPage({ params }: { params: Promise<{ token: 
   const recibo = data as Recibo;
   const company = { nombre: recibo.empresa_nombre ?? "LUMOS", direccion: recibo.empresa_direccion, telefono: recibo.empresa_telefono, email: recibo.empresa_email, logo_url: recibo.empresa_logo_url };
 
-  return <main className="login-page"><section className="glass login-card print-area print-ticket" style={{ width: "min(400px, 100%)" }}>
+  return <main className="login-page"><section id="receipt-print" className="glass login-card print-area receipt-document" style={{ width: "min(400px, 100%)" }}>
     <Letterhead company={company} subtitle={recibo.sucursal_nombre ?? undefined} />
     <p className="print-center" style={{ fontWeight: 800, fontSize: 15, margin: "6px 0" }}>Recibo virtual</p>
     <div className="print-dashed" />

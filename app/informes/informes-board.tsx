@@ -1,4 +1,5 @@
 "use client";
+import { printDocumentById } from "@/lib/print-document";
 
 import Link from "next/link";
 import { Banknote, CircleAlert, Printer, ReceiptText, Target, Wallet } from "lucide-react";
@@ -47,7 +48,7 @@ export default function InformesBoard(props: InformesData) {
     <div className="new-patient-form no-print" style={{ maxWidth: 220, marginBottom: 12 }}><label>Mes del informe<input type="month" value={mes} onChange={(event) => setMes(event.target.value)} /></label></div>
     <div className="notice no-print"><CircleAlert size={18} /><span>{error || notice || "Las ventas se cuentan solo cuando quedan completadas; los saldos se calculan en tiempo real."}</span></div>
 
-    <div className="print-area">
+    <div id="monthly-report-print" className="print-area">
     <p className="section-label" style={{ textTransform: "capitalize" }}>{mesLargo(mes)}{todoElNegocio ? " · Todo el negocio" : ` · ${props.companies.find((c) => c.id === empresaId)?.nombre ?? ""}`}</p>
 
     {loading && !informe ? <p className="field-hint">Calculando informe…</p> : informe && <>
@@ -82,7 +83,7 @@ export default function InformesBoard(props: InformesData) {
     </>}
     </div>
 
-    {informe && <div className="modal-actions no-print" style={{ marginTop: 14 }}><button className="outline-action" type="button" onClick={() => window.print()}><Printer size={15} /> Imprimir / guardar informe</button></div>}
+    {informe && <div className="modal-actions no-print" style={{ marginTop: 14 }}><button className="outline-action" type="button" onClick={() => printDocumentById("monthly-report-print")}><Printer size={15} /> Imprimir / guardar informe</button></div>}
   </div></main>;
 }
 
@@ -100,5 +101,5 @@ function SucursalRow({ row, showEmpresa, onGuardarMeta }: { row: InformeSucursal
       <p className="field-hint" style={{ marginTop: 4 }}>Meta: {money(row.meta)} · {cumplimiento}% cumplido</p>
     </>}
     {editando ? <div className="new-patient-form" style={{ marginTop: 8, maxWidth: 200 }}><label>Nueva meta del mes<input type="number" min={0} step={0.01} value={valor} onChange={(event) => setValor(event.target.value)} autoFocus onBlur={() => { setEditando(false); const n = Number(valor); if (Number.isFinite(n) && n !== row.meta) onGuardarMeta(n); }} onKeyDown={(event) => event.key === "Enter" && (event.currentTarget as HTMLInputElement).blur()} /></label></div> : null}
-  </div><div className="task-actions">{row.sucursal_id !== "sin_sucursal" && !editando && <button className="outline-action" type="button" onClick={() => setEditando(true)}><Target size={14} /> {row.meta > 0 ? "Editar meta" : "Poner meta"}</button>}</div></article>;
+  </div><div className="task-actions no-print">{row.sucursal_id !== "sin_sucursal" && !editando && <button className="outline-action" type="button" onClick={() => setEditando(true)}><Target size={14} /> {row.meta > 0 ? "Editar meta" : "Poner meta"}</button>}</div></article>;
 }

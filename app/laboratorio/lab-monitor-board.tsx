@@ -8,7 +8,7 @@ import { estadoOrdenLabels, laboratorioLabels, tipoLenteLabels, type EstadoOrden
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import LabOrderPrint from "@/app/lab-order-print";
 import { cambiarEstadoOrdenLaboratorio } from "@/app/ventas/lab-actions";
-import { printCurrentDocument } from "@/lib/print-document";
+import { printDocumentById } from "@/lib/print-document";
 
 const statusOptions = Object.entries(estadoOrdenLabels) as [EstadoOrdenLaboratorio, string][];
 const flowStatuses: EstadoOrdenLaboratorio[] = ["pendiente", "enviado", "recibido", "notificado", "entregado"];
@@ -102,7 +102,7 @@ function OrderCard({ order, pending, onOpen, onStatus }: { order: LabMonitorOrde
 
 function OrderDetail({ order, pending, onClose, onStatus }: { order: LabMonitorOrder; pending: boolean; onClose: () => void; onStatus: (next: EstadoOrdenLaboratorio) => void }) {
   return <div className="modal-backdrop"><section className="new-patient-modal lab-monitor-modal" role="dialog" aria-modal="true" aria-labelledby="lab-order-title"><button className="modal-close no-print" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>
-    <div className="print-area print-a4">
+    <div id="lab-monitor-print" className="print-area print-a4">
       <LabOrderPrint orderId={order.id} createdAt={order.creado_en} branchName={order.sucursal_nombre} patientName={order.paciente_nombre} patientPhone={order.paciente_telefono} productDescription={order.producto_descripcion} rx={order.rx} medidas={order.medidas} reviewerName={order.reviso_nombre} useLabel={order.uso_calculado === "lejos_y_cerca" ? "Todas" : order.uso_calculado === "cerca" ? "Cerca" : "Lejos"} notes={[`Laboratorio: ${laboratorioLabels[order.laboratorio] ?? order.laboratorio}`, `Tipo de lente: ${tipoLenteLabels[order.tipo_lente] ?? order.tipo_lente}`, order.notas].filter(Boolean).join(". ")} deliveryDate={order.fecha_entrega_estimada} saleFolio={order.venta_folio} company={order.membrete} warranty={order.es_garantia} />
     </div>
     <div className="no-print">
@@ -113,6 +113,6 @@ function OrderDetail({ order, pending, onClose, onStatus }: { order: LabMonitorO
       <div className="lab-detail-grid lab-measures"><span><strong>Vertical</strong>{order.medidas?.vertical || "—"}</span><span><strong>Horizontal mayor</strong>{order.medidas?.horizontal_mayor || "—"}</span><span><strong>Puente</strong>{order.medidas?.puente || "—"}</span><span><strong>Altura</strong>{order.medidas?.altura || "—"}</span><span><strong>DNP</strong>{order.medidas?.dnp || "—"}</span></div>
       {order.notas && <div className="lab-notes"><strong>Indicaciones</strong><p>{order.notas}</p></div>}
     </div>
-    <div className="modal-actions no-print"><label className="lab-modal-status">Estado<select value={order.estado} disabled={pending} onChange={(event) => onStatus(event.target.value as EstadoOrdenLaboratorio)}>{statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button className="outline-action" type="button" onClick={printCurrentDocument}><Printer size={15} /> Imprimir</button><button className="new-consultation" type="button" onClick={onClose}>Cerrar</button></div>
+    <div className="modal-actions no-print"><label className="lab-modal-status">Estado<select value={order.estado} disabled={pending} onChange={(event) => onStatus(event.target.value as EstadoOrdenLaboratorio)}>{statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button className="outline-action" type="button" onClick={() => printDocumentById("lab-monitor-print")}><Printer size={15} /> Imprimir</button><button className="new-consultation" type="button" onClick={onClose}>Cerrar</button></div>
   </section></div>;
 }

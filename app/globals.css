@@ -93,9 +93,10 @@ button.check-badge { cursor: pointer; }
 @media (max-width: 860px) { .dashboard-layout { grid-template-columns: 1fr; }.dashboard-sidebar { position: static; } }
 @media (max-width: 620px) { .goal-overview-heading { flex-direction: column; }.goal-grid { grid-template-columns: 1fr; } }
 .letterhead { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }.letterhead img { height: 52px; width: auto; object-fit: contain; }.letterhead-text { display: grid; gap: 2px; }.letterhead-text strong { font-size: 19px; letter-spacing: -.02em; color: #1c2c3d; }.letterhead-text span { font-size: 11px; color: #5d7086; line-height: 1.4; }.print-a4 { width: 100%; max-width: 190mm; margin: 0 auto; }.print-ticket { width: 100%; max-width: 320px; margin: 0 auto; }.print-ticket .letterhead { flex-direction: column; text-align: center; }.print-ticket .letterhead-text { justify-items: center; }.print-dashed { border-top: 1px dashed #a7b3c2; margin: 12px 0; }.print-center { text-align: center; }
-@page a4doc { size: A4; margin: 14mm; }
+@page { size: A4; margin: 12mm; }
+@page a4doc { size: A4; margin: 12mm; }
 @page ticketdoc { size: 80mm auto; margin: 4mm; }
-@media print { body * { visibility: hidden; }.print-area, .print-area * { visibility: visible; }.print-area { position: absolute; top: 0; left: 0; width: 100%; padding: 20px; }.no-print { display: none !important; }.print-a4 { page: a4doc; }.print-ticket { page: ticketdoc; padding: 4px; } }
+
 .sale-mode-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 14px; }.sale-mode-card { display: grid; gap: 6px; border: 1px solid #d4e0ea; border-radius: 16px; padding: 20px; text-align: left; color: #274c77; background: rgba(255,255,255,.7); cursor: pointer; }.sale-mode-card:hover { background: #e8f3ff; }.sale-mode-card strong { font-size: 17px; }.sale-mode-card span { color: #66768d; font-size: 13px; }
 .product-search-modal { width: min(820px, 100%); }.product-search-list { display: grid; gap: 6px; max-height: min(520px, 60vh); margin-top: 13px; overflow-y: auto; }.product-search-row { display: grid; grid-template-columns: minmax(0, 1fr) 86px 78px 112px; align-items: center; gap: 10px; width: 100%; border: 1px solid #e0e8ee; border-radius: 12px; padding: 11px 13px; color: #314359; background: #fff; text-align: left; cursor: pointer; transition: border-color .15s, background .15s, transform .15s; }.product-search-row:hover { border-color: #a9ccc5; background: #f2faf7; transform: translateY(-1px); }.product-search-row strong { min-width: 0; overflow: hidden; color: #283d4c; font-size: 13px; font-weight: 750; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }.product-category-pill { justify-self: start; border-radius: 999px; padding: 4px 7px; color: #426761; background: #e9f4f1; font-size: 10px; font-weight: 800; white-space: nowrap; }.product-result-price { color: #1c6259; font-size: 13px; font-weight: 900; text-align: right; white-space: nowrap; }.product-result-stock { color: #718096; font-size: 11px; font-weight: 700; text-align: right; white-space: nowrap; }
 @media (max-width: 620px) { .product-search-row { grid-template-columns: minmax(0, 1fr) 70px; gap: 6px 8px; }.product-search-row strong { grid-column: 1 / -1; }.product-category-pill { display: none; }.product-result-price { text-align: left; }.product-result-stock { text-align: right; } }
@@ -161,16 +162,7 @@ body { font-family: var(--font-body), Arial, sans-serif; background: radial-grad
   .lab-print-header { grid-template-columns: 125px 1fr; padding-right: 125px; }
 }
 
-@media print {
-  html, body { width: 100% !important; height: auto !important; overflow: visible !important; background: #fff !important; }
-  body * { visibility: hidden !important; }
-  .modal-backdrop { position: static !important; inset: auto !important; display: block !important; width: auto !important; height: auto !important; padding: 0 !important; overflow: visible !important; background: transparent !important; visibility: visible !important; }
-  .new-patient-modal, .sale-modal-shell, .lab-monitor-modal, .lab-modal { position: static !important; display: block !important; width: auto !important; max-width: none !important; height: auto !important; max-height: none !important; overflow: visible !important; border: 0 !important; border-radius: 0 !important; padding: 0 !important; background: #fff !important; box-shadow: none !important; visibility: visible !important; }
-  .print-area, .print-area * { visibility: visible !important; }
-  .print-area { position: static !important; inset: auto !important; width: 100% !important; max-width: none !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
-  .lab-order-print { width: 100% !important; min-width: 0 !important; min-height: 0 !important; padding: 0 !important; transform: none !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-  .no-print { display: none !important; }
-}
+
 
 /* Informe A4 de revisión clínica */
 .new-patient-form select { width: 100%; border: 1px solid #d4e0ea; border-radius: 9px; padding: 10px; outline-color: #78a6c8; color: #29394e; background: #fff; }
@@ -194,15 +186,7 @@ body { font-family: var(--font-body), Arial, sans-serif; background: radial-grad
 .role-preview { display: grid; gap: 7px; margin-top: 10px; border: 1px solid #d9e7e4; border-radius: 12px; padding: 11px 13px; color: #355d59; background: #f2f9f7; }.role-preview > strong { font-size: 12px; }.role-preview > div { display: flex; flex-wrap: wrap; gap: 6px; }.role-preview span { border-radius: 999px; padding: 4px 8px; color: #466966; background: #fff; font-size: 10px; font-weight: 700; }
 
 @media (max-width: 760px) { .clinical-review-print, .clinical-prescription-print { min-width: 720px; padding: 20px; }.clinical-print-letterhead { grid-template-columns: 160px 1fr; }.biom-grid { grid-template-columns: 1fr; }.complementary-exam-row { grid-template-columns: 1fr 36px; }.complementary-exam-row input { grid-column: 1 / -1; grid-row: 2; } }
-@media print {
-  body.is-printing .print-only { display: block !important; }
-  body.is-printing .print-area { position: fixed !important; inset: 0 auto auto 0 !important; width: 100% !important; }
-  body.is-targeted-print .print-area:not(.active-print-area) { display: none !important; visibility: hidden !important; }
-  .clinical-review-print { width: 100% !important; min-width: 0 !important; min-height: 0 !important; padding: 0 !important; font-size: 10.5px !important; line-height: 1.2 !important; transform: none !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-  .clinical-prescription-print { width: 100% !important; min-width: 0 !important; min-height: 0 !important; padding: 0 !important; transform: none !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-  .clinical-print-letterhead { grid-template-columns: 160px 1fr !important; min-height: 120px !important; }.clinical-print-logo { height: 115px !important; }.clinical-print-logo img { max-width: 145px !important; max-height: 115px !important; }.clinical-print-letterhead h1 { font-size: 23px !important; }.clinical-print-letterhead p { font-size: 11px !important; }
-  .clinical-print-title { margin: 1px 0 9px !important; font-size: 19px !important; }.clinical-print-patient-row { margin-bottom: 10px !important; font-size: 13px !important; }.clinical-print-demographics { row-gap: 2px !important; margin-bottom: 4px !important; }.clinical-print-section { margin-top: 2px !important; }.clinical-print-section h3 { margin: 5px 0 2px !important; font-size: 14px !important; }.clinical-print-section > p, .clinical-print-finding span, .clinical-print-finding strong { font-size: 10px !important; }.clinical-print-rx-lines strong { font-size: 11px !important; }.clinical-print-signature { margin-top: 26px !important; }
-}
+
 
 /* Correcciones de interacción: los modales siempre quedan sobre ambos menús. */
 .modal-backdrop { z-index: 100; }
@@ -260,4 +244,58 @@ body { font-family: var(--font-body), Arial, sans-serif; background: radial-grad
   .task-actions { width: 100%; }
   .branch-directory-grid { grid-template-columns: 1fr; }
   .branch-directory-heading, .branch-filter-panel { align-items: flex-start; flex-direction: column; }
+}
+
+/* Receipt keeps its existing narrow preview; all print buttons default to A4. */
+.receipt-document { width: 100%; max-width: 320px; margin: 0 auto; }
+.receipt-document .letterhead { flex-direction: column; text-align: center; }
+.receipt-document .letterhead-text { justify-items: center; }
+
+/* Only the isolated iframe receives these rules. No modal ancestors are copied. */
+@media print {
+  .no-print { display: none !important; }
+  html:root { height: auto !important; min-height: 0 !important; background: #fff; }
+  body.print-context { height: auto !important; min-height: 0 !important; display: block !important; width: auto !important; margin: 0 !important; padding: 0 !important; background: #fff !important; color: #20252b; font: 11pt/1.3 Arial, sans-serif; }
+  .print-context, .print-context * { box-sizing: border-box; position: static !important; max-height: none !important; overflow: visible !important; box-shadow: none !important; backdrop-filter: none !important; filter: none !important; transform: none !important; text-shadow: none !important; }
+  .print-context .glass { background: #fff !important; border-radius: 0 !important; }
+  .print-context > .print-area { display: block !important; page: a4doc; width: 100% !important; max-width: 186mm !important; min-width: 0 !important; height: auto !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; border: 0 !important; break-inside: auto; }
+  .print-context > .print-ticket { page: ticketdoc; max-width: 72mm !important; }
+  .print-context .print-area * { min-width: 0; overflow-wrap: anywhere; }
+  .print-context .clinical-review-print, .print-context .clinical-prescription-print, .print-context .lab-order-print { width: 100% !important; min-width: 0 !important; min-height: 0 !important; padding: 0 !important; font-size: 11pt; line-height: 1.3; }
+  .print-context img { max-width: 100%; object-fit: contain; }
+  .print-context .letterhead, .print-context .clinical-print-letterhead, .print-context .lab-print-header { min-height: 0; margin: 0 0 4mm; gap: 5mm; break-inside: avoid; }
+  .print-context .clinical-print-letterhead, .print-context .lab-print-header { grid-template-columns: 35mm minmax(0, 1fr); padding: 0; }
+  .print-context .clinical-print-logo, .print-context .lab-print-brand { height: auto; min-height: 0; }
+  .print-context .letterhead img, .print-context .clinical-print-logo img, .print-context .lab-print-brand img { height: auto; max-height: 18mm; max-width: 35mm; }
+  .print-context .clinical-print-letterhead h1, .print-context .lab-print-heading h1 { font-size: 16pt; }
+  .print-context .clinical-print-title { margin: 2mm 0 3mm; font-size: 15pt; }
+  .print-context .clinical-print-patient-row { margin-bottom: 3mm; font-size: 11pt; }
+  .print-context .clinical-print-section { margin: 2mm 0; }
+  .print-context .clinical-print-section h3, .print-context .prescription-items h3 { margin: 2mm 0; font-size: 12pt; }
+  .print-context .clinical-print-finding strong, .print-context .clinical-print-finding span, .print-context .clinical-print-letterhead p, .print-context .letterhead-text span, .print-context .clinical-print-signature small { font-size: 10pt; }
+  .print-context .prescription-items { display: block; margin: 4mm 0; }
+  .print-context .prescription-items article { margin: 0 0 4mm; padding-bottom: 3mm; }
+  .print-context .prescription-items p, .print-context .prescription-items strong { font-size: 11pt; }
+  .print-context .clinical-print-signature { margin: 10mm 0 0; break-inside: avoid; }
+  .print-context .lab-print-patient { margin: 4mm 0; }
+  .print-context .lab-print-patient h2 { font-size: 13pt; }
+  .print-context .lab-print-heading p, .print-context .lab-print-heading span, .print-context .lab-print-product, .print-context .lab-print-review p, .print-context .lab-print-footer { font-size: 11pt; }
+  .print-context .lab-print-rx-row { grid-template-columns: 14mm repeat(6, minmax(0, 1fr)); min-height: 8mm; font-size: 10pt; }
+  .print-context .lab-print-rx-row > strong { font-size: 11pt; }
+  .print-context .lab-print-rx-row > span { white-space: normal; }
+  .print-context .lab-print-review, .print-context .lab-print-notes { min-height: 0; padding: 4mm 0; }
+  .print-context .lab-print-notes p { font-size: 10pt; }
+  .print-context .lab-print-footer { margin-top: 5mm; }
+  .print-context section, .print-context .task-card, .print-context tr { break-inside: avoid; }
+  /* Long reports must paginate, including tables and extensive clinical notes. */
+  .print-context .agenda-board, .print-context .clinical-print-section, .print-context .prescription-items { break-inside: auto; }
+  .print-context h2, .print-context h3 { break-after: avoid; }
+  .print-context p { orphans: 3; widows: 3; }
+  .print-context table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+  .print-context thead { display: table-header-group; }
+  .print-context th, .print-context td { padding: 2mm; font-size: 10pt; white-space: normal; }
+  .print-context .agenda-board { padding: 3mm 0; }
+  .print-context .receipt-document { font-size: 11pt; line-height: 1.3; }
+  .print-context .receipt-document p { font-size: 10pt !important; }
+  .print-context .print-field-value { white-space: pre-wrap; }
 }

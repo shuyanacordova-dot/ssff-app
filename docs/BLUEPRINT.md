@@ -56,7 +56,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | Carpeta del paciente | 🟡 | Cuatro pestañas: Revisiones, Ventas, Fotos y documentos, Laboratorio con contador y órdenes. Pendientes Citas, Estado de cuenta, Comunicaciones. |
 | Ventas y cobros | ✅ | Venta rápida / lentes, abonos, anulación, convenios, acuerdo de pago, folio |
 | Laboratorio | 🟡 | Pestaña propia en carpeta con nueva orden, selector de ventas completadas y acceso al modal existente. Sin venta ofrece registrarla. Tarjetas con fecha, lente, estado y garantía; acceso en ventas renombrado. Pendiente prueba con sesión real. |
-| Impresiones (receta, revisión, orden, recibo) | 🟡 | Existen, pero Shuyana reporta problemas. **Fase A** — detalles pendientes (ver sección 8) |
+| Impresiones (receta, revisión, orden, recibo) | 🟡 | Implementado, pendiente prueba en navegador: contexto aislado por documento, A4 con márgenes de 12 mm, logos y espacios compactos, paginación sin modales. Incluye acuerdos, resumen del día e informes. TypeScript correcto. |
 | Inventario | ✅ | Stock por sucursal, transferencias, alertas, pestañas por categoría |
 | Caja, resumen del día | ✅ | Cuadre diario convive con la herramienta vieja de Notion (no tocar esa) |
 | Cuentas de bancos / cuadre global | 🟡 | Enlace existe pero apunta a la misma caja diaria |
@@ -78,7 +78,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 ### Fase A — Arreglos urgentes (en curso)
 1. **Editar ficha del paciente** — botón "Editar datos" en la carpeta, con registro de quién cambió qué y cuándo.
 2. **Pestaña "Laboratorio" en la carpeta del paciente** — lista de órdenes del paciente + botón visible "Nueva orden de laboratorio" (elige la venta y abre el formulario que ya existe).
-3. **Impresiones** — receta, revisión, orden de laboratorio y recibo. Problema reportado: **se cortan o salen en varias hojas**. Papel: **A4 para todo**. Causa probable: se imprime ocultando (no quitando) el resto de la pantalla y el documento vive dentro de una ventana emergente con altura limitada. Solución: imprimir cada documento en una hoja limpia aparte (A4, márgenes fijos).
+3. **Impresiones — hecho, pendiente prueba**. Receta, revisión, orden, recibo, acuerdos, resumen del día e informes imprimen solo su documento en un iframe limpio. A4 por defecto, márgenes de 12 mm; ticket 80 mm conservado como opción técnica. Pendiente verificar en navegador receta/orden/recibo de una página con datos normales, historia extensa sin recortes ni hojas vacías, logos, cancelar y repetir impresión.
 4. **Seguridad** — quitar permiso público (`anon`) a las 7 funciones listadas en la sección 3.
 
 ### Fase B — Relación con pacientes (CRM + fidelización) — **siguiente prioridad elegida por Shuyana (2026-09-24): CRM y recordatorios**
@@ -134,6 +134,8 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | L9 | 2026-09-24 | El chequeo de seguridad de Supabase mostró funciones creadas sin quitar el permiso público `anon`. | En cada función nueva: `revoke all ... from public, anon` y `grant execute ... to authenticated`. Correr `get_advisors` después de cada migración. |
 | L10 | 2026-09-24 | Se pidió instalar un complemento desde un repositorio de GitHub no verificado. | No instalar código de fuentes no verificadas. Codex se usa con el plugin oficial ya instalado. |
 
+| L11 | 2026-09-24 | Revisión del código: tres bloques de impresión combinaban `visibility: hidden` (conserva espacio), posición absoluta y finalmente fija de `.print-area`, con documentos dentro de modales con `max-height`/`overflow: auto`. Los parches de modal eran incompletos y no eliminaban el resto del layout; además había mínimos de altura y anchura móviles, y recibos por defecto en ticket. | Imprimir una copia aislada del documento, sin ancestros modales ni clases temporales en el body original. Esperar estilos/logos/fuentes, convertir controles a texto actual, usar A4 y flujo normal con saltos por secciones/filas. No usar `:has()`. Confirmar paginación real en navegador; TypeScript no la verifica. |
+
 ---
 
 ## 7. Mapa de archivos clave
@@ -179,3 +181,5 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-24 | Arreglo de impresión que congelaba, botón de orden visible en ventas, edición de revisiones | `ef2a66c` |
 | 2026-09-24 | Este Blueprint + reglas para IAs (`AGENTS.md`, `CLAUDE.md`) | `6804ec0` |
 | 2026-09-24 | Edición de pacientes con auditoría y pestaña Laboratorio. Archivos: `app/pacientes/actions.ts`, `app/pacientes/patient-clinical-client.tsx`, `app/ventas/sales-board.tsx`, `lib/clinical.ts`, `lib/ventas.ts`, `supabase/migrations/20260924193358_actualizar_paciente_clinico.sql`, `docs/BLUEPRINT.md`. Construido por Codex, revisado por Claude (permisos ampliados a todo el equipo). TypeScript sin errores; migración aplicada; prueba con sesión real pendiente. | (este commit) |
+
+| 2026-09-24 | Impresión aislada A4. Archivos: `lib/print-document.ts`, `app/globals.css`, `app/recibo/[token]/page.tsx`, `app/recibo/print-button.tsx`, `app/ventas/lab-order-modal.tsx`, `app/laboratorio/lab-monitor-board.tsx`, `app/ventas/acuerdo-pago-view.tsx`, `app/cuentas-cobrar/cuentas-cobrar-board.tsx`, `app/resumen-dia/resumen-dia-board.tsx`, `app/informes/informes-board.tsx`, `docs/BLUEPRINT.md`. Receta/revisión conservan sus IDs existentes; componentes clínicos, orden y membrete reciben ajustes solo al imprimir. Modal de recibo en ventas/carpeta gestiona el enlace público, no contiene un documento imprimible propio. TypeScript correcto; prueba visual pendiente de Claude. Sin commit/push ni cambios de base de datos por instrucción expresa. | (este commit) |

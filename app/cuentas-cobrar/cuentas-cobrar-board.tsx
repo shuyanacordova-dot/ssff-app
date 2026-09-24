@@ -1,4 +1,5 @@
 "use client";
+import { printDocumentById } from "@/lib/print-document";
 
 import Link from "next/link";
 import { AlertTriangle, CircleAlert, Copy, FileText, MessageCircle, MoreVertical, Printer, Wallet, X } from "lucide-react";
@@ -110,7 +111,7 @@ function ConvenioModal({ deuda, empresasConvenio, onClose, onNotice }: { deuda: 
   });
 
   if (resultado) return <div className="modal-backdrop"><section className="new-patient-modal task-modal" role="dialog" aria-modal="true"><button className="modal-close no-print" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>
-    <div className="print-area print-a4">
+    <div id="collection-agreement-print" className="print-area print-a4">
       <Letterhead company={{ nombre: resultado.empresa_nombre ?? "LUMOS", direccion: resultado.empresa_direccion, telefono: resultado.empresa_telefono, email: resultado.empresa_email, logo_url: resultado.empresa_logo_url }} subtitle={resultado.sucursal_nombre ?? undefined} />
       <p className="print-center" style={{ fontWeight: 800, fontSize: 17, margin: "6px 0 14px" }}>Solicitud de Financiamiento</p>
 
@@ -144,7 +145,7 @@ function ConvenioModal({ deuda, empresasConvenio, onClose, onNotice }: { deuda: 
         <p style={{ margin: "4px 0 0", fontSize: 13 }}>Nombre y firma del solicitante</p>
       </div>
     </div>
-    <div className="modal-actions no-print"><button className="outline-action" type="button" onClick={onClose}>Cerrar</button><button className="new-consultation" type="button" onClick={() => window.print()}><Printer size={15} /> Imprimir</button></div>
+    <div className="modal-actions no-print"><button className="outline-action" type="button" onClick={onClose}>Cerrar</button><button className="new-consultation" type="button" onClick={() => printDocumentById("collection-agreement-print")}><Printer size={15} /> Imprimir</button></div>
   </section></div>;
 
   return <div className="modal-backdrop"><section className="new-patient-modal task-modal" role="dialog" aria-modal="true" aria-labelledby="convenio-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>

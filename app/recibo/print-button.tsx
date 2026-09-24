@@ -1,7 +1,7 @@
 "use client";
 
-import { printCurrentDocument } from "@/lib/print-document";
+import { printDocumentById } from "@/lib/print-document";
 
 export default function PrintButton() {
-  return <button type="button" className="outline-action no-print" onClick={printCurrentDocument}>Guardar / imprimir</button>;
+  return <button type="button" className="outline-action no-print" onClick={() => printDocumentById("receipt-print")}>Guardar / imprimir</button>;
 }
