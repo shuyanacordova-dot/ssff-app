@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AgendaStatus, AgendaTeamMember } from "@/lib/agenda";
 
-const clinicalRoles = new Set(["superadmin", "admin_sucursal", "optometra"]);
+const agendaRoles = new Set(["superadmin", "admin_sucursal", "optometra", "vendedor"]);
 const states = new Set<AgendaStatus>(["programada", "confirmada", "atendida", "cancelada", "no_asistio"]);
 type Profile = { id: string; empresa_id: string; sucursal_id: string | null; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null };
 const field = (form: FormData, name: string) => typeof form.get(name) === "string" ? String(form.get(name)).trim() : "";
@@ -18,7 +18,7 @@ async function currentProfile() {
   const { data: raw, error } = await supabase.from("usuarios").select("id,empresa_id,sucursal_id,activo,roles(nombre)").eq("auth_user_id", auth.user.id).maybeSingle();
   const profile = raw as unknown as Profile | null;
   const role = roleName(profile);
-  if (error || !profile?.activo || !role || !clinicalRoles.has(role)) throw new Error("No tienes permiso para gestionar la agenda clínica.");
+  if (error || !profile?.activo || !role || !agendaRoles.has(role)) throw new Error("No tienes permiso para gestionar la agenda clínica.");
   return { supabase, profile, role };
 }
 

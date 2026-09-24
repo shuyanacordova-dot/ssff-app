@@ -10,7 +10,7 @@ export type Appointment = { id: string; paciente_id: string; empresa_atencion_id
 export type AgendaProfile = { id: string; nombre: string; empresa_id: string; sucursal_id: string | null; rol: string };
 export type AgendaData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: AgendaProfile; appointments: Appointment[]; patients: AgendaPatient[]; companies: AgendaCompany[]; branches: AgendaBranch[]; team: AgendaTeamMember[] };
 
-const clinicalRoles = new Set(["superadmin", "admin_sucursal", "optometra"]);
+const agendaRoles = new Set(["superadmin", "admin_sucursal", "optometra", "vendedor"]);
 const roleName = (profile: { roles: { nombre: string } | { nombre: string }[] | null } | null) => Array.isArray(profile?.roles) ? profile.roles[0]?.nombre : profile?.roles?.nombre;
 
 export async function getAgendaData(): Promise<AgendaData> {
@@ -23,7 +23,7 @@ export async function getAgendaData(): Promise<AgendaData> {
     const { data: rawProfile, error: profileError } = await supabase.from("usuarios").select("id,nombre,empresa_id,sucursal_id,activo,roles(nombre)").eq("auth_user_id", auth.user.id).maybeSingle();
     const profile = rawProfile as unknown as { id: string; nombre: string; empresa_id: string; sucursal_id: string | null; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null } | null;
     const role = roleName(profile);
-    if (profileError || !profile?.activo || !role || !clinicalRoles.has(role)) return { status: "forbidden", message: "Tu perfil no tiene permiso para la agenda clínica.", ...empty };
+    if (profileError || !profile?.activo || !role || !agendaRoles.has(role)) return { status: "forbidden", message: "Tu perfil no tiene permiso para la agenda clínica.", ...empty };
 
     const rangeStart = new Date(); rangeStart.setDate(rangeStart.getDate() - 120);
     const rangeEnd = new Date(); rangeEnd.setDate(rangeEnd.getDate() + 180);

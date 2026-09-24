@@ -2,15 +2,8 @@
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export type InformeSucursal = { sucursal_id: string; sucursal_nombre: string; empresa_id: string; empresa_nombre: string; ventas_total: number; ventas_count: number; cobrado_total: number; meta: number };
-export type InformeMensual = {
-  mes: string;
-  por_sucursal: InformeSucursal[];
-  totales: { ventas_total: number; ventas_count: number; cobrado_total: number; saldo_total: number; meta_total: number; gastos_total: number; cuentas_por_cobrar_total: number };
-  gastos_por_clasificacion: { clasificacion: string; monto: number }[];
-  cobros_por_metodo: { metodo: string; monto: number }[];
-  cuadres: { correctos: number; total: number };
-};
+import type { InformeMensual } from "@/lib/informes";
+export type { InformeMensual, InformeSucursal } from "@/lib/informes";
 
 export async function obtenerInformeMensual(empresaId: string | null, mes: string) {
   const supabase = await createSupabaseServerClient();

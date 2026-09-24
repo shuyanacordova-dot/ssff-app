@@ -46,7 +46,7 @@ export default function Cart({ products, stock, companies, branches, patients, e
 
   const elegirModo = (value: Modo) => { setModo(value); setItems([]); };
   const resetCompany = (value: string) => { setCompany(value); setBranch(""); setItems([]); };
-  const addProduct = (id: string) => { if (id && !items.some((item) => item.producto_id === id)) setItems([...items, { producto_id: id, cantidad: 1, descuento: 0 }]); };
+  const addProduct = (id: string) => { if (id && available.some((product) => product.id === id) && !items.some((item) => item.producto_id === id)) setItems([...items, { producto_id: id, cantidad: 1, descuento: 0 }]); };
   const updateItem = (id: string, patch: Partial<CartItem>) => setItems(items.map((item) => item.producto_id === id ? { ...item, ...patch } : item));
   const addPayment = () => setPayments([...payments, { metodo: "efectivo", monto: "", referencia: "", banco: "" }]);
   const updatePayment = (index: number, patch: Partial<CartPayment>) => setPayments(payments.map((payment, i) => i === index ? { ...payment, ...patch } : payment));
@@ -84,8 +84,8 @@ export default function Cart({ products, stock, companies, branches, patients, e
 
   if (!modo) return <section className="glass agenda-board" style={{ marginBottom: 18 }}><p className="section-label">NUEVA VENTA</p><h2>¿Qué tipo de venta es?</h2>
     <div className="sale-mode-grid">
-      <button type="button" className="sale-mode-card" onClick={() => elegirModo("rapida")}><strong>Venta rápida</strong><span>Accesorios, gafas de sol y exámenes</span></button>
-      <button type="button" className="sale-mode-card" onClick={() => elegirModo("lentes")}><strong>Lentes</strong><span>Armazón y lunas para una fórmula</span></button>
+      <button type="button" className="sale-mode-card" onClick={() => elegirModo("rapida")}><strong>Venta rápida</strong><span>Accesorios y gafas de sol</span></button>
+      <button type="button" className="sale-mode-card" onClick={() => elegirModo("lentes")}><strong>Lentes</strong><span>Armazón y lunas para una fórmula</span><span className="field-hint">Lunas y lentes de contacto siempre van aquí.</span></button>
     </div>
   </section>;
 

@@ -8,6 +8,8 @@ const manrope = Manrope({ subsets: ["latin"], variable: "--font-body", weight: [
 
 export const metadata: Metadata = {
   title: "LumOS | Sistema Óptico",
+  applicationName: "LumOS",
+  appleWebApp: { capable: true, title: "LumOS", statusBarStyle: "default" },
   description: "LumOS, el sistema de gestión de Shuvisión y Focus",
 };
 

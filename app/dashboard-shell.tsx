@@ -44,13 +44,15 @@ function MetasDashboard({ informe, message }: { informe: InformeMensual | null; 
   return <section className="goal-overview glass">
     <div className="goal-overview-heading"><div><p className="section-label">METAS DEL MES</p><h2>Avance por sucursal</h2><p>{mes}</p></div><Link className="outline-action" href="/informes"><Target size={15} /> Configurar metas</Link></div>
     {message ? <p className="field-hint">{message}</p> : informe?.por_sucursal.length ? <div className="goal-grid">{informe.por_sucursal.map((row) => {
-      const cumplimiento = pct(row.ventas_total, row.meta);
-      const restante = Math.max(0, row.meta - row.ventas_total);
+      const cobrado = row.ingresos_total ?? 0;
+      const cumplimiento = pct(cobrado, row.meta);
+      const restante = Math.max(0, row.meta - cobrado);
       return <article className="goal-card" key={row.sucursal_id}>
         <div className="goal-card-top"><div><span>{row.empresa_nombre}</span><h3>{row.sucursal_nombre}</h3></div><strong>{row.meta > 0 ? `${cumplimiento}%` : "Sin meta"}</strong></div>
         <div className="goal-progress"><span style={{ width: `${Math.min(100, cumplimiento)}%` }} /></div>
-        <p><strong>{money(row.ventas_total)}</strong> vendidos</p>
-        <small>{row.meta > 0 ? `Meta ${money(row.meta)} · Faltan ${money(restante)}` : "Configura la meta mensual de esta sucursal"}</small>
+        <p><strong>{money(cobrado)}</strong> cobrado en el mes</p>
+        <p className="field-hint">Total vendido: {money(row.ventas_total)}</p>
+        <small>{row.meta > 0 ? `Meta ${money(row.meta)} · Cobrado ${money(cobrado)} · Faltan ${money(restante)}` : "Configura la meta mensual de esta sucursal"}</small>
       </article>;
     })}</div> : <div className="goal-empty"><Target size={22} /><p>Aún no hay metas de sucursales disponibles para este mes.</p></div>}
   </section>;
