@@ -1,10 +1,12 @@
+import { formatRecordDate } from "@/lib/record-date";
+import { paymentMethodLabels } from "@/lib/payment-methods";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 import Letterhead from "../../print-letterhead";
 import PrintButton from "../print-button";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
-const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
-const formatDateOnly = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${value}T12:00:00`));
+const formatDate = formatRecordDate;
+const formatDateOnly = formatRecordDate;
 
 type Recibo = {
   paciente_nombre: string;
@@ -61,7 +63,7 @@ export default async function ReciboPage({ params }: { params: Promise<{ token: 
     <div className="print-dashed" />
 
     <p className="section-label">DETALLE DE ABONOS</p>
-    {recibo.abonos.length ? recibo.abonos.map((abono, index) => <p key={index} style={{ margin: "4px 0", fontSize: 13 }}>{formatDate(abono.fecha)} · {abono.metodo} <strong style={{ float: "right" }}>{money(abono.monto)}</strong></p>) : <p className="field-hint">Todavía no se han registrado abonos.</p>}
+    {recibo.abonos.length ? recibo.abonos.map((abono, index) => <p key={index} style={{ margin: "4px 0", fontSize: 13 }}>{formatDate(abono.fecha)} · {paymentMethodLabels[abono.metodo] ?? abono.metodo} <strong style={{ float: "right" }}>{money(abono.monto)}</strong></p>) : <p className="field-hint">Todavía no se han registrado abonos.</p>}
     <div className="print-dashed" />
 
     {recibo.fecha_entrega_estimada && <p style={{ margin: "3px 0" }}>Entrega tentativa <strong style={{ float: "right" }}>{formatDateOnly(recibo.fecha_entrega_estimada)}</strong></p>}

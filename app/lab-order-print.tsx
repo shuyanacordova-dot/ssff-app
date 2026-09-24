@@ -1,3 +1,4 @@
+import { formatRecordDate } from "@/lib/record-date";
 import { Binoculars, Eye, Phone, UserRound } from "lucide-react";
 import type { OrdenLaboratorioMedidas, OrdenLaboratorioRx, RxEye } from "@/lib/laboratorio";
 
@@ -54,9 +55,9 @@ function EyeLine({ label, eye, altura }: { label: "OD" | "OI"; eye: RxEye; altur
 
 const formatDelivery = (dateValue?: string | null) => {
   if (!dateValue) return "No especificada";
-  const date = new Date(dateValue.length === 10 ? `${dateValue}T12:00:00` : dateValue);
+  const date = new Date(dateValue.length === 10 ? `${dateValue}T12:00:00-05:00` : dateValue);
   if (Number.isNaN(date.getTime())) return dateValue;
-  return new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "2-digit", year: "numeric", hour: dateValue.length > 10 ? "2-digit" : undefined, minute: dateValue.length > 10 ? "2-digit" : undefined }).format(date);
+  return new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "short", year: "numeric", hour: dateValue.length > 10 ? "2-digit" : undefined, minute: dateValue.length > 10 ? "2-digit" : undefined }).format(date);
 };
 
 export default function LabOrderPrint(props: LabOrderPrintProps) {
@@ -77,6 +78,7 @@ export default function LabOrderPrint(props: LabOrderPrintProps) {
       <div className="lab-print-heading">
         <p>Detalle de la orden de trabajo #</p>
         <h1>{code}</h1>
+        <p>Fecha de creación: <strong>{formatRecordDate(props.createdAt)}</strong></p>
         <span>Sucursal: {props.branchName.toUpperCase()}</span>
         {props.warranty && <em>GARANTÍA</em>}
       </div>

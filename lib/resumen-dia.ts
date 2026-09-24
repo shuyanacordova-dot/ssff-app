@@ -42,7 +42,7 @@ export async function getResumenDiaData(fecha: string, empresaIdParam?: string):
     ]);
     if (ventasResult.error || gastosResult.error) return { status: "error", message: "No se pudo cargar el resumen del día.", ...empty };
 
-    const ventaIds = (ventasResult.data ?? []).map((v) => v.id);
+    const ventaIds = (ventasResult.data ?? []).filter((v) => v.estado !== "anulada").map((v) => v.id);
     const pagosResult = ventaIds.length ? await supabase.from("pagos_venta").select("id,venta_id,metodo,monto,creado_en,recibido_por").in("venta_id", ventaIds).gte("creado_en", inicio).lt("creado_en", fin).order("creado_en", { ascending: true }) : { data: [], error: null };
     if (pagosResult.error) return { status: "error", message: "No se pudieron cargar los abonos del día.", ...empty };
 

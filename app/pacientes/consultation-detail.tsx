@@ -1,4 +1,5 @@
 "use client";
+import { formatRecordDate } from "@/lib/record-date";
 
 import { Pencil, Printer, X } from "lucide-react";
 import type { Consultation, PatientRecord } from "@/lib/clinical";
@@ -8,7 +9,7 @@ import { printDocumentById } from "@/lib/print-document";
 import ClinicalReviewPrint from "./clinical-review-print";
 import ClinicalPrescriptionPrint, { hasClinicalPrescription } from "./clinical-prescription-print";
 
-const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${value.slice(0, 10)}T12:00:00`));
+const formatDate = formatRecordDate;
 const prettyKey = (key: string) => key.replaceAll("_", " ").replace(/^./, (character) => character.toUpperCase());
 const sexoLabel: Record<string, string> = { femenino: "Femenino", masculino: "Masculino", otro: "Otro" };
 const RX_COLUMNS = [{ key: "esfera", label: "ESF" }, { key: "cilindro", label: "CIL" }, { key: "eje", label: "EJE" }, { key: "add", label: "ADD" }, { key: "av_lejos", label: "AV LEJOS" }, { key: "av_cerca", label: "AV CERCA" }, { key: "dnp", label: "DNP" }];

@@ -1,4 +1,5 @@
 "use client";
+import { paymentMethods as methods } from "@/lib/payment-methods";
 import { useMemo, useState, useTransition } from "react";
 import { Search, X } from "lucide-react";
 import { registrarVenta } from "./actions";
@@ -9,16 +10,16 @@ import type { EmpresaConvenio, PaymentMethod, SaleBranch, SaleCompany, SalePatie
 type CartItem = { producto_id: string; cantidad: number; descuento: number };
 type CartPayment = { metodo: PaymentMethod; monto: string; referencia: string; banco: string };
 type Modo = "" | "rapida" | "lentes";
-const methods: { value: PaymentMethod; label: string }[] = [{ value: "efectivo", label: "Efectivo" }, { value: "transferencia", label: "Transferencia" }, { value: "tarjeta", label: "Tarjeta" }, { value: "credito", label: "Crédito" }, { value: "otro", label: "Otro" }];
 const bancos = [{ value: "pichincha", label: "Banco Pichincha" }, { value: "guayaquil", label: "Banco Guayaquil" }, { value: "internacional", label: "Banco Internacional" }, { value: "otro", label: "Otro banco" }];
 const money = (n: number) => `$${n.toFixed(2)}`;
 const primeraCuotaFecha = () => { const d = new Date(); d.setMonth(d.getMonth() + 1); d.setDate(1); return d; };
 const formatFecha = (d: Date) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "long", year: "numeric" }).format(d);
 const productCategoryLabel: Record<string, string> = { montura: "Armazón", lente: "Luna", accesorio: "Accesorio", gafas_sol: "Gafas", servicio: "Examen" };
 
-export default function Cart({ products, stock, companies, branches, patients, empresasConvenio, defaultCompany, defaultBranch, defaultPacienteId, lockPatient, onDone }: { products: SaleProduct[]; stock: SaleStock[]; companies: SaleCompany[]; branches: SaleBranch[]; patients: SalePatient[]; empresasConvenio: EmpresaConvenio[]; defaultCompany: string; defaultBranch: string; defaultPacienteId?: string; lockPatient?: boolean; onDone: (message: string) => void }) {
+export default function Cart({ products, stock, branches, patients, empresasConvenio, defaultCompany, defaultBranch, defaultPacienteId, lockPatient, onDone }: { products: SaleProduct[]; stock: SaleStock[]; companies: SaleCompany[]; branches: SaleBranch[]; patients: SalePatient[]; empresasConvenio: EmpresaConvenio[]; defaultCompany: string; defaultBranch: string; defaultPacienteId?: string; lockPatient?: boolean; onDone: (message: string) => void }) {
   const [modo, setModo] = useState<Modo>("");
-  const [company, setCompany] = useState(defaultCompany); const [branch, setBranch] = useState(defaultBranch); const [cliente, setCliente] = useState(""); const [pacienteId, setPacienteId] = useState(defaultPacienteId ?? "");
+  const [branch, setBranch] = useState(() => branches.find((b) => b.id === defaultBranch)?.id ?? branches.find((b) => b.empresa_id === defaultCompany)?.id ?? "");
+  const company = branches.find((b) => b.id === branch)?.empresa_id ?? ""; const [cliente, setCliente] = useState(""); const [pacienteId, setPacienteId] = useState(defaultPacienteId ?? "");
   const [items, setItems] = useState<CartItem[]>([]); const [payments, setPayments] = useState<CartPayment[]>([]);
   const [notice, setNotice] = useState(""); const [pending, start] = useTransition();
   const [convenioActivo, setConvenioActivo] = useState(false);
@@ -31,7 +32,6 @@ export default function Cart({ products, stock, companies, branches, patients, e
   const [buscando, setBuscando] = useState<"" | "rapida" | "montura" | "lunas">("");
 
   const stockFor = (productoId: string, sucursalId: string) => stock.find((s) => s.producto_id === productoId && s.sucursal_id === sucursalId)?.cantidad ?? 0;
-  const branchesForCompany = branches.filter((b) => b.empresa_id === company);
   const empresaProducts = products.filter((p) => p.empresa_id === company);
   const stockOk = (p: SaleProduct) => { if ((p.categoria !== "montura" && p.categoria !== "gafas_sol") || !p.controla_inventario || !branch) return true; return stockFor(p.id, branch) > 0; };
   const availableRapida = empresaProducts.filter((p) => ["accesorio", "gafas_sol", "servicio"].includes(p.categoria)).filter(stockOk);
@@ -45,7 +45,7 @@ export default function Cart({ products, stock, companies, branches, patients, e
   const saldo = Math.max(0, subtotal - paidTotal);
 
   const elegirModo = (value: Modo) => { setModo(value); setItems([]); };
-  const resetCompany = (value: string) => { setCompany(value); setBranch(""); setItems([]); };
+  const resetBranch = (value: string) => { setBranch(value); setItems([]); };
   const addProduct = (id: string) => { if (id && available.some((product) => product.id === id) && !items.some((item) => item.producto_id === id)) setItems([...items, { producto_id: id, cantidad: 1, descuento: 0 }]); };
   const updateItem = (id: string, patch: Partial<CartItem>) => setItems(items.map((item) => item.producto_id === id ? { ...item, ...patch } : item));
   const addPayment = () => setPayments([...payments, { metodo: "efectivo", monto: "", referencia: "", banco: "" }]);
@@ -94,8 +94,8 @@ export default function Cart({ products, stock, companies, branches, patients, e
     <button type="button" className="text-action" onClick={() => elegirModo("")}>← Cambiar tipo de venta</button>
     <form onSubmit={(event) => { event.preventDefault(); submit(event.currentTarget); }}>
       <div className="new-patient-form" style={{ marginTop: 10 }}>
-        <label>Empresa<select name="empresa_id" value={company} onChange={(event) => resetCompany(event.target.value)}>{companies.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></label>
-        <label>Sucursal<select key={company} name="sucursal_id" value={branch} onChange={(event) => setBranch(event.target.value)}><option value="">Sin sucursal específica</option>{branchesForCompany.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label>
+        <input type="hidden" name="empresa_id" value={company} />
+        <label>Sucursal<select name="sucursal_id" required value={branch} onChange={(event) => resetBranch(event.target.value)}><option value="" disabled>Selecciona una sucursal</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label>
         {lockPatient ? <label>Paciente<input value={patients[0] ? `${patients[0].apellidos}, ${patients[0].nombres}` : ""} disabled /><input type="hidden" name="paciente_id" value={pacienteId} /></label> : <label>Paciente<select name="paciente_id" value={pacienteId} onChange={(event) => setPacienteId(event.target.value)}><option value="">Sin paciente (cliente ocasional)</option>{patients.map((patient) => <option key={patient.id} value={patient.id}>{patient.apellidos}, {patient.nombres}{patient.cedula ? ` · ${patient.cedula}` : ""}</option>)}</select></label>}
         <label>Cliente<input name="cliente_nombre" placeholder="Opcional" value={pacienteId ? "" : cliente} disabled={!!pacienteId} onChange={(event) => setCliente(event.target.value)} /></label>
         {modo === "rapida" && <label>Agregar producto<select defaultValue="" onChange={(event) => { addProduct(event.target.value); event.currentTarget.value = ""; }}><option value="">Selecciona un producto</option>{availableRapida.map((p) => <option key={p.id} value={p.id}>{p.nombre} · {money(Number(p.precio_venta))}</option>)}</select></label>}

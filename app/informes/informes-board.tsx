@@ -39,7 +39,7 @@ export default function InformesBoard(props: InformesData) {
     catch (err) { setError(err instanceof Error ? err.message : "No se pudo guardar la meta."); }
   });
 
-  const cumplimientoTotal = informe ? pct(informe.totales.ingresos_total ?? 0, informe.totales.meta_total) : 0;
+  const cumplimientoTotal = informe ? pct(informe.totales.cobrado_total ?? 0, informe.totales.meta_total) : 0;
 
   return <main className="page agenda-page"><div className="container agenda-shell">
     <header className="agenda-header no-print"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">DIRECCIÓN</p><h1>Informes</h1><p className="subtitle">Metas, ventas por sucursal e informe mensual del negocio.</p></div>
@@ -91,17 +91,17 @@ export default function InformesBoard(props: InformesData) {
 function SucursalRow({ row, showEmpresa, onGuardarMeta }: { row: InformeSucursal; showEmpresa: boolean; onGuardarMeta: (monto: number) => void }) {
   const [editando, setEditando] = useState(false);
   const [valor, setValor] = useState(String(row.meta || ""));
-  const cobrado = row.ingresos_total ?? 0;
+  const cobrado = row.cobrado_total ?? 0;
   const cumplimiento = pct(cobrado, row.meta);
   const restante = Math.max(0, row.meta - cobrado);
   const barWidth = Math.min(100, cumplimiento);
   return <article className="task-card"><div className="task-status"><span className={`status-dot ${row.meta > 0 && cobrado >= row.meta ? "aprobada" : ""}`} /></div><div className="task-main">
     <div className="task-meta">{showEmpresa && <span>{row.empresa_nombre}</span>}<span>{row.ventas_count} venta(s)</span></div>
     <h2>{row.sucursal_nombre}</h2>
-    <p>Cobrado en el mes: <strong>{money(cobrado)}</strong></p>
+    <p>A cuenta del mes: <strong>{money(cobrado)}</strong></p>
     {row.meta > 0 && <>
       <div style={{ height: 8, borderRadius: 99, background: "#edf1f5", overflow: "hidden", marginTop: 6 }}><div style={{ height: "100%", width: `${barWidth}%`, background: cumplimiento >= 100 ? "#2ba879" : "#3b82c4", borderRadius: 99 }} /></div>
-      <p className="field-hint" style={{ marginTop: 4 }}>Meta {money(row.meta)} · Cobrado {money(cobrado)} · Faltan {money(restante)} · {cumplimiento}% cumplido</p>
+      <p className="field-hint" style={{ marginTop: 4 }}>Meta {money(row.meta)} · Faltan {money(restante)} · {cumplimiento}% cumplido</p>
     </>}
     {editando ? <div className="new-patient-form" style={{ marginTop: 8, maxWidth: 200 }}><label>Nueva meta del mes<input type="number" min={0} step={0.01} value={valor} onChange={(event) => setValor(event.target.value)} autoFocus onBlur={() => { setEditando(false); const n = Number(valor); if (Number.isFinite(n) && n !== row.meta) onGuardarMeta(n); }} onKeyDown={(event) => event.key === "Enter" && (event.currentTarget as HTMLInputElement).blur()} /></label></div> : null}
   </div><div className="task-actions no-print">{row.sucursal_id !== "sin_sucursal" && !editando && <button className="outline-action" type="button" onClick={() => setEditando(true)}><Target size={14} /> {row.meta > 0 ? "Editar meta" : "Poner meta"}</button>}</div></article>;

@@ -1,4 +1,5 @@
 "use client";
+import { formatRecordDate } from "@/lib/record-date";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -25,8 +26,8 @@ const demoPatients: PatientRecord[] = [
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
 const fullName = (patient: PatientRecord) => `${patient.nombres} ${patient.apellidos}`;
 const initials = (patient: PatientRecord) => `${patient.nombres[0] ?? ""}${patient.apellidos[0] ?? ""}`.toUpperCase();
-const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${value.slice(0, 10)}T12:00:00`));
-const formatTimestamp = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
+const formatDate = formatRecordDate;
+const formatTimestamp = formatRecordDate;
 const calcularEdad = (fechaISO: string): number | null => {
   if (!fechaISO) return null;
   const nacimiento = new Date(`${fechaISO}T00:00:00`);

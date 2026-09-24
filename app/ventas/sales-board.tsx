@@ -1,4 +1,5 @@
 "use client";
+import { paymentMethods, paymentMethodLabels } from "@/lib/payment-methods";
 
 import Link from "next/link";
 import { Building2, CircleAlert, FlaskConical, MoreVertical, Plus, Package, ReceiptText, ShieldCheck, Wallet, MessageCircle, X } from "lucide-react";
@@ -109,7 +110,7 @@ export function SaleCard({ sale, companyName, branchName, patient, lensItems, ha
       {patient && hasLabOrderItems && <button type="button" onClick={onCreateLabOrder}><FlaskConical size={14} /> Orden de laboratorio</button>}
       {sale.saldo > 0 && <button type="button" onClick={() => setShowAbono((value) => !value)}><Wallet size={14} /> Registrar abono</button>}
     </div>}
-    {showAbono && <div className="new-patient-form" style={{ marginTop: 10 }} onClick={(event) => event.stopPropagation()}><label>Método<select value={metodo} onChange={(event) => setMetodo(event.target.value)}>{["efectivo", "transferencia", "tarjeta", "credito", "otro"].map((m) => <option key={m} value={m}>{m}</option>)}</select></label><label>Monto<input type="number" min={0} step={0.01} max={sale.saldo} value={monto} onChange={(event) => setMonto(event.target.value)} /></label><button type="button" className="new-consultation" disabled={pending || !Number(monto) || Number(monto) > sale.saldo} onClick={submitAbono}>Confirmar abono</button></div>}
+    {showAbono && <div className="new-patient-form" style={{ marginTop: 10 }} onClick={(event) => event.stopPropagation()}><label>Método<select value={metodo} onChange={(event) => setMetodo(event.target.value)}>{paymentMethods.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select></label><label>Monto<input type="number" min={0} step={0.01} max={sale.saldo} value={monto} onChange={(event) => setMonto(event.target.value)} /></label><button type="button" className="new-consultation" disabled={pending || !Number(monto) || Number(monto) > sale.saldo} onClick={submitAbono}>Confirmar abono</button></div>}
   </div><div className="task-actions" onClick={(event) => event.stopPropagation()}><span className={`state-pill ${statePillClass[sale.estado]}`}>{stateLabel[sale.estado]}</span>
     {sale.estado === "completada" && <div className="menu-wrap" ref={menuRef}>
       <button className="outline-action" type="button" onClick={() => setMenuOpen((v) => !v)}><MoreVertical size={14} /> Más opciones</button>
@@ -142,7 +143,7 @@ export function VentaDetailModal({ sale, companyName, patient, onClose }: { sale
     </div>
 
     <p className="section-label" style={{ marginTop: 14 }}>PAGOS Y ABONOS</p>
-    {(sale.pagos_venta ?? []).length ? <div className="task-list">{(sale.pagos_venta ?? []).map((pago) => <article className="task-card" key={pago.id}><div className="task-status" /><div className="task-main"><p style={{ margin: 0 }}>{new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(pago.creado_en))} · {pago.metodo}{pago.banco && ` · ${pago.banco}`}{pago.referencia && ` · Ref: ${pago.referencia}`}</p></div><div className="task-actions"><strong>{money(pago.monto)}</strong></div></article>)}</div> : <p className="field-hint">Todavía no se han registrado pagos.</p>}
+    {(sale.pagos_venta ?? []).length ? <div className="task-list">{(sale.pagos_venta ?? []).map((pago) => <article className="task-card" key={pago.id}><div className="task-status" /><div className="task-main"><p style={{ margin: 0 }}>{new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(pago.creado_en))} · {paymentMethodLabels[pago.metodo] ?? pago.metodo}{pago.banco && ` · ${pago.banco}`}{pago.referencia && ` · Ref: ${pago.referencia}`}</p></div><div className="task-actions"><strong>{money(pago.monto)}</strong></div></article>)}</div> : <p className="field-hint">Todavía no se han registrado pagos.</p>}
 
     <div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cerrar</button></div>
   </section></div>;

@@ -1,8 +1,9 @@
+import { formatRecordDate } from "@/lib/record-date";
 import type { Consultation, PatientRecord } from "@/lib/clinical";
 import type { SaleCompany } from "@/lib/ventas";
 
 type Props = { consultation: Consultation; patient: PatientRecord; company?: SaleCompany; branchName?: string };
-const dateLabel = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(`${value.slice(0, 10)}T12:00:00`));
+const dateLabel = formatRecordDate;
 
 export function hasClinicalPrescription(consultation: Consultation) {
   const receta = consultation.receta;

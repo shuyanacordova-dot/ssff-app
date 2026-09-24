@@ -55,7 +55,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | Pacientes — editar ficha | ✅ | Botón "Editar datos" en la carpeta. Todo el equipo puede editar. Cada cambio queda en `pacientes_cambios` (antes/después, quién, cuándo). Falta probar con sesión real. |
 | Historia clínica / revisiones | ✅ | Crear, ver detalle, **editar** (desde 2026-09-24), imprimir |
 | Carpeta del paciente | 🟡 | Cuatro pestañas: Revisiones, Ventas, Fotos y documentos, Laboratorio con contador y órdenes. Pendientes Citas, Estado de cuenta, Comunicaciones. |
-| Ventas y cobros | ✅ | Pantalla general de ventas: **solo venta rápida** (accesorios, gafas de sol, exámenes). Venta de **lentes solo desde la carpeta del paciente** (2026-09-24), abonos, anulación, convenios, acuerdo de pago, folio |
+| Ventas y cobros | 🟡 | Pantalla general: solo venta rápida. Lentes solo desde la carpeta del paciente. El formulario pide **solo sucursal** (la empresa sale de la sucursal). Métodos de pago: Efectivo, Transferencia, Tarjeta de crédito, Otro ("Crédito" solo en historial). **Datos importados duplicados: ver sección 11** |
 | Laboratorio | 🟡 | Pestaña propia en carpeta con nueva orden, selector de ventas completadas y acceso al modal existente. Sin venta ofrece registrarla. Tarjetas con fecha, lente, estado y garantía; acceso en ventas renombrado. Pendiente prueba con sesión real. |
 | Impresiones (receta, revisión, orden, recibo) | 🟡 | Implementado, pendiente prueba en navegador: contexto aislado por documento, A4 con márgenes de 12 mm, logos y espacios compactos, paginación sin modales. Incluye acuerdos, resumen del día e informes. TypeScript correcto. |
 | Inventario | ✅ | Stock por sucursal, transferencias, alertas, pestañas por categoría |
@@ -64,7 +64,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | Cuentas por cobrar | ✅ | Incluye mensaje de cobro con días de atraso. Vendedores y caja ya ven los nombres de los pacientes (2026-09-24) |
 | Agenda | ✅ | Vista día y mes. Vendedores pueden ver y agendar citas (2026-09-24). Falta Google Calendar |
 | Convenios | ✅ | Empresas con descuento a rol |
-| Informes y metas | ✅ | Las metas se comparan con lo **cobrado en el mes** (abonos por fecha de pago), no con el total vendido (2026-09-24) |
+| Informes y metas | ✅ | Las metas usan **"A cuenta del mes"** = lo pagado de las ventas creadas en el mes (igual que la columna "A cuenta" de Optox). Queda también `ingresos_total` (abonos por fecha de pago) disponible |
 | Facturación SRI | 🟡 | Solo **borradores** internos (`app/facturacion`). No firma ni envía al SRI. **Fase C** |
 | Asistente Shu (IA) | 🟡 | Ayuda administrativa básica (`app/asistente`). **Fase D** |
 | CRM / seguimiento de pacientes | ❌ | **Fase B** |
@@ -115,6 +115,10 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 - Metas de venta = dinero cobrado en el mes, no el total vendido (2026-09-24).
 - Venta rápida nunca incluye lentes (lunas ni lentes de contacto). El botón "Lentes" solo existe dentro de la carpeta del paciente (2026-09-24).
 - El gráfico de metas muestra solo el dinero cobrado; no muestra el total vendido (2026-09-24).
+- Metas = **"A cuenta"** de Optox: lo pagado de las ventas creadas en el mes (`cobrado_total`) (2026-09-24).
+- Formulario de venta: solo sucursal, sin empresa. Métodos de pago: Efectivo, Transferencia, Tarjeta de crédito, Otro (2026-09-24).
+- Fechas: se deben **ver** en todo registro, se deben poder **elegir** (registrar algo con fecha anterior) y **no repetir** (2026-09-24).
+- Ventas duplicadas por importación: se **anulan** (no se borran), conservando la copia que coincide con Optox. Autorizado por Shuyana para septiembre; historial cuando envíe los Excel de Optox (2026-09-24).
 - **Publicación**: Vercel NO se actualiza desde GitHub. Se publica con `npx vercel --prod` desde esta carpeta (enlazada en `.vercel/`). Después de cada entrega: commit + push + publicar (2026-09-24).
 - Vendedor: ve datos de pacientes (no historia clínica), registra pacientes, agenda citas y ve cuentas por cobrar. Caja ve nombres de pacientes para cobrar (2026-09-24).
 - La orden de laboratorio siempre está ligada a una venta (la base de datos lo exige).
@@ -144,6 +148,8 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | L12 | 2026-09-24 | Vendedores no encontraban pacientes ni veían cuentas por cobrar: la pantalla los dejaba entrar (arreglo de L6) pero la base de datos (RLS de `pacientes_clinicos`, `paciente_empresas`, `citas_agenda`) solo permitía roles clínicos. | Al dar acceso a un rol, revisar **las dos capas** y probar simulando ese rol en SQL (`set local role authenticated` + `request.jwt.claims`). |
 | L13 | 2026-09-24 | Lentes de contacto aparecían en venta rápida porque 5 productos estaban guardados como "accesorio". | Cuando algo "aparece donde no debe", revisar primero los datos (categorías), no solo el código. |
 | L14 | 2026-09-24 | Shuyana no veía ningún cambio del día (metas, ícono, laboratorio): Vercel no estaba conectado a GitHub; las publicaciones se hacían a mano con la herramienta de Vercel y la última era de 23 h antes. | "Subido a GitHub" no es "publicado". Publicar con `npx vercel --prod` y comprobar en el sitio real (por ejemplo, que `/apple-icon.png` responda). |
+| L15 | 2026-09-24 | Las ventas se importaron **tres veces** (folios 5120–5223, 5489–5601 y 5757–5768 solo con saldo). Metas, cuentas por cobrar y reportes salían inflados (Shuvision: $16,498 vs $7,839 real). | Toda importación debe guardar el folio de origen (Optox) y no insertar si ya existe. Comparar totales contra el sistema de origen después de importar. |
+| L16 | 2026-09-24 | La anulación masiva de 118 ventas fue bloqueada por el control de permisos (cambio grande en datos compartidos). | Para cambios masivos de datos: mostrar el plan con números, pedir autorización explícita en el chat y dejar el SQL listo en `docs/pendientes/`. |
 
 ---
 
@@ -193,6 +199,18 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-24 | Seguridad: 7 funciones sin acceso público. `supabase/migrations/20260924193549_revocar_anon_funciones.sql` | `8c728eb` |
 | 2026-09-24 | Impresión aislada A4. Archivos: `lib/print-document.ts`, `app/globals.css`, `app/recibo/[token]/page.tsx`, `app/recibo/print-button.tsx`, `app/ventas/lab-order-modal.tsx`, `app/laboratorio/lab-monitor-board.tsx`, `app/ventas/acuerdo-pago-view.tsx`, `app/cuentas-cobrar/cuentas-cobrar-board.tsx`, `app/resumen-dia/resumen-dia-board.tsx`, `app/informes/informes-board.tsx`, `docs/BLUEPRINT.md`. Receta/revisión conservan sus IDs existentes; componentes clínicos, orden y membrete reciben ajustes solo al imprimir. Modal de recibo en ventas/carpeta gestiona el enlace público, no contiene un documento imprimible propio. TypeScript correcto; prueba visual pendiente de Claude. Sin commit/push ni cambios de base de datos por instrucción expresa. Probado por Claude: recibo en una hoja A4. | `2cb18f1` |
 | 2026-09-24 | Ícono para Dock/inicio, metas por dinero cobrado, venta rápida sin lentes, sucursales renombradas, vendedor con pacientes/agenda/cuentas por cobrar. Migración `20260924220247_vendedor_pacientes_agenda_metas_cobradas.sql` aplicada. | (este commit) |
+| 2026-09-24 | Solo sucursal en ventas, métodos de pago, metas "A cuenta", fechas visibles, resumen del día sin anuladas, tabla de referencia Optox. | (este commit) |
+
+---
+
+## 11. Pendientes abiertos (2026-09-24)
+
+1. **Aplicar depuración de septiembre** (`docs/pendientes/depurar_ventas_duplicadas_septiembre.sql`): anula 118 copias. Resultado verificado: Shuvision queda $7,639 / a cuenta $5,604; Sacha idéntica a Optox; Focus $1,735 / $1,450. Requiere autorización explícita.
+2. **Historial completo**: Shuyana exportará de Optox "Ventas por sucursal" de todos los meses → cargar en `optox_ventas_referencia` y depurar igual.
+3. Faltan en el sistema: ventas de Optox del 24-sep (Shuvision folio 6802 $200; Focus 6565 $100 y 6566 $70) y un abono de $100 de Adriana Hurtado (Focus 6563).
+4. Inconsistencias: ventas con total $0 pero con pagos (ej. Lady Gómez 13-sep, $180 dos veces); ventas con `pagado` distinto a la suma de sus pagos.
+5. **Resumen del día**: solo muestra abonos de ventas creadas ese día; debe mostrar todos los abonos recibidos ese día.
+6. **Elegir fecha**: permitir registrar revisión, venta, orden, cita y cuadre con fecha anterior (con registro de quién lo hizo), y evitar duplicados por fecha.
 
 ---
 

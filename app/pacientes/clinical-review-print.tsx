@@ -1,3 +1,4 @@
+import { formatRecordDate } from "@/lib/record-date";
 import type { Consultation, PatientRecord } from "@/lib/clinical";
 import { complementaryExamsFrom } from "@/lib/clinical-format";
 import type { SaleCompany } from "@/lib/ventas";
@@ -7,10 +8,7 @@ const shown = (value?: string | null) => value?.trim() || "";
 const display = (value?: string | null) => shown(value) || "—";
 const sex: Record<string, string> = { femenino: "F", masculino: "M", otro: "Otro" };
 
-const dateLabel = (value: string) => {
-  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
-  return new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date).replaceAll("/", "-");
-};
+const dateLabel = formatRecordDate;
 
 const ageAt = (birthDate: string | null, eventDate: string) => {
   if (!birthDate) return null;

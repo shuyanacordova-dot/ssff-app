@@ -1,4 +1,5 @@
 "use client";
+import { formatRecordDate } from "@/lib/record-date";
 
 import Link from "next/link";
 import { AlertCircle, Banknote, CheckCircle2, Plus, Receipt, XCircle, X } from "lucide-react";
@@ -8,7 +9,7 @@ import { crearCierreCaja, crearGasto, previsualizarCierre, type ResultadoCierre,
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
 const today = () => new Date().toISOString().slice(0, 10);
-const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${value}T12:00:00`));
+const formatDate = formatRecordDate;
 const bancoLabel: Record<string, string> = { pichincha: "Banco Pichincha", guayaquil: "Banco Guayaquil", internacional: "Banco Internacional" };
 const clasificacionLabel: Record<string, string> = { salarios: "Salarios", pago_proveedor: "Pago a proveedor", gastos_mensuales: "Gastos mensuales", gastos_operacion: "Gastos de operación", ajuste: "Ajuste" };
 
@@ -95,7 +96,7 @@ function CheckBadge({ label, value }: { label: string; value: boolean | null }) 
 
 function CierreCard({ cierre, sucursalNombre }: { cierre: CierreCaja; sucursalNombre: string }) {
   const transferencias = cierre.declarado_transferencia_pichincha + cierre.declarado_transferencia_guayaquil + cierre.declarado_transferencia_internacional;
-  return <article className="task-card"><div className="task-status"><span className={`status-dot ${cierre.cuadre_correcto ? "aprobada" : "devuelta"}`} /></div><div className="task-main"><div className="task-meta"><span>{sucursalNombre}</span><span>{formatDate(cierre.fecha)}</span></div><h2>Caja física: {money(cierre.caja_fisica)} · Esperada: {money(cierre.caja_esperada)}</h2><p>Caja anterior: {money(cierre.caja_anterior)} · Efectivo declarado: {money(cierre.declarado_efectivo)} · Tarjetas: {money(cierre.declarado_tarjeta)} · Transferencias: {money(transferencias)}</p><p>Egresos efectivo: {money(cierre.egresos_efectivo)} · Depósitos: {money(cierre.depositos)} · Diferencia de caja: {money(cierre.diferencia)}</p><div className="check-badges"><CheckBadge label="Métodos de pago" value={cierre.check_metodos_pago} /><CheckBadge label="Efectivo en caja" value={cierre.check_caja_fisica} /></div></div><div className="task-actions"><span className={`state-pill ${cierre.cuadre_correcto ? "aprobada" : "devuelta"}`}>{cierre.cuadre_correcto ? "Caja cuadrada" : "Caja no cuadrada"}</span></div></article>;
+  return <article className="task-card"><div className="task-status"><span className={`status-dot ${cierre.cuadre_correcto ? "aprobada" : "devuelta"}`} /></div><div className="task-main"><div className="task-meta"><span>{sucursalNombre}</span><strong>Cierre del {formatDate(cierre.fecha)}</strong></div><h2>Caja física: {money(cierre.caja_fisica)} · Esperada: {money(cierre.caja_esperada)}</h2><p>Caja anterior: {money(cierre.caja_anterior)} · Efectivo declarado: {money(cierre.declarado_efectivo)} · Tarjetas: {money(cierre.declarado_tarjeta)} · Transferencias: {money(transferencias)}</p><p>Egresos efectivo: {money(cierre.egresos_efectivo)} · Depósitos: {money(cierre.depositos)} · Diferencia de caja: {money(cierre.diferencia)}</p><div className="check-badges"><CheckBadge label="Métodos de pago" value={cierre.check_metodos_pago} /><CheckBadge label="Efectivo en caja" value={cierre.check_caja_fisica} /></div></div><div className="task-actions"><span className={`state-pill ${cierre.cuadre_correcto ? "aprobada" : "devuelta"}`}>{cierre.cuadre_correcto ? "Caja cuadrada" : "Caja no cuadrada"}</span></div></article>;
 }
 
 function GastoModal({ empresaId, branches, cuentas, canSaldos, pending, onClose, onSubmit }: { empresaId: string; branches: CajaData["branches"]; cuentas: CajaData["cuentas"]; canSaldos: boolean; pending: boolean; onClose: () => void; onSubmit: (form: FormData) => void }) {
@@ -167,6 +168,7 @@ function CierreModal({ empresaId, branches, onClose }: { empresaId: string; bran
   };
 
   if (resultado) return <div className="modal-backdrop"><section className="new-patient-modal" role="dialog" aria-modal="true"><button className="modal-close" onClick={() => onClose(resultado.cuadre_correcto ? "Caja cuadrada." : "Caja no cuadrada — revisa las diferencias.")} aria-label="Cerrar"><X size={19} /></button>
+    <p className="section-label">Cierre del {formatDate(fecha)}</p>
     {resultado.cuadre_correcto ? <div style={{ display: "grid", justifyItems: "center", gap: 10, padding: "20px 0" }}><CheckCircle2 size={48} color="#247658" /><h2 style={{ margin: 0 }}>Caja cuadrada</h2><p className="field-hint">El efectivo, las tarjetas y las transferencias coinciden con el sistema.</p></div>
       : <div style={{ display: "grid", justifyItems: "center", gap: 10, padding: "20px 0" }}><XCircle size={48} color="#a24150" /><h2 style={{ margin: 0 }}>Caja no cuadrada</h2><p className="field-hint">Diferencia en efectivo: <strong>{money(resultado.diferencia)}</strong>. Diferencia en métodos de pago: <strong>{money(resultado.diferencia_cobros_declarados)}</strong>. El cierre quedó registrado para revisión.</p></div>}
     <div className="modal-actions"><button className="new-consultation" type="button" onClick={() => onClose(resultado.cuadre_correcto ? "Caja cuadrada." : "Caja no cuadrada — revisa las diferencias.")}>Listo</button></div>

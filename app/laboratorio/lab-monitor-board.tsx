@@ -1,4 +1,5 @@
 "use client";
+import { formatRecordDate } from "@/lib/record-date";
 
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, Clock3, FlaskConical, MessageCircle, PackageCheck, Printer, Search, ShieldAlert, X } from "lucide-react";
@@ -14,7 +15,7 @@ const statusOptions = Object.entries(estadoOrdenLabels) as [EstadoOrdenLaborator
 const flowStatuses: EstadoOrdenLaboratorio[] = ["pendiente", "enviado", "recibido", "notificado", "entregado"];
 const closedStatuses = new Set<EstadoOrdenLaboratorio>(["entregado", "rechazado"]);
 const readyStatuses = new Set<EstadoOrdenLaboratorio>(["recibido"]);
-const date = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value.length === 10 ? `${value}T12:00:00` : value));
+const date = formatRecordDate;
 const shortId = (order: LabMonitorOrder) => order.venta_folio ? `Venta #${order.venta_folio}` : `Orden ${order.id.slice(0, 8).toUpperCase()}`;
 const overdue = (order: LabMonitorOrder) => !!order.fecha_entrega_estimada && new Date(`${order.fecha_entrega_estimada}T23:59:59`) < new Date() && !closedStatuses.has(order.estado);
 const nextStatus = (status: EstadoOrdenLaboratorio) => { const index = flowStatuses.indexOf(status); return index >= 0 && index < flowStatuses.length - 1 ? flowStatuses[index + 1] : null; };

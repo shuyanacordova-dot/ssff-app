@@ -1,4 +1,5 @@
 "use client";
+import { paymentMethodLabels } from "@/lib/payment-methods";
 import { printDocumentById } from "@/lib/print-document";
 
 import Link from "next/link";
@@ -135,7 +136,7 @@ function ConvenioModal({ deuda, empresasConvenio, onClose, onNotice }: { deuda: 
         <span><strong>Primera cuota</strong>{formatDate(resultado.fecha_primera_cuota)}</span>
       </div>
 
-      {resultado.abonos.length > 0 && <><p className="section-label" style={{ marginTop: 14 }}>DETALLE DE ABONOS</p>{resultado.abonos.map((abono, index) => <p key={index} style={{ margin: "4px 0", fontSize: 13 }}>{formatDate(abono.fecha)} · {abono.metodo} <strong style={{ float: "right" }}>{money(abono.monto)}</strong></p>)}</>}
+      {resultado.abonos.length > 0 && <><p className="section-label" style={{ marginTop: 14 }}>DETALLE DE ABONOS</p>{resultado.abonos.map((abono, index) => <p key={index} style={{ margin: "4px 0", fontSize: 13 }}>{formatDate(abono.fecha)} · {paymentMethodLabels[abono.metodo] ?? abono.metodo} <strong style={{ float: "right" }}>{money(abono.monto)}</strong></p>)}</>}
 
       <p className="section-label" style={{ marginTop: 14 }}>TÉRMINOS Y CONDICIONES</p>
       <p style={{ whiteSpace: "pre-line", lineHeight: 1.6, fontSize: 13 }}>{resultado.texto}</p>
