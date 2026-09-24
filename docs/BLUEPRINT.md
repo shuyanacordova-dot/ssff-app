@@ -1,0 +1,175 @@
+# LumOS — Blueprint del sistema para ópticas
+
+> Documento vivo. **Toda IA (Claude o Codex) debe leerlo antes de trabajar y actualizarlo al terminar.**
+> Dueña del producto: Shuyana Córdova (optometrista, gerente de SHUVISION y Focus Óptica). No es programadora: todo se le explica en lenguaje simple.
+> Última actualización: 2026-09-24.
+
+---
+
+## 1. Qué es LumOS
+
+Un sistema de gestión para ópticas, parecido a Optox pero hecho a la medida de SHUVISION y Focus Óptica.
+Cubre: pacientes e historia clínica, ventas y cobros, laboratorio, inventario, caja y bancos, cuentas por cobrar,
+agenda, tareas, informes, facturación electrónica SRI, fidelización y asistentes con IA.
+
+**Organizaciones**
+- SHUVISION — matriz Shushufindi + sucursal Sacha (La Joya de los Sachas).
+- Focus Óptica — Shushufindi. Empresa independiente: sus datos NO se mezclan con SHUVISION salvo que Shuyana lo autorice.
+
+**Equipo y roles**
+- Shuyana: superadmin (todo).
+- Jassyra, Joi/Joao: admin_sucursal (supervisión, ventas, sin permisos totales).
+- Tiffany (SHUVISION), Erick (Focus): optometra + vendedor.
+- Yuli: vendedora (sin acceso completo a historia clínica).
+
+**Tecnología**: Next.js 15 + React 19, Supabase (Postgres, proyecto `rbmmhcwvzmjafjauwvsr`), publicado en Vercel,
+código en GitHub `shuyanacordova-dot/ssff-app` rama `main`.
+
+---
+
+## 2. Reglas de trabajo (obligatorias)
+
+1. **Claude planifica y revisa; Codex construye.** Claude escribe la tarea con archivos exactos; Codex implementa; Claude revisa el cambio, aplica migraciones de base de datos y verifica.
+2. **Nunca borrar trabajo.** No usar `git reset --hard`, `git checkout .`, ni borrar ramas o archivos que no se crearon en la misma tarea. Nunca borrar columnas ni tablas: solo agregar.
+3. **Guardar siempre.** Cada tarea terminada = un commit en `main` + push a GitHub. Nada queda "solo en la computadora".
+4. **Base de datos**: todo cambio va como archivo en `supabase/migrations/AAAAMMDDHHMMSS_nombre.sql` **y** se aplica al proyecto Supabase. Si una función cambia de parámetros, borrar la versión vieja y volver a dar permisos (ver lección L3).
+5. **Permisos en dos capas**: la base de datos (RLS / `tiene_permiso`) y la pantalla deben coincidir (ver lección L6).
+6. **Probar antes de decir "listo"**: compilar (`npx tsc --noEmit`) y probar en el navegador. Si no se pudo probar, decirlo claramente.
+7. **Diseño**: mantener el estilo iOS "glass" (`.glass`, pastillas de estado, pestañas). No inventar estilos nuevos.
+8. **Impresión**: usar el patrón `.print-area` / `.no-print` de `app/globals.css`. **Prohibido** usar selectores `:has()` en CSS de impresión (ver lección L2).
+9. **Fechas**: Ecuador es UTC-5. Calcular rangos de día con la zona horaria explícita (ver lección L4).
+10. **Actualizar este documento** al final de cada tarea: estado del módulo, archivos tocados, y cualquier error nuevo en la sección 6.
+
+---
+
+## 3. Estado actual por módulo (2026-09-24)
+
+Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
+
+| Módulo | Estado | Notas |
+|---|---|---|
+| Login, roles, equipo, sucursales | ✅ | `app/login`, `app/equipo`, `app/configuracion/sucursales` |
+| Inicio / tareas y supervisión | ✅ | Tareas como checklist |
+| Pacientes — crear ficha | ✅ | Edad calculada, ocupación, responsable de cuenta |
+| Pacientes — **editar ficha** | ❌ | No existe forma de corregir nombres, cédula, teléfono, etc. **Fase A** |
+| Historia clínica / revisiones | ✅ | Crear, ver detalle, **editar** (desde 2026-09-24), imprimir |
+| Carpeta del paciente | 🟡 | Solo 3 pestañas: Revisiones, Ventas, Fotos. Falta pestaña **Laboratorio** (Fase A), Citas, Estado de cuenta, Comunicaciones |
+| Ventas y cobros | ✅ | Venta rápida / lentes, abonos, anulación, convenios, acuerdo de pago, folio |
+| Laboratorio | 🟡 | Crear/editar orden desde una venta, checklist de estados, garantías, monitor `/laboratorio`. El botón en la carpeta está escondido dentro de cada venta ("Crear orden") |
+| Impresiones (receta, revisión, orden, recibo) | 🟡 | Existen, pero Shuyana reporta problemas. **Fase A** — detalles pendientes (ver sección 8) |
+| Inventario | ✅ | Stock por sucursal, transferencias, alertas, pestañas por categoría |
+| Caja, resumen del día | ✅ | Cuadre diario convive con la herramienta vieja de Notion (no tocar esa) |
+| Cuentas de bancos / cuadre global | 🟡 | Enlace existe pero apunta a la misma caja diaria |
+| Cuentas por cobrar | ✅ | Incluye mensaje de cobro con días de atraso |
+| Agenda | ✅ | Vista día y mes. Falta Google Calendar |
+| Convenios | ✅ | Empresas con descuento a rol |
+| Informes y metas | ✅ | |
+| Facturación SRI | 🟡 | Solo **borradores** internos (`app/facturacion`). No firma ni envía al SRI. **Fase C** |
+| Asistente Shu (IA) | 🟡 | Ayuda administrativa básica (`app/asistente`). **Fase D** |
+| CRM / seguimiento de pacientes | ❌ | **Fase B** |
+| Tarjeta de lealtad y referidos | ❌ | **Fase B** |
+| Auditoría general de cambios | ❌ | Solo existe `log_accesos`. Se necesita para ediciones de pacientes y ventas |
+
+---
+
+## 4. Hoja de ruta
+
+### Fase A — Arreglos urgentes (en curso)
+1. **Editar ficha del paciente** — botón "Editar datos" en la carpeta, con registro de quién cambió qué y cuándo.
+2. **Pestaña "Laboratorio" en la carpeta del paciente** — lista de órdenes del paciente + botón visible "Nueva orden de laboratorio" (elige la venta y abre el formulario que ya existe).
+3. **Impresiones** — receta, revisión, orden de laboratorio y recibo: revisar formato, que quepan en una hoja, membrete correcto por sucursal. (Esperando detalles de Shuyana.)
+
+### Fase B — Relación con pacientes (CRM + fidelización)
+- Recordatorios de control (3 m / 6 m / 1 año) con cola "pendientes de enviar" por WhatsApp (siempre con confirmación humana).
+- Seguimiento postventa (a los 7 días: "¿cómo te adaptaste a tus lentes?").
+- Cumpleaños con mensaje y beneficio.
+- **Tarjeta de lealtad y referidos**: código único por paciente, registro de "quién lo refirió", puntos o beneficios por referido, tarjeta imprimible/digital con QR.
+- Segmentos: pacientes sin volver hace más de 1 año, con saldo, con convenio, usuarios de lentes de contacto.
+
+### Fase C — Facturación electrónica SRI
+- Generar XML de factura, firmar con la firma electrónica (.p12) de cada empresa, enviar al SRI (recepción y autorización), guardar número de autorización, generar RIDE (PDF) y enviarlo por correo/WhatsApp.
+- Primero en **ambiente de pruebas** del SRI; luego producción.
+- La firma electrónica y su clave NUNCA se guardan en el código; van cifradas en el servidor.
+
+### Fase D — Asistentes IA
+- Asistente de gestión: responde "¿cuánto vendimos esta semana?", "¿qué órdenes están atrasadas?", "¿quién debe más?".
+- Asistente clínico: resume la historia del paciente y compara revisiones (apoyo, nunca reemplaza el criterio clínico). Control estricto de qué datos clínicos salen a un servicio externo.
+
+### Fase E — Integraciones y respaldo
+- Google Calendar (distinguir "control recomendado" de "cita confirmada").
+- Make / WhatsApp / Notion.
+- Respaldo externo independiente de Supabase.
+
+---
+
+## 5. Decisiones tomadas (no cambiar sin preguntar)
+
+- El nombre del sistema es **LumOS** (antes Revelio / SSFF).
+- Revisiones clínicas: se pueden editar (decisión 2026-09-24).
+- La orden de laboratorio siempre está ligada a una venta (la base de datos lo exige).
+- Vendedores no ven la historia clínica completa; al crear una orden, si no ven la graduación la escriben a mano.
+- La herramienta vieja de cuadre en Notion (`cuadre-diario-notion-bridge`) sigue funcionando en paralelo. No escribir en ella ni migrar sus datos sin permiso.
+- WhatsApp de "lentes listos" y "seguimiento" siempre con confirmación humana antes de enviar.
+- Focus y SHUVISION no comparten datos automáticamente.
+- No se instalan complementos/plugins de repositorios no verificados. Codex se usa mediante el plugin oficial ya instalado (`codex:rescue`).
+
+---
+
+## 6. Bitácora de errores y lecciones (para no repetirlos)
+
+| # | Fecha | Qué pasó | Lección |
+|---|---|---|---|
+| L1 | 2026-09-24 | El botón "Crear orden de laboratorio" nunca aparecía: solo se mostraba si el producto vendido tenía categoría `lente`, pero las ventas antiguas no tenían producto ligado. | No ocultar botones importantes con condiciones que dependen de datos que pueden faltar. Probar con datos reales. |
+| L2 | 2026-09-24 | Imprimir la historia clínica congelaba el navegador por un selector CSS `:has()` en `@media print`. | No usar `:has()` en CSS de impresión; usar clases (`.print-area`). |
+| L3 | 2026-09-17 | Al agregar parámetros a una función de Supabase quedaba la versión vieja "huérfana". | Al cambiar la firma de una función: `drop function` de la versión anterior y repetir `revoke`/`grant`. |
+| L4 | 2026-09-16 | Reportes del día salían corridos un día. | Usar rangos explícitos UTC-5 (ver `rangoGuayaquil` en `lib/resumen-dia.ts`). |
+| L5 | 2026-09-17 | La casilla de convenio no se veía hasta agregar un producto. | Revisar que las opciones importantes siempre estén visibles. |
+| L6 | 2026-09-23 | Vendedores no podían abrir carpetas aunque la base de datos se lo permitía (la pantalla los bloqueaba). | Permisos de pantalla y de base de datos deben coincidir. |
+| L7 | 2026-09-17 | Se entregó un paquete grande de cambios sin probar en el navegador (sesión cerrada, sin credenciales). | No acumular muchos cambios sin probar. Entregar en partes pequeñas. |
+| L8 | 2026-09-24 | Shuyana sintió que "las órdenes de trabajo se borraron". Revisión de git: **no se perdió código**; el botón estaba escondido dentro de cada tarjeta de venta y el filtro de L1 lo ocultaba. | Las funciones importantes necesitan un lugar visible y propio (pestaña "Laboratorio"). Anotar aquí cada entrega para poder demostrar qué existe. |
+
+---
+
+## 7. Mapa de archivos clave
+
+- Carpeta del paciente: `app/pacientes/patient-clinical-client.tsx` (pestañas, modales), acciones `app/pacientes/actions.ts`, datos `lib/clinical.ts`
+- Historia clínica: `app/pacientes/consultation-form.tsx`, `consultation-detail.tsx`
+- Impresiones: `app/pacientes/clinical-prescription-print.tsx` (receta), `app/pacientes/clinical-review-print.tsx` (revisión), `app/lab-order-print.tsx` (orden), `app/recibo/` (recibo), `app/print-letterhead.tsx` (membrete), `lib/print-document.ts`, CSS en `app/globals.css`
+- Ventas: `app/ventas/sales-board.tsx` (incluye `SaleCard`), `cart.tsx`, `actions.ts`
+- Laboratorio: `app/ventas/lab-order-modal.tsx`, `app/ventas/lab-actions.ts`, `lib/laboratorio.ts`, monitor `app/laboratorio/`
+- Facturación: `app/facturacion/`, `lib/facturacion.ts`
+- Asistente: `app/asistente/`
+- Navegación: `app/app-navigation.tsx`, `app/dashboard-shell.tsx`
+- Base de datos: `supabase/migrations/` (46 migraciones al 2026-09-24)
+
+---
+
+## 8. Preguntas abiertas para Shuyana
+
+**Impresiones**
+- ¿Qué falla exactamente? (se corta, sale en varias hojas, letra pequeña, falta información, membrete incorrecto, no imprime).
+- ¿Qué impresora usan? ¿Hoja A4, media hoja (A5) o ticket térmico de 80 mm? ¿Cuál para cada documento?
+
+**Facturación SRI** (necesario antes de empezar la Fase C)
+- RUC de cada empresa, régimen (RIMPE emprendedor / negocio popular / general), si llevan contabilidad.
+- ¿Tienen firma electrónica (.p12) vigente para cada RUC?
+- Establecimiento y punto de emisión por sucursal (ej. 001-001, 002-001).
+- ¿Hoy facturan con otro sistema? ¿Cuál es el último número de factura emitido?
+
+**Tarjeta de lealtad**
+- ¿Qué recibe quien refiere? (descuento, puntos, examen gratis, accesorio).
+- ¿Qué recibe el referido?
+- ¿Tarjeta física impresa, digital (WhatsApp) o ambas?
+
+**Interfaz**
+- ¿Qué pantallas usan más al día y cuáles se sienten lentas o confusas?
+- ¿Se usa más en computadora, tablet o celular?
+
+---
+
+## 9. Registro de entregas
+
+| Fecha | Qué se entregó | Commit |
+|---|---|---|
+| 2026-09-24 | Arreglo de impresión que congelaba, botón de orden visible en ventas, edición de revisiones | `ef2a66c` |
+| 2026-09-24 | Este Blueprint + reglas para IAs (`AGENTS.md`, `CLAUDE.md`) | (este commit) |
