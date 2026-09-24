@@ -55,7 +55,8 @@ function DeudaCard({ deuda, pending, onFrecuencia, onCobroInsistente, onConvenio
   const nombre = `${deuda.nombres} ${deuda.apellidos}`;
   const token = deuda.ventas[0]?.recibo_token;
   const ticketUrl = origin && token ? `${origin}/recibo/${token}` : null;
-  const mensaje = construirMensajeContacto(plantilla, { nombre: deuda.nombres, empresa: deuda.empresa_nombre, saldo: deuda.saldo_total, ticketUrl });
+  const fechaCompra = deuda.ventas[0]?.creado_en ?? null;
+  const mensaje = construirMensajeContacto(plantilla, { nombre: deuda.nombres, empresa: deuda.empresa_nombre, saldo: deuda.saldo_total, ticketUrl, fechaCompra });
   const wa = enlaceWhatsapp(deuda.telefono, mensaje);
   const closeMenu = () => setMenuOpen(false);
   const copiarMensaje = async () => {
