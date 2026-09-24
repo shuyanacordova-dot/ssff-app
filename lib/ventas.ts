@@ -14,7 +14,7 @@ export type SalePayment = { id: string; metodo: PaymentMethod; monto: number; re
 export type SalePatient = { id: string; nombres: string; apellidos: string; cedula: string | null; telefono: string | null };
 export type Sale = { id: string; empresa_id: string; sucursal_id: string | null; paciente_id: string | null; cliente_nombre: string | null; estado: SaleStatus; subtotal: number; descuento: number; total: number; pagado: number; saldo: number; motivo_anulacion: string | null; recibo_token: string; fecha_entrega_estimada: string | null; creado_en: string; folio: number | null; venta_items: SaleItem[]; pagos_venta: SalePayment[] };
 export type SalesProfile = { id: string; empresa_id: string; sucursal_id: string | null; rol: string };
-export type SaleLabOrder = { id: string; venta_id: string; venta_item_id: string | null; estado: string; laboratorio: string; es_garantia: boolean };
+export type SaleLabOrder = { id: string; venta_id: string; venta_item_id: string | null; estado: string; laboratorio: string; creado_en: string; tipo_lente: string; es_garantia: boolean };
 export type EmpresaConvenio = { id: string; nombre: string };
 export type Garantia = { id: string; venta_id: string; venta_item_id: string | null; tipo: "armazon" | "luna"; motivo: string; estado: "abierta" | "resuelta" | "rechazada"; orden_laboratorio_id: string | null; notas: string | null; creado_en: string };
 export type VentasData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: SalesProfile; products: SaleProduct[]; stock: SaleStock[]; sales: Sale[]; companies: SaleCompany[]; branches: SaleBranch[]; accessibleBranches: SaleBranch[]; patients: SalePatient[]; labOrders: SaleLabOrder[]; garantias: Garantia[]; empresasConvenio: EmpresaConvenio[] };
@@ -65,7 +65,7 @@ export async function getVentasData(): Promise<VentasData> {
 
     const saleIds = (salesResult.data ?? []).map((sale) => sale.id);
     const [labOrdersResult, garantiasResult] = saleIds.length ? await Promise.all([
-      supabase.from("ordenes_laboratorio").select("id,venta_id,venta_item_id,estado,laboratorio,es_garantia").in("venta_id", saleIds),
+      supabase.from("ordenes_laboratorio").select("id,venta_id,venta_item_id,estado,laboratorio,es_garantia,creado_en,tipo_lente").in("venta_id", saleIds),
       supabase.from("garantias").select("id,venta_id,venta_item_id,tipo,motivo,estado,orden_laboratorio_id,notas,creado_en").in("venta_id", saleIds).order("creado_en", { ascending: false }),
     ]) : [{ data: [], error: null }, { data: [], error: null }];
 

@@ -103,7 +103,7 @@ export async function getClinicalData(): Promise<ClinicalData> {
 
     const saleIds = (salesResult.data ?? []).map((sale) => sale.id);
     const [labOrdersResult, garantiasResult] = saleIds.length ? await Promise.all([
-      supabase.from("ordenes_laboratorio").select("id,venta_id,venta_item_id,estado,laboratorio,es_garantia").in("venta_id", saleIds),
+      supabase.from("ordenes_laboratorio").select("id,venta_id,venta_item_id,estado,laboratorio,es_garantia,creado_en,tipo_lente").in("venta_id", saleIds),
       supabase.from("garantias").select("id,venta_id,venta_item_id,tipo,motivo,estado,orden_laboratorio_id,notas,creado_en").in("venta_id", saleIds).order("creado_en", { ascending: false }),
     ]) : [{ data: [], error: null }, { data: [], error: null }];
 

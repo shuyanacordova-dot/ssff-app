@@ -106,7 +106,7 @@ export function SaleCard({ sale, companyName, branchName, patient, lensItems, ha
     {labOrders.length > 0 && <div className="lab-order-badges" onClick={(event) => event.stopPropagation()}>{labOrders.map((order) => <button key={order.id} type="button" className="check-badge ok" onClick={() => onViewOrder(order.id)}><FlaskConical size={13} /> {order.laboratorio} · {order.estado}{order.es_garantia ? " · garantía" : ""}</button>)}</div>}
     {sale.estado === "completada" && <div className="sale-primary-actions" onClick={(event) => event.stopPropagation()}>
       <button type="button" onClick={onRecibo}><ReceiptText size={14} /> Recibo</button>
-      {patient && hasLabOrderItems && <button type="button" onClick={onCreateLabOrder}><FlaskConical size={14} /> Crear orden</button>}
+      {patient && hasLabOrderItems && <button type="button" onClick={onCreateLabOrder}><FlaskConical size={14} /> Orden de laboratorio</button>}
       {sale.saldo > 0 && <button type="button" onClick={() => setShowAbono((value) => !value)}><Wallet size={14} /> Registrar abono</button>}
     </div>}
     {showAbono && <div className="new-patient-form" style={{ marginTop: 10 }} onClick={(event) => event.stopPropagation()}><label>Método<select value={metodo} onChange={(event) => setMetodo(event.target.value)}>{["efectivo", "transferencia", "tarjeta", "credito", "otro"].map((m) => <option key={m} value={m}>{m}</option>)}</select></label><label>Monto<input type="number" min={0} step={0.01} max={sale.saldo} value={monto} onChange={(event) => setMonto(event.target.value)} /></label><button type="button" className="new-consultation" disabled={pending || !Number(monto) || Number(monto) > sale.saldo} onClick={submitAbono}>Confirmar abono</button></div>}

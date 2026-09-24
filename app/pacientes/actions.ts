@@ -12,6 +12,7 @@ import { isAdditionalOptometrist } from "@/lib/clinical-professionals";
 const clinicalRoles = new Set(["superadmin", "admin_sucursal", "optometra"]);
 // Carpetas de pacientes (buscar, registrar, ver historial): también vendedores, que las usan para ventas y órdenes de laboratorio.
 const folderRoles = new Set(["superadmin", "admin_sucursal", "optometra", "vendedor"]);
+const patientEditRoles = new Set(["superadmin", "admin_sucursal", "optometra", "vendedor", "caja"]);
 const text = (data: FormData, name: string) => typeof data.get(name) === "string" ? String(data.get(name)).trim() : "";
 const normalizarWhatsapp = (raw: string) => { const digits = raw.replace(/\D/g, ""); const local = digits.startsWith("593") ? digits.slice(3) : digits.startsWith("0") ? digits.slice(1) : digits; return local ? `+593 ${local}` : ""; };
 type UserProfile = { id: string; empresa_id: string; sucursal_id: string | null; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null };
@@ -40,6 +41,29 @@ export async function crearPacienteClinico(data: FormData) {
   });
   if (error) throw new Error(error.message || "No se pudo registrar el paciente.");
   const saved = result as { paciente_id: string; ya_existia: boolean };
+  const { data: patientRow, error: patientError } = await supabase.from("pacientes_clinicos")
+    .select("id,nombres,apellidos,cedula,telefono,email,direccion,sexo,ocupacion,responsable_id,fecha_nacimiento,frecuencia_cobro,empresa_origen_id,actualizado_en")
+    .eq("id", saved.paciente_id).single();
+  if (patientError || !patientRow) throw new Error("La ficha se guardó, pero no se pudo volver a cargar.");
+  const [patient] = await enrichPatientRecords(supabase, [patientRow]);
+  revalidatePath("/pacientes");
+  return { ...saved, patient };
+}
+
+export async function actualizarPacienteClinico(data: FormData) {
+  const { supabase } = await currentClinicalProfile(patientEditRoles);
+  const pacienteId = text(data, "paciente_id");
+  if (!pacienteId) throw new Error("Falta identificar al paciente.");
+  const nombres = text(data, "nombres"); const apellidos = text(data, "apellidos");
+  if (!nombres || !apellidos) throw new Error("Ingresa nombres y apellidos.");
+  const { data: result, error } = await supabase.rpc("actualizar_paciente_clinico", {
+    p_paciente_id: pacienteId,
+    p_nombres: nombres, p_apellidos: apellidos, p_cedula: text(data, "cedula") || null, p_telefono: normalizarWhatsapp(text(data, "telefono")) || null,
+    p_email: text(data, "email") || null, p_fecha_nacimiento: text(data, "fecha_nacimiento") || null, p_sexo: text(data, "sexo") || null,
+    p_ocupacion: text(data, "ocupacion") || null, p_responsable_id: text(data, "responsable_id") || null,
+  });
+  if (error) throw new Error(error.message || "No se pudo actualizar el paciente.");
+  const saved = result as { paciente_id: string };
   const { data: patientRow, error: patientError } = await supabase.from("pacientes_clinicos")
     .select("id,nombres,apellidos,cedula,telefono,email,direccion,sexo,ocupacion,responsable_id,fecha_nacimiento,frecuencia_cobro,empresa_origen_id,actualizado_en")
     .eq("id", saved.paciente_id).single();
@@ -191,7 +215,7 @@ export async function obtenerHistorialPaciente(pacienteId: string): Promise<{ co
   const sales = salesResult.error ? [] : ((salesResult.data ?? []) as unknown as PatientSale[]);
   const saleIds = sales.map((sale) => sale.id);
   const [labOrdersResult, garantiasResult] = saleIds.length ? await Promise.all([
-    supabase.from("ordenes_laboratorio").select("id,venta_id,venta_item_id,estado,laboratorio,es_garantia").in("venta_id", saleIds),
+    supabase.from("ordenes_laboratorio").select("id,venta_id,venta_item_id,estado,laboratorio,es_garantia,creado_en,tipo_lente").in("venta_id", saleIds),
     supabase.from("garantias").select("id,venta_id,venta_item_id,tipo,motivo,estado,orden_laboratorio_id,notas,creado_en").in("venta_id", saleIds).order("creado_en", { ascending: false }),
   ]) : [{ data: [], error: null }, { data: [], error: null }];
   return {

@@ -51,11 +51,11 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | Login, roles, equipo, sucursales | ✅ | `app/login`, `app/equipo`, `app/configuracion/sucursales` |
 | Inicio / tareas y supervisión | ✅ | Tareas como checklist |
 | Pacientes — crear ficha | ✅ | Edad calculada, ocupación, responsable de cuenta |
-| Pacientes — **editar ficha** | ❌ | No existe forma de corregir nombres, cédula, teléfono, etc. **Fase A** |
+| Pacientes — editar ficha | 🟡 | Implementado: formulario compartido con alta, permisos clínicos y auditoría antes/después. Pendiente aplicar `20260924193358_actualizar_paciente_clinico.sql` y probar con sesión real. |
 | Historia clínica / revisiones | ✅ | Crear, ver detalle, **editar** (desde 2026-09-24), imprimir |
-| Carpeta del paciente | 🟡 | Solo 3 pestañas: Revisiones, Ventas, Fotos. Falta pestaña **Laboratorio** (Fase A), Citas, Estado de cuenta, Comunicaciones |
+| Carpeta del paciente | 🟡 | Cuatro pestañas: Revisiones, Ventas, Fotos y documentos, Laboratorio con contador y órdenes. Pendientes Citas, Estado de cuenta, Comunicaciones. |
 | Ventas y cobros | ✅ | Venta rápida / lentes, abonos, anulación, convenios, acuerdo de pago, folio |
-| Laboratorio | 🟡 | Crear/editar orden desde una venta, checklist de estados, garantías, monitor `/laboratorio`. El botón en la carpeta está escondido dentro de cada venta ("Crear orden") |
+| Laboratorio | 🟡 | Pestaña propia en carpeta con nueva orden, selector de ventas completadas y acceso al modal existente. Sin venta ofrece registrarla. Tarjetas con fecha, lente, estado y garantía; acceso en ventas renombrado. Pendiente prueba con sesión real. |
 | Impresiones (receta, revisión, orden, recibo) | 🟡 | Existen, pero Shuyana reporta problemas. **Fase A** — detalles pendientes (ver sección 8) |
 | Inventario | ✅ | Stock por sucursal, transferencias, alertas, pestañas por categoría |
 | Caja, resumen del día | ✅ | Cuadre diario convive con la herramienta vieja de Notion (no tocar esa) |
@@ -68,7 +68,8 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | Asistente Shu (IA) | 🟡 | Ayuda administrativa básica (`app/asistente`). **Fase D** |
 | CRM / seguimiento de pacientes | ❌ | **Fase B** |
 | Tarjeta de lealtad y referidos | ❌ | **Fase B** |
-| Auditoría general de cambios | ❌ | Solo existe `log_accesos`. Se necesita para ediciones de pacientes y ventas |
+| Auditoría general de cambios | 🟡 | `pacientes_cambios` activa para ediciones de pacientes. Falta pantalla para verla y auditoría de otros módulos. |
+| Seguridad de funciones de base de datos | 🟡 | El chequeo de Supabase (2026-09-24) muestra 7 funciones que se pueden llamar sin iniciar sesión (`activar_cobro_insistente`, `actualizar_estado_garantia`, `actualizar_orden_laboratorio`, `crear_garantia`, `crear_orden_laboratorio` versión 11 parámetros, `registrar_pago_deuda_negocio`, `vincular_orden_garantia`). Hay que quitarles el permiso `anon`. `obtener_recibo_publico` es pública a propósito. |
 
 ---
 
@@ -77,9 +78,10 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 ### Fase A — Arreglos urgentes (en curso)
 1. **Editar ficha del paciente** — botón "Editar datos" en la carpeta, con registro de quién cambió qué y cuándo.
 2. **Pestaña "Laboratorio" en la carpeta del paciente** — lista de órdenes del paciente + botón visible "Nueva orden de laboratorio" (elige la venta y abre el formulario que ya existe).
-3. **Impresiones** — receta, revisión, orden de laboratorio y recibo: revisar formato, que quepan en una hoja, membrete correcto por sucursal. (Esperando detalles de Shuyana.)
+3. **Impresiones** — receta, revisión, orden de laboratorio y recibo. Problema reportado: **se cortan o salen en varias hojas**. Papel: **A4 para todo**. Causa probable: se imprime ocultando (no quitando) el resto de la pantalla y el documento vive dentro de una ventana emergente con altura limitada. Solución: imprimir cada documento en una hoja limpia aparte (A4, márgenes fijos).
+4. **Seguridad** — quitar permiso público (`anon`) a las 7 funciones listadas en la sección 3.
 
-### Fase B — Relación con pacientes (CRM + fidelización)
+### Fase B — Relación con pacientes (CRM + fidelización) — **siguiente prioridad elegida por Shuyana (2026-09-24): CRM y recordatorios**
 - Recordatorios de control (3 m / 6 m / 1 año) con cola "pendientes de enviar" por WhatsApp (siempre con confirmación humana).
 - Seguimiento postventa (a los 7 días: "¿cómo te adaptaste a tus lentes?").
 - Cumpleaños con mensaje y beneficio.
@@ -106,6 +108,8 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 
 - El nombre del sistema es **LumOS** (antes Revelio / SSFF).
 - Revisiones clínicas: se pueden editar (decisión 2026-09-24).
+- Datos del paciente: los puede editar todo el equipo, incluidos vendedores; siempre queda registro (decisión 2026-09-24).
+- Orden de módulos nuevos: primero CRM y recordatorios (decisión 2026-09-24).
 - La orden de laboratorio siempre está ligada a una venta (la base de datos lo exige).
 - Vendedores no ven la historia clínica completa; al crear una orden, si no ven la graduación la escriben a mano.
 - La herramienta vieja de cuadre en Notion (`cuadre-diario-notion-bridge`) sigue funcionando en paralelo. No escribir en ella ni migrar sus datos sin permiso.
@@ -127,6 +131,8 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | L6 | 2026-09-23 | Vendedores no podían abrir carpetas aunque la base de datos se lo permitía (la pantalla los bloqueaba). | Permisos de pantalla y de base de datos deben coincidir. |
 | L7 | 2026-09-17 | Se entregó un paquete grande de cambios sin probar en el navegador (sesión cerrada, sin credenciales). | No acumular muchos cambios sin probar. Entregar en partes pequeñas. |
 | L8 | 2026-09-24 | Shuyana sintió que "las órdenes de trabajo se borraron". Revisión de git: **no se perdió código**; el botón estaba escondido dentro de cada tarjeta de venta y el filtro de L1 lo ocultaba. | Las funciones importantes necesitan un lugar visible y propio (pestaña "Laboratorio"). Anotar aquí cada entrega para poder demostrar qué existe. |
+| L9 | 2026-09-24 | El chequeo de seguridad de Supabase mostró funciones creadas sin quitar el permiso público `anon`. | En cada función nueva: `revoke all ... from public, anon` y `grant execute ... to authenticated`. Correr `get_advisors` después de cada migración. |
+| L10 | 2026-09-24 | Se pidió instalar un complemento desde un repositorio de GitHub no verificado. | No instalar código de fuentes no verificadas. Codex se usa con el plugin oficial ya instalado. |
 
 ---
 
@@ -147,8 +153,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 ## 8. Preguntas abiertas para Shuyana
 
 **Impresiones**
-- ¿Qué falla exactamente? (se corta, sale en varias hojas, letra pequeña, falta información, membrete incorrecto, no imprime).
-- ¿Qué impresora usan? ¿Hoja A4, media hoja (A5) o ticket térmico de 80 mm? ¿Cuál para cada documento?
+- ✅ Respondido 2026-09-24: se cortan o salen en varias hojas; papel A4 para todo.
 
 **Facturación SRI** (necesario antes de empezar la Fase C)
 - RUC de cada empresa, régimen (RIMPE emprendedor / negocio popular / general), si llevan contabilidad.
@@ -172,4 +177,5 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | Fecha | Qué se entregó | Commit |
 |---|---|---|
 | 2026-09-24 | Arreglo de impresión que congelaba, botón de orden visible en ventas, edición de revisiones | `ef2a66c` |
-| 2026-09-24 | Este Blueprint + reglas para IAs (`AGENTS.md`, `CLAUDE.md`) | (este commit) |
+| 2026-09-24 | Este Blueprint + reglas para IAs (`AGENTS.md`, `CLAUDE.md`) | `6804ec0` |
+| 2026-09-24 | Edición de pacientes con auditoría y pestaña Laboratorio. Archivos: `app/pacientes/actions.ts`, `app/pacientes/patient-clinical-client.tsx`, `app/ventas/sales-board.tsx`, `lib/clinical.ts`, `lib/ventas.ts`, `supabase/migrations/20260924193358_actualizar_paciente_clinico.sql`, `docs/BLUEPRINT.md`. Construido por Codex, revisado por Claude (permisos ampliados a todo el equipo). TypeScript sin errores; migración aplicada; prueba con sesión real pendiente. | (este commit) |
