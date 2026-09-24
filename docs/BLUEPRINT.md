@@ -183,3 +183,32 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-24 | Edición de pacientes con auditoría y pestaña Laboratorio. Archivos: `app/pacientes/actions.ts`, `app/pacientes/patient-clinical-client.tsx`, `app/ventas/sales-board.tsx`, `lib/clinical.ts`, `lib/ventas.ts`, `supabase/migrations/20260924193358_actualizar_paciente_clinico.sql`, `docs/BLUEPRINT.md`. Construido por Codex, revisado por Claude (permisos ampliados a todo el equipo). TypeScript sin errores; migración aplicada; prueba con sesión real pendiente. | (este commit) |
 
 | 2026-09-24 | Impresión aislada A4. Archivos: `lib/print-document.ts`, `app/globals.css`, `app/recibo/[token]/page.tsx`, `app/recibo/print-button.tsx`, `app/ventas/lab-order-modal.tsx`, `app/laboratorio/lab-monitor-board.tsx`, `app/ventas/acuerdo-pago-view.tsx`, `app/cuentas-cobrar/cuentas-cobrar-board.tsx`, `app/resumen-dia/resumen-dia-board.tsx`, `app/informes/informes-board.tsx`, `docs/BLUEPRINT.md`. Receta/revisión conservan sus IDs existentes; componentes clínicos, orden y membrete reciben ajustes solo al imprimir. Modal de recibo en ventas/carpeta gestiona el enlace público, no contiene un documento imprimible propio. TypeScript correcto; prueba visual pendiente de Claude. Sin commit/push ni cambios de base de datos por instrucción expresa. | (este commit) |
+
+---
+
+## 10. Ideas del especialista (propuestas, pendientes de aprobar por Shuyana)
+
+**CRM y recordatorios (Fase B, prioridad elegida)**
+1. *Bandeja diaria "A quién contactar hoy"*: una sola lista con motivo, mensaje de WhatsApp listo y botón "Enviado" (confirmación humana).
+2. *Control vencido*: usa el "próximo control" de la última revisión.
+3. *Examen sin compra*: pacientes que se hicieron la revisión y no compraron en 15–30 días (la mayor fuga de ventas en ópticas).
+4. *Lentes listos sin retirar*: órdenes "notificado" hace más de 7 días.
+5. *Postventa*: a los 7 días de la entrega, "¿cómo te adaptaste?"; si hay problema, crea tarea al optometrista.
+6. *Cumpleaños* con beneficio.
+7. *Inactivos*: más de 12 meses sin visita.
+8. *Lentes de contacto*: recordatorio de reposición según duración.
+9. Historial de contactos por paciente (pestaña "Comunicaciones" en la carpeta).
+
+**Fidelización**
+- Tarjeta de lealtad con código/QR por paciente, "¿quién te refirió?" al crear la ficha, beneficios por referido, ranking de mejores referidores.
+- Encuesta de satisfacción corta después de la entrega y enlace para reseña en Google.
+
+**Indicadores clave para ópticas (Informes)**
+- Conversión examen → venta por optometrista y por sucursal.
+- Ticket promedio; porcentaje de progresivos, antirreflejo y fotocromáticos.
+- Días promedio de entrega por laboratorio y porcentaje de garantías por laboratorio.
+- Comisiones por vendedor.
+
+**Otros módulos sugeridos**
+- Proveedores y compras (órdenes de compra, cuentas por pagar).
+- Portal del paciente: receta digital, recibo y estado de su orden con un enlace.
