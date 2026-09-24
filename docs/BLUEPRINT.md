@@ -31,7 +31,7 @@ código en GitHub `shuyanacordova-dot/ssff-app` rama `main`.
 
 1. **Claude planifica y revisa; Codex construye.** Claude escribe la tarea con archivos exactos; Codex implementa; Claude revisa el cambio, aplica migraciones de base de datos y verifica.
 2. **Nunca borrar trabajo.** No usar `git reset --hard`, `git checkout .`, ni borrar ramas o archivos que no se crearon en la misma tarea. Nunca borrar columnas ni tablas: solo agregar.
-3. **Guardar siempre.** Cada tarea terminada = un commit en `main` + push a GitHub. Nada queda "solo en la computadora".
+3. **Guardar y publicar siempre.** Cada tarea terminada = commit en `main` + push a GitHub + **publicar en Vercel con `npx vercel --prod`** (Vercel no se actualiza solo desde GitHub). Verificar en el sitio real que el cambio se ve.
 4. **Base de datos**: todo cambio va como archivo en `supabase/migrations/AAAAMMDDHHMMSS_nombre.sql` **y** se aplica al proyecto Supabase. Si una función cambia de parámetros, borrar la versión vieja y volver a dar permisos (ver lección L3).
 5. **Permisos en dos capas**: la base de datos (RLS / `tiene_permiso`) y la pantalla deben coincidir (ver lección L6).
 6. **Probar antes de decir "listo"**: compilar (`npx tsc --noEmit`) y probar en el navegador. Si no se pudo probar, decirlo claramente.
@@ -55,7 +55,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | Pacientes — editar ficha | ✅ | Botón "Editar datos" en la carpeta. Todo el equipo puede editar. Cada cambio queda en `pacientes_cambios` (antes/después, quién, cuándo). Falta probar con sesión real. |
 | Historia clínica / revisiones | ✅ | Crear, ver detalle, **editar** (desde 2026-09-24), imprimir |
 | Carpeta del paciente | 🟡 | Cuatro pestañas: Revisiones, Ventas, Fotos y documentos, Laboratorio con contador y órdenes. Pendientes Citas, Estado de cuenta, Comunicaciones. |
-| Ventas y cobros | ✅ | Venta rápida (solo accesorios, gafas de sol y exámenes; **nunca lentes**), modo Lentes (armazón + lunas + lentes de contacto), abonos, anulación, convenios, acuerdo de pago, folio |
+| Ventas y cobros | ✅ | Pantalla general de ventas: **solo venta rápida** (accesorios, gafas de sol, exámenes). Venta de **lentes solo desde la carpeta del paciente** (2026-09-24), abonos, anulación, convenios, acuerdo de pago, folio |
 | Laboratorio | 🟡 | Pestaña propia en carpeta con nueva orden, selector de ventas completadas y acceso al modal existente. Sin venta ofrece registrarla. Tarjetas con fecha, lente, estado y garantía; acceso en ventas renombrado. Pendiente prueba con sesión real. |
 | Impresiones (receta, revisión, orden, recibo) | 🟡 | Implementado, pendiente prueba en navegador: contexto aislado por documento, A4 con márgenes de 12 mm, logos y espacios compactos, paginación sin modales. Incluye acuerdos, resumen del día e informes. TypeScript correcto. |
 | Inventario | ✅ | Stock por sucursal, transferencias, alertas, pestañas por categoría |
@@ -113,7 +113,9 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 - Orden de módulos nuevos: primero CRM y recordatorios (decisión 2026-09-24).
 - Nombres de sucursales: Shuvision, Shuvision Sacha y Focus (2026-09-24).
 - Metas de venta = dinero cobrado en el mes, no el total vendido (2026-09-24).
-- Venta rápida nunca incluye lentes (lunas ni lentes de contacto) (2026-09-24).
+- Venta rápida nunca incluye lentes (lunas ni lentes de contacto). El botón "Lentes" solo existe dentro de la carpeta del paciente (2026-09-24).
+- El gráfico de metas muestra solo el dinero cobrado; no muestra el total vendido (2026-09-24).
+- **Publicación**: Vercel NO se actualiza desde GitHub. Se publica con `npx vercel --prod` desde esta carpeta (enlazada en `.vercel/`). Después de cada entrega: commit + push + publicar (2026-09-24).
 - Vendedor: ve datos de pacientes (no historia clínica), registra pacientes, agenda citas y ve cuentas por cobrar. Caja ve nombres de pacientes para cobrar (2026-09-24).
 - La orden de laboratorio siempre está ligada a una venta (la base de datos lo exige).
 - Vendedores no ven la historia clínica completa; al crear una orden, si no ven la graduación la escriben a mano.
@@ -141,6 +143,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | L11 | 2026-09-24 | Revisión del código: tres bloques de impresión combinaban `visibility: hidden` (conserva espacio), posición absoluta y finalmente fija de `.print-area`, con documentos dentro de modales con `max-height`/`overflow: auto`. Los parches de modal eran incompletos y no eliminaban el resto del layout; además había mínimos de altura y anchura móviles, y recibos por defecto en ticket. | Imprimir una copia aislada del documento, sin ancestros modales ni clases temporales en el body original. Esperar estilos/logos/fuentes, convertir controles a texto actual, usar A4 y flujo normal con saltos por secciones/filas. No usar `:has()`. Confirmar paginación real en navegador; TypeScript no la verifica. |
 | L12 | 2026-09-24 | Vendedores no encontraban pacientes ni veían cuentas por cobrar: la pantalla los dejaba entrar (arreglo de L6) pero la base de datos (RLS de `pacientes_clinicos`, `paciente_empresas`, `citas_agenda`) solo permitía roles clínicos. | Al dar acceso a un rol, revisar **las dos capas** y probar simulando ese rol en SQL (`set local role authenticated` + `request.jwt.claims`). |
 | L13 | 2026-09-24 | Lentes de contacto aparecían en venta rápida porque 5 productos estaban guardados como "accesorio". | Cuando algo "aparece donde no debe", revisar primero los datos (categorías), no solo el código. |
+| L14 | 2026-09-24 | Shuyana no veía ningún cambio del día (metas, ícono, laboratorio): Vercel no estaba conectado a GitHub; las publicaciones se hacían a mano con la herramienta de Vercel y la última era de 23 h antes. | "Subido a GitHub" no es "publicado". Publicar con `npx vercel --prod` y comprobar en el sitio real (por ejemplo, que `/apple-icon.png` responda). |
 
 ---
 

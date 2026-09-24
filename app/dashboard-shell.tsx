@@ -51,7 +51,6 @@ function MetasDashboard({ informe, message }: { informe: InformeMensual | null; 
         <div className="goal-card-top"><div><span>{row.empresa_nombre}</span><h3>{row.sucursal_nombre}</h3></div><strong>{row.meta > 0 ? `${cumplimiento}%` : "Sin meta"}</strong></div>
         <div className="goal-progress"><span style={{ width: `${Math.min(100, cumplimiento)}%` }} /></div>
         <p><strong>{money(cobrado)}</strong> cobrado en el mes</p>
-        <p className="field-hint">Total vendido: {money(row.ventas_total)}</p>
         <small>{row.meta > 0 ? `Meta ${money(row.meta)} · Cobrado ${money(cobrado)} · Faltan ${money(restante)}` : "Configura la meta mensual de esta sucursal"}</small>
       </article>;
     })}</div> : <div className="goal-empty"><Target size={22} /><p>Aún no hay metas de sucursales disponibles para este mes.</p></div>}

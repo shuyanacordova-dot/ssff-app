@@ -99,7 +99,6 @@ function SucursalRow({ row, showEmpresa, onGuardarMeta }: { row: InformeSucursal
     <div className="task-meta">{showEmpresa && <span>{row.empresa_nombre}</span>}<span>{row.ventas_count} venta(s)</span></div>
     <h2>{row.sucursal_nombre}</h2>
     <p>Cobrado en el mes: <strong>{money(cobrado)}</strong></p>
-    <p className="field-hint">Total vendido: {money(row.ventas_total)} · Cobrado de esas ventas: {money(row.cobrado_total)}</p>
     {row.meta > 0 && <>
       <div style={{ height: 8, borderRadius: 99, background: "#edf1f5", overflow: "hidden", marginTop: 6 }}><div style={{ height: "100%", width: `${barWidth}%`, background: cumplimiento >= 100 ? "#2ba879" : "#3b82c4", borderRadius: 99 }} /></div>
       <p className="field-hint" style={{ marginTop: 4 }}>Meta {money(row.meta)} · Cobrado {money(cobrado)} · Faltan {money(restante)} · {cumplimiento}% cumplido</p>

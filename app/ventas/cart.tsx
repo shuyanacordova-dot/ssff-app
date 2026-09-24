@@ -85,8 +85,9 @@ export default function Cart({ products, stock, companies, branches, patients, e
   if (!modo) return <section className="glass agenda-board" style={{ marginBottom: 18 }}><p className="section-label">NUEVA VENTA</p><h2>¿Qué tipo de venta es?</h2>
     <div className="sale-mode-grid">
       <button type="button" className="sale-mode-card" onClick={() => elegirModo("rapida")}><strong>Venta rápida</strong><span>Accesorios y gafas de sol</span></button>
-      <button type="button" className="sale-mode-card" onClick={() => elegirModo("lentes")}><strong>Lentes</strong><span>Armazón y lunas para una fórmula</span><span className="field-hint">Lunas y lentes de contacto siempre van aquí.</span></button>
+      {lockPatient && <button type="button" className="sale-mode-card" onClick={() => elegirModo("lentes")}><strong>Lentes</strong><span>Armazón y lunas para una fórmula</span><span className="field-hint">Lunas y lentes de contacto siempre van aquí.</span></button>}
     </div>
+    {!lockPatient && <p className="field-hint" style={{ marginTop: 12 }}>Las ventas de lentes se hacen desde la carpeta del paciente (Pacientes → carpeta → Ventas → Nueva venta).</p>}
   </section>;
 
   return <section className="glass agenda-board" style={{ marginBottom: 18 }}><p className="section-label">NUEVA VENTA · {modo === "rapida" ? "VENTA RÁPIDA" : "LENTES"}</p><h2>Carrito y cobro</h2>
