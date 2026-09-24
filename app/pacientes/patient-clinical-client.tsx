@@ -54,6 +54,7 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
   const [isConsulting, setIsConsulting] = useState(false);
   const [isSelling, setIsSelling] = useState(false);
   const [viewingConsultation, setViewingConsultation] = useState<Consultation | null>(null);
+  const [editingConsultation, setEditingConsultation] = useState<Consultation | null>(null);
   const [viewingSale, setViewingSale] = useState<PatientSale | null>(null);
   const [labOrderContext, setLabOrderContext] = useState<{ sale: PatientSale; orderId?: string; esGarantia?: boolean; ordenOriginalId?: string | null } | null>(null);
   const [reciboSale, setReciboSale] = useState<PatientSale | null>(null);
@@ -119,7 +120,7 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
   const garantias = usingExtraHistorial ? (historial[selected?.id ?? ""]?.garantias ?? []) : props.garantias.filter((garantia) => saleIds.has(garantia.venta_id));
   const companyName = (id: string) => props.companies.find((company) => company.id === id)?.nombre ?? "Empresa";
   const productoById = useMemo(() => new Map(props.products.map((product) => [product.id, product])), [props.products]);
-  const lensItemsFor = (sale: PatientSale) => sale.venta_items.filter((item) => item.producto_id && productoById.get(item.producto_id)?.categoria === "lente");
+  const lensItemsFor = (sale: PatientSale) => sale.venta_items;
   const labOrderItemsFor = (sale: PatientSale) => lensItemsFor(sale);
   const canAnular = props.profile?.rol === "superadmin";
   const canAuthorClinical = props.profile?.rol !== "vendedor";
@@ -191,9 +192,9 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
       <p className="field-hint">Si el responsable no existe todavía, guarda primero su propia ficha y luego vincúlalo aquí buscándolo por nombre o cédula.</p>
     </div>}
     <div className="modal-actions"><button className="outline-action" type="button" onClick={closeCreating}>Cancelar</button><button className="new-consultation" disabled={pending} type="submit">{pending ? "Guardando…" : "Guardar ficha clínica"}</button></div></form></section></div>}
-  {isConsulting && selected && <ConsultationModal pacienteId={selected.id} optometrists={props.optometrists} defaultOptometristId={props.optometrists.some((person) => person.id === props.profile?.id) ? props.profile?.id : undefined} onClose={() => setIsConsulting(false)} onSaved={setNotice} />}
+  {(isConsulting || editingConsultation) && selected && <ConsultationModal pacienteId={selected.id} optometrists={props.optometrists} defaultOptometristId={props.optometrists.some((person) => person.id === props.profile?.id) ? props.profile?.id : undefined} initial={editingConsultation ?? undefined} onClose={() => { setIsConsulting(false); setEditingConsultation(null); }} onSaved={setNotice} />}
   {isSelling && selected && !demoMode && <div className="modal-backdrop"><div className="sale-modal-shell"><button className="modal-close" onClick={() => setIsSelling(false)} aria-label="Cerrar"><X size={19} /></button><Cart products={props.products} stock={props.stock} companies={props.companies} branches={props.branches} patients={[selected]} empresasConvenio={props.empresasConvenio} defaultCompany={props.profile?.empresa_id ?? props.companies[0]?.id ?? ""} defaultBranch={props.profile?.sucursal_id ?? ""} defaultPacienteId={selected.id} lockPatient onDone={(message) => { setNotice(message); setSection("sales"); setIsSelling(false); }} /></div></div>}
-  {viewingConsultation && selected && <ConsultationDetailModal consultation={viewingConsultation} patient={selected} company={branchLetterhead(props.companies.find((c) => c.id === viewingConsultation.empresa_atencion_id) ?? props.companies[0], props.branches.find((b) => b.id === viewingConsultation.sucursal_atencion_id)) ?? undefined} branchName={props.branches.find((b) => b.id === viewingConsultation.sucursal_atencion_id)?.nombre} onClose={() => setViewingConsultation(null)} />}
+  {viewingConsultation && selected && <ConsultationDetailModal consultation={viewingConsultation} patient={selected} company={branchLetterhead(props.companies.find((c) => c.id === viewingConsultation.empresa_atencion_id) ?? props.companies[0], props.branches.find((b) => b.id === viewingConsultation.sucursal_atencion_id)) ?? undefined} branchName={props.branches.find((b) => b.id === viewingConsultation.sucursal_atencion_id)?.nombre} onClose={() => setViewingConsultation(null)} onEdit={() => { setEditingConsultation(viewingConsultation); setViewingConsultation(null); }} />}
   {viewingSale && selected && <VentaDetailModal sale={viewingSale} companyName={companyName(viewingSale.empresa_id)} patient={selected} onClose={() => setViewingSale(null)} />}
   {labOrderContext && selected && <LabOrderModal sale={labOrderContext.sale} lensItems={labOrderItemsFor(labOrderContext.sale)} productoById={productoById} existingOrderId={labOrderContext.orderId} esGarantia={labOrderContext.esGarantia} patientName={fullName(selected)} patientPhone={selected.telefono} company={branchLetterhead(props.companies.find((c) => c.id === labOrderContext.sale.empresa_id), props.branches.find((b) => b.id === labOrderContext.sale.sucursal_id)) ?? undefined} branchName={props.branches.find((b) => b.id === labOrderContext.sale.sucursal_id)?.nombre} onClose={() => setLabOrderContext(null)} onCreated={(message) => setNotice(message)} />}
   {reciboSale && selected && <ReciboModal sale={reciboSale} patient={selected} onClose={() => setReciboSale(null)} onSaved={(message) => setNotice(message)} />}

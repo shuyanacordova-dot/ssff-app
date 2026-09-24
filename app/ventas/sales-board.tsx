@@ -40,7 +40,7 @@ export default function SalesBoard(props: VentasData) {
   }), [props.sales, accessibleBranchIds, branchFilter]);
   const visibleSaleIds = useMemo(() => new Set(visibleSales.map((sale) => sale.id)), [visibleSales]);
   const visibleGarantias = useMemo(() => props.garantias.filter((garantia) => visibleSaleIds.has(garantia.venta_id)), [props.garantias, visibleSaleIds]);
-  const lensItemsFor = (sale: Sale) => sale.venta_items.filter((item) => item.producto_id && productoById.get(item.producto_id)?.categoria === "lente");
+  const lensItemsFor = (sale: Sale) => sale.venta_items;
   const labOrderItemsFor = (sale: Sale) => lensItemsFor(sale);
 
   if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN COMERCIAL</p><h1>Cobros</h1><p className="subtitle">{props.message ?? "No se pudo abrir ventas."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/ventas">Iniciar sesión</Link>}</header></div></main>;

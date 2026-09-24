@@ -1,6 +1,6 @@
 "use client";
 
-import { Printer, X } from "lucide-react";
+import { Pencil, Printer, X } from "lucide-react";
 import type { Consultation, PatientRecord } from "@/lib/clinical";
 import { complementaryExamsFrom } from "@/lib/clinical-format";
 import type { SaleCompany } from "@/lib/ventas";
@@ -43,7 +43,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return <section className="consultation-screen-section"><p className="section-label">{title}</p>{children}</section>;
 }
 
-export default function ConsultationDetailModal({ consultation, patient, company, branchName, onClose }: { consultation: Consultation; patient: PatientRecord; company?: SaleCompany; branchName?: string; onClose: () => void }) {
+export default function ConsultationDetailModal({ consultation, patient, company, branchName, onClose, onEdit }: { consultation: Consultation; patient: PatientRecord; company?: SaleCompany; branchName?: string; onClose: () => void; onEdit?: () => void }) {
   const receta = consultation.receta;
   const edad = calcularEdad(patient.fecha_nacimiento);
   const complementaryExams = complementaryExamsFrom(consultation);
@@ -73,6 +73,6 @@ export default function ConsultationDetailModal({ consultation, patient, company
 
     <div id="clinical-review-print" className="print-area print-a4 print-only"><ClinicalReviewPrint consultation={consultation} patient={patient} company={company} branchName={branchName} /></div>
     <div id="clinical-prescription-print" className="print-area print-a4 print-only"><ClinicalPrescriptionPrint consultation={consultation} patient={patient} company={company} branchName={branchName} /></div>
-    <div className="modal-actions no-print"><button className="outline-action" type="button" onClick={onClose}>Cerrar</button>{hasPrescription && <button className="outline-action" type="button" onClick={() => printDocumentById("clinical-prescription-print")}><Printer size={16} /> Imprimir receta</button>}<button className="new-consultation" type="button" onClick={() => printDocumentById("clinical-review-print")}><Printer size={16} /> Imprimir revisión</button></div>
+    <div className="modal-actions no-print"><button className="outline-action" type="button" onClick={onClose}>Cerrar</button>{onEdit && <button className="outline-action" type="button" onClick={onEdit}><Pencil size={16} /> Editar</button>}{hasPrescription && <button className="outline-action" type="button" onClick={() => printDocumentById("clinical-prescription-print")}><Printer size={16} /> Imprimir receta</button>}<button className="new-consultation" type="button" onClick={() => printDocumentById("clinical-review-print")}><Printer size={16} /> Imprimir revisión</button></div>
   </section></div>;
 }

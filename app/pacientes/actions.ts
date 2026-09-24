@@ -110,6 +110,46 @@ export async function crearConsulta(data: FormData) {
   revalidatePath("/pacientes"); revalidatePath("/agenda");
 }
 
+export async function actualizarConsulta(data: FormData) {
+  const { supabase, profile } = await currentClinicalProfile();
+  const consultaId = text(data, "consulta_id");
+  const optometristaId = text(data, "optometrista_id");
+  if (!consultaId) throw new Error("Falta identificar la consulta.");
+  if (!optometristaId) throw new Error("Selecciona quién realizó la revisión.");
+  const invalidRxField = signedRxFields.find((field) => { const value = text(data, field); return value && !signedRxPattern.test(value); });
+  if (invalidRxField) throw new Error("No se guardó: cada Esfera, Cilindro o Adición debe comenzar con + o -.");
+  const { data: directory } = await supabase.rpc("directorio_tareas");
+  const optometrist = ((directory ?? []) as { id: string; rol: string }[]).find((member) => member.id === optometristaId);
+  if (!optometrist || (optometrist.rol !== "optometra" && !isAdditionalOptometrist(optometrist.id))) throw new Error("La persona seleccionada no es un optometrista activo.");
+
+  const antecedentes = { dispositivos_electronicos: text(data, "ante_dispositivos"), horas_dispositivos: text(data, "ante_horas_dispositivos"), hipersensibilidad: text(data, "ante_hipersensibilidad"), ultimo_control: text(data, "ante_ultimo_control"), enfermedades_condiciones: text(data, "ante_enfermedades") };
+  const agudezaVisual = { sc_od: text(data, "av_sc_od"), sc_oi: text(data, "av_sc_oi"), scp_od: text(data, "av_scp_od"), scp_oi: text(data, "av_scp_oi") };
+  const lensometria = { od_esfera: text(data, "lens_od_esfera"), od_cilindro: text(data, "lens_od_cilindro"), od_eje: text(data, "lens_od_eje"), od_add: text(data, "lens_od_add"), od_av_lejos: text(data, "lens_od_av_lejos"), od_av_cerca: text(data, "lens_od_av_cerca"), oi_esfera: text(data, "lens_oi_esfera"), oi_cilindro: text(data, "lens_oi_cilindro"), oi_eje: text(data, "lens_oi_eje"), oi_add: text(data, "lens_oi_add"), oi_av_lejos: text(data, "lens_oi_av_lejos"), oi_av_cerca: text(data, "lens_oi_av_cerca") };
+  const odK1 = text(data, "quera_od_k1"); const odK2 = text(data, "quera_od_k2"); const oiK1 = text(data, "quera_oi_k1"); const oiK2 = text(data, "quera_oi_k2");
+  const queratometria = { od_k1: odK1, od_k2: odK2, od_eje: text(data, "quera_od_eje"), od_astigmatismo: astigmatismo(odK1, odK2), oi_k1: oiK1, oi_k2: oiK2, oi_eje: text(data, "quera_oi_eje"), oi_astigmatismo: astigmatismo(oiK1, oiK2) };
+  const autorefractor = { od_esfera: text(data, "auto_od_esfera"), od_cilindro: text(data, "auto_od_cilindro"), od_eje: text(data, "auto_od_eje"), od_add: text(data, "auto_od_add"), oi_esfera: text(data, "auto_oi_esfera"), oi_cilindro: text(data, "auto_oi_cilindro"), oi_eje: text(data, "auto_oi_eje"), oi_add: text(data, "auto_oi_add") };
+  const refraccion = { od_esfera: text(data, "ref_od_esfera"), od_cilindro: text(data, "ref_od_cilindro"), od_eje: text(data, "ref_od_eje"), od_add: text(data, "ref_od_add"), od_av_lejos: text(data, "ref_od_av_lejos"), od_av_cerca: text(data, "ref_od_av_cerca"), od_dnp: text(data, "ref_od_dnp"), oi_esfera: text(data, "ref_oi_esfera"), oi_cilindro: text(data, "ref_oi_cilindro"), oi_eje: text(data, "ref_oi_eje"), oi_add: text(data, "ref_oi_add"), oi_av_lejos: text(data, "ref_oi_av_lejos"), oi_av_cerca: text(data, "ref_oi_av_cerca"), oi_dnp: text(data, "ref_oi_dnp") };
+  const examenBinocular = { cover_test: text(data, "bino_cover_test"), motilidad: text(data, "bino_motilidad"), estereopsis: text(data, "bino_estereopsis"), complementarios: JSON.stringify(parseComplementaryExams(text(data, "examenes_complementarios"))) };
+  const biomicroscopia = { od: text(data, "biom_od"), oi: text(data, "biom_oi") };
+  const hasAddition = [refraccion.od_add, refraccion.oi_add].some((value) => value && Number.isFinite(Number(value.replace(",", "."))) && Math.abs(Number(value.replace(",", "."))) > 0.001);
+  let impresionDiagnostica = text(data, "impresion_diagnostica");
+  if (hasAddition && !/(presbicia|H52\.4)/i.test(impresionDiagnostica)) impresionDiagnostica = [impresionDiagnostica, "Presbicia (CIE-10 H52.4)"].filter(Boolean).join(". ");
+  const receta = {
+    lagrimas_artificiales: data.get("receta_lagrimas") === "si", lagrimas_productos: data.getAll("lagrimas_producto").map(String), lagrimas_otro: text(data, "lagrimas_otro"), lagrimas_frecuencia: text(data, "lagrimas_frecuencia"),
+    vitaminas: data.get("receta_vitaminas") === "si", vitaminas_productos: data.getAll("vitaminas_producto").map(String), vitaminas_otro: text(data, "vitaminas_otro"), vitaminas_frecuencia: text(data, "vitaminas_frecuencia"),
+    terapia_visual: data.get("receta_terapia_visual") === "si", terapia_instrucciones: text(data, "terapia_instrucciones"),
+  };
+
+  const { error } = await supabase.from("consultas_optometricas").update({
+    optometrista_id: optometristaId,
+    motivo_consulta: text(data, "motivo_consulta") || null, antecedentes,
+    agudeza_visual: agudezaVisual, lensometria, queratometria, autorefractor, refraccion, examen_binocular: examenBinocular, biomicroscopia,
+    impresion_diagnostica: impresionDiagnostica || null, receta, plan_manejo: text(data, "plan_manejo") || null, observaciones: text(data, "observaciones") || null,
+  }).eq("id", consultaId);
+  if (error) throw new Error(error.message || "No se pudo actualizar la consulta.");
+  revalidatePath("/pacientes");
+}
+
 export async function buscarPacientesClinicos(query: string): Promise<PatientRecord[]> {
   const { supabase } = await currentClinicalProfile(folderRoles);
   const q = query.trim();

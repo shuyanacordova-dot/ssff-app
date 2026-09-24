@@ -195,7 +195,6 @@ body { font-family: var(--font-body), Arial, sans-serif; background: radial-grad
 
 @media (max-width: 760px) { .clinical-review-print, .clinical-prescription-print { min-width: 720px; padding: 20px; }.clinical-print-letterhead { grid-template-columns: 160px 1fr; }.biom-grid { grid-template-columns: 1fr; }.complementary-exam-row { grid-template-columns: 1fr 36px; }.complementary-exam-row input { grid-column: 1 / -1; grid-row: 2; } }
 @media print {
-  body.is-printing *:not(.print-area):not(.print-area *):not(:has(.print-area)) { display: none !important; }
   body.is-printing .print-only { display: block !important; }
   body.is-printing .print-area { position: fixed !important; inset: 0 auto auto 0 !important; width: 100% !important; }
   body.is-targeted-print .print-area:not(.active-print-area) { display: none !important; visibility: hidden !important; }
