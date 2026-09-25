@@ -156,6 +156,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | L20 | 2026-09-25 | La caja calculaba el día en UTC (lo de después de las 19:00 caía al día siguiente) y el CRM salía vacío porque solo 10 de 3.021 pacientes importados estaban vinculados a su empresa. | Revisar en cada función `::date` sobre timestamptz (usar `at time zone \'America/Guayaquil\'`). Al importar, crear también los vínculos paciente–empresa. |
 | L21 | 2026-09-25 | Codex alcanzó el límite de uso de la cuenta (hasta 28-sep) a mitad de 3 tareas. Claude revisó y terminó el trabajo parcial (faltaba mostrar la apertura de caja y toda la pantalla del CRM). | Revisar siempre el estado real de los archivos cuando una tarea falla; no asumir que quedó completa. |
 | L22 | 2026-09-25 | Un componente de pantalla importó un valor (no solo tipos) desde un archivo de servidor y rompió la compilación de producción; además el comando siguió y publicó el intento. | Constantes compartidas en archivos sin código de servidor (`*-config.ts` / `*-labels.ts`). Publicar solo si `next build` termina con código 0. |
+| L23 | 2026-09-25 | La importación de Optox guardó la hora de los abonos en formato 12 h y sin zona horaria; los de la tarde se corrieron al día anterior. Además, al anular duplicados, algunos abonos quedaron en la copia anulada y la venta que quedó viva no tenía pagos. | Al importar: fecha + hora de 24 h en `America/Guayaquil`, y cuadrar día por día contra el Resumen del día de Optox. Al anular duplicados: mover o recrear los abonos en la venta que queda. |
 
 ---
 
@@ -212,6 +213,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-25 | Pestaña Comunicaciones en la carpeta; tabla de emisores SRI por sucursal; proyectos largos y plan de salida de Optox en el Blueprint. | (este commit) |
 | 2026-09-25 | Sucursal destacada en Laboratorio; 29 controles agendados desde historias; banco de lunas con alerta en la orden de laboratorio. | (este commit) |
 | 2026-09-25 | Personas del convenio (clientes potenciales) y plantillas Excel (banco de lunas, personas de convenio). | (este commit) |
+| 2026-09-25 | Carga de faltantes de Optox 22–24 sep (ventas, abonos, salidas) cuadrada contra las capturas; hallazgo de la hora de abonos importados (L23). | (este commit) |
 
 ---
 
@@ -219,12 +221,12 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 
 1. ✅ **Depuración julio–septiembre 2026 aplicada** (2026-09-24, autorizada por Shuyana): 332 ventas anuladas a su nombre, respaldadas en `depuracion_ventas_duplicadas` (migración `20260925001427`). Julio y agosto idénticos a Optox en las 3 sucursales. Cuentas por cobrar: 110 ventas con saldo, $17,590.
 2. **Historial**: Excel completo de Optox recibido (7,627 ventas desde nov-2022). Enero–junio 2026 y años anteriores **no tienen duplicados** (el sistema tiene igual o menos que Optox). Sacha antes de junio 2026 no es válido (indicación de Shuyana); el sistema no tiene ventas de Sacha antes de julio.
-3. **Pendiente de Shuyana (archivo no llegó en el chat)**: historias y pagos de estos días. Faltan en el sistema: ventas de Optox del 24-sep (Shuvision folio 6802 $200; Focus 6565 $100 y 6566 $70) y un abono de $100 de Adriana Hurtado (Focus 6563).
+3. ✅ **Faltantes de Optox 22–24 sep cargados** (2026-09-25, desde capturas del Resumen del día de las 3 sucursales; migración `20260925150000_optox_faltantes_22_24_sep.sql`): 6 ventas del 24-sep (Shuvision 6802, 6803; Sacha 174, 175; Focus 6565, 6566), 5 abonos del 23-sep que faltaban (2 habían quedado en copias anuladas), abono de $100 de Adriana Hurtado (5652), abono de $55 de Marjury Terán (5197) y 4 salidas del 24-sep. El abono $0 "Retiro sin novedad" de Sacha no se carga (es entrega, no dinero). **Historias clínicas de esos días aún no llegan.**
 4. Inconsistencias: ventas con total $0 pero con pagos (ej. Lady Gómez 13-sep, $180 dos veces); ventas con `pagado` distinto a la suma de sus pagos.
 5. **Resumen del día**: solo muestra abonos de ventas creadas ese día; debe mostrar todos los abonos recibidos ese día.
 6. **Elegir fecha**: permitir registrar revisión, venta, orden, cita y cuadre con fecha anterior (con registro de quién lo hizo), y evitar duplicados por fecha.
 
-7. **Fechas de ventas "del día de la carga"**: en la base de datos las ventas importadas tienen el día correcto (hora 12:00 porque Optox no se importó con hora) y los pagos también. Falta que Shuyana indique en qué pantalla ve la fecha incorrecta (ejemplo: paciente y venta). Opción: corregir la hora con la columna "Hora" de Optox (`optox_ventas_referencia`).
+7. **Hora de los abonos importados (causa encontrada 2026-09-25)**: la importación guardó la hora de cada abono en formato 12 h y con el mes en los minutos (ej. 2:12 pm → `02:09` UTC). 191 abonos de jul–sep 2026 ($11,754.95) con hora 1–4 pm aparecen el **día anterior** en Resumen del día e informes (ej. Shuvision 22-sep muestra $34 en vez de $13). Corrección propuesta: poner esos 191 abonos a las 12:00 de su fecha. **Espera autorización escrita de Shuyana** (cambio masivo).
 8. **Make – Focus separado**: plan Free (2 escenarios activos, 1.000 operaciones/mes). Todos los escenarios (Cumpleaños, Cobros, Control anual, Convenios) envían desde un solo número y leen de Notion. Para separar Focus: registrar el número de Focus en Meta (WhatsApp Cloud API), crear su conexión en Make y filtrar por empresa. Probablemente requiere subir de plan en Make.
 9. **WhatsApp Business de las 3 ópticas dentro de LumOS** (propuesta): conectar cada número a la API oficial de WhatsApp (Meta Cloud API, con "coexistencia" para seguir usando la app en el celular), bandeja de mensajes en LumOS ligada a la carpeta del paciente (pestaña Comunicaciones), asistente con IA que sugiere o envía respuestas a preguntas frecuentes (horarios, estado de la orden, saldo) y siempre pide confirmación en lo sensible. Make queda solo para campañas.
 
