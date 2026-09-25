@@ -21,6 +21,8 @@ const frecuenciaLabel: Record<string, string> = { semanal: "Semanal", quincenal:
 const categorias: { id: CategoriaDeuda; label: string; ayuda: string }[] = [
   { id: "urgentes", label: "Urgentes", ayuda: `Deudas de más de 3 meses (${DIAS_URGENTE} días), de la más antigua a la más reciente.` },
   { id: "recientes", label: "Ventas recientes", ayuda: `Saldos de ventas de hasta 3 meses (${DIAS_URGENTE} días), de la venta más nueva a la más antigua.` },
+  { id: "semanales", label: "Cobros semanales", ayuda: "Pacientes con frecuencia de cobro semanal." },
+  { id: "quincenales", label: "Cobros quincenales", ayuda: "Pacientes con frecuencia de cobro quincenal." },
   { id: "mensuales", label: "Cobros mensuales", ayuda: "Pacientes con frecuencia de cobro mensual." },
   { id: "convenio", label: "Convenios", ayuda: "Deudas con acuerdo de pago con una empresa (descuento a rol)." },
   { id: "apartados", label: "Apartados", ayuda: `Productos separados con abono: se entregan solo cuando el paciente paga todo. Plazo de ${DIAS_APARTADO} días desde la venta; si vence, decide si extender o liberar (anular la venta devuelve el producto al stock).` },
@@ -132,7 +134,7 @@ function DeudaCard({ deuda, pending, onCanje, onApartado, mostrarCategoria, onCl
   useEffect(() => { if (!menuOpen) return; const onClick = (event: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(event.target as Node)) closeMenu(); }; document.addEventListener("mousedown", onClick); return () => document.removeEventListener("mousedown", onClick); }, [menuOpen]);
 
   return <article className="task-card"><div className="task-status" /><div className="task-main">
-    <div className="task-meta"><span className={deuda.dias_mas_antigua > DIAS_URGENTE ? "urgente" : ""}>{deuda.dias_mas_antigua === 0 ? "Hoy" : deuda.dias_mas_antigua === 1 ? "Ayer" : `${deuda.dias_mas_antigua} días`}</span>{mostrarCategoria && <span>{categoriaLabel(deuda.categoria)}{deuda.categoria_manual ? " (manual)" : ""}</span>}{deuda.convenio && <span>Convenio {deuda.convenio.empresa} · {deuda.convenio.cuotas} cuotas de {money(deuda.convenio.monto_cuota)}</span>}{apartado && <span className={apartado.vencido ? "urgente" : ""}><Tag size={11} /> {apartado.texto}</span>}<span>{deuda.telefono || "Sin WhatsApp registrado"}</span>{deuda.cobro_insistente && <span className="urgente"><AlertTriangle size={11} /> Cobro insistente</span>}</div>
+    <div className="task-meta"><span className="branch-meta" style={{ fontSize: 13 }}>{deuda.sucursales.join(" · ")}</span><span className={deuda.dias_mas_antigua > DIAS_URGENTE ? "urgente" : ""}>{deuda.dias_mas_antigua === 0 ? "Hoy" : deuda.dias_mas_antigua === 1 ? "Ayer" : `${deuda.dias_mas_antigua} días`}</span>{mostrarCategoria && <span>{categoriaLabel(deuda.categoria)}{deuda.categoria_manual ? " (manual)" : ""}</span>}{deuda.convenio && <span>Convenio {deuda.convenio.empresa} · {deuda.convenio.cuotas} cuotas de {money(deuda.convenio.monto_cuota)}</span>}{apartado && <span className={apartado.vencido ? "urgente" : ""}><Tag size={11} /> {apartado.texto}</span>}{deuda.cobro_insistente && <span className="urgente"><AlertTriangle size={11} /> Cobro insistente</span>}</div>
     <h2>{nombre}</h2>
     <p>Saldo pendiente: <strong>{money(deuda.saldo_total)}</strong></p>
     <div className="collection-controls">
@@ -184,7 +186,7 @@ function RezagadoCard({ lente, pending, onEntregado }: { lente: LenteRezagado; p
   const mensaje = construirMensajeContacto("listo_retiro", { nombre: lente.paciente_nombre.split(" ")[0] ?? lente.paciente_nombre, empresa: lente.sucursal_nombre, saldo: lente.saldo, ticketUrl: null, fechaCompra: null });
   const wa = enlaceWhatsapp(lente.telefono, mensaje);
   return <article className="task-card"><div className="task-status" /><div className="task-main">
-    <div className="task-meta"><span className="urgente">Listo hace {lente.dias_listo} días</span><span>{lente.sucursal_nombre}</span><span>{(laboratorioLabels as Record<string, string>)[lente.laboratorio] ?? lente.laboratorio}</span><span>{lente.telefono || "Sin WhatsApp registrado"}</span></div>
+    <div className="task-meta"><span className="branch-meta" style={{ fontSize: 13 }}>{lente.sucursal_nombre}</span><span className="urgente">Listo hace {lente.dias_listo} días</span><span>{(laboratorioLabels as Record<string, string>)[lente.laboratorio] ?? lente.laboratorio}</span></div>
     <h2>{lente.paciente_nombre}</h2>
     <p>{lente.saldo > 0 ? <>Saldo pendiente: <strong>{money(lente.saldo)}</strong></> : "Sin saldo pendiente"}</p>
   </div><div className="task-actions">
