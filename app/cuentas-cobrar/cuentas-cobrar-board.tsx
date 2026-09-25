@@ -106,10 +106,10 @@ function DeudaCard({ deuda, pending, mostrarCategoria, onClasificar, onFrecuenci
     </section></div>}
   </div><div className="task-actions">
     {wa ? <button className="new-consultation" type="button" onClick={() => setVerMensaje(true)}><MessageCircle size={14} /> Ver mensaje</button> : <span style={{ color: "#a24150", fontSize: 12, fontWeight: 700 }}>Sin WhatsApp registrado</span>}
+    <Link className="outline-action" href={`/pacientes?paciente=${deuda.paciente_id}${deuda.ventas.length === 1 ? `&venta=${deuda.ventas[0].id}` : ""}`}><Wallet size={14} /> Añadir pago</Link>
     <div className="menu-wrap" ref={menuRef}>
       <button className="outline-action" type="button" onClick={() => setMenuOpen((v) => !v)}><MoreVertical size={14} /> Más opciones</button>
       {menuOpen && <div className="menu-dropdown">
-        {deuda.ventas.map((venta) => <Link key={venta.id} href={`/pacientes?paciente=${deuda.paciente_id}&venta=${venta.id}`} onClick={closeMenu}><Wallet size={14} /> Añadir pago{deuda.ventas.length > 1 ? ` · ${formatDate(venta.creado_en)} (${money(venta.saldo)})` : ""}</Link>)}
         <button type="button" onClick={() => { onConvenio(); closeMenu(); }}><FileText size={14} /> Convenio de pago</button>
         <button type="button" className={deuda.cobro_insistente ? "danger" : ""} onClick={() => { onCobroInsistente(!deuda.cobro_insistente); closeMenu(); }}><AlertTriangle size={14} /> {deuda.cobro_insistente ? "Quitar cobro insistente" : "Activar cobro insistente"}</button>
       </div>}
