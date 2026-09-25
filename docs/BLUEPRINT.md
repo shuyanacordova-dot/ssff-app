@@ -217,6 +217,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-25 | Carga de faltantes de Optox 22–24 sep (ventas, abonos, salidas) cuadrada contra las capturas; hallazgo de la hora de abonos importados (L23). | (este commit) |
 | 2026-09-25 | Corrección de la hora de 172 abonos importados (aparecían el día anterior), con respaldo. | (este commit) |
 | 2026-09-25 | Cuadre de caja: botón claro "Anotar valores y cerrar caja", abre en la sucursal elegida, montos aceptan coma o punto, apertura ya no se repite dentro del cierre. | (este commit) |
+| 2026-09-25 | Menú de arriba: "Resumen del día" reemplaza a "Laboratorio" (Laboratorio sigue en el menú completo). | (este commit) |
 
 ---
 

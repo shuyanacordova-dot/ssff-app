@@ -32,12 +32,13 @@ const primaryItems: NavItem[] = [
   { href: "/", label: "Inicio", detail: "Panel principal", icon: Home, group: "Operación" },
   { href: "/pacientes", label: "Pacientes", detail: "Historias y revisiones", icon: Users, group: "Operación" },
   { href: "/ventas", label: "Ventas", detail: "Cobros y pedidos", icon: Banknote, group: "Operación" },
-  { href: "/laboratorio", label: "Laboratorio", detail: "Órdenes y entregas", icon: FlaskConical, group: "Operación" },
+  { href: "/resumen-dia", label: "Resumen del día", detail: "Cierre operativo", icon: Landmark, group: "Finanzas" },
   { href: "/agenda", label: "Agenda", detail: "Citas del equipo", icon: CalendarDays, group: "Operación" },
 ];
 
 const menuItems: NavItem[] = [
   ...primaryItems,
+  { href: "/laboratorio", label: "Laboratorio", detail: "Órdenes y entregas", icon: FlaskConical, group: "Operación" },
   { href: "/inventario", label: "Inventario", detail: "Monturas, lunas y stock", icon: Package, group: "Operación" },
   { href: "/crm", label: "CRM", detail: "A quién contactar hoy", icon: HeartHandshake, group: "Operación" },
   { href: "/tareas", label: "Tareas", detail: "Seguimiento del equipo", icon: ClipboardList, group: "Operación" },
@@ -45,7 +46,6 @@ const menuItems: NavItem[] = [
   { href: "/cuentas-cobrar", label: "Cuentas por cobrar", detail: "Saldos y convenios de pago", icon: Wallet, group: "Finanzas" },
   { href: "/facturacion", label: "Facturación", detail: "Borradores vinculados a ventas", icon: FileText, group: "Finanzas" },
   { href: "/convenios", label: "Convenios", detail: "Empresas aliadas", icon: Building2, group: "Finanzas" },
-  { href: "/resumen-dia", label: "Resumen del día", detail: "Cierre operativo", icon: Landmark, group: "Finanzas" },
   { href: "/informes", label: "Informes y metas", detail: "Resultados por sucursal", icon: BarChart3, group: "Finanzas" },
   { href: "/asistente", label: "Asistente Shu", detail: "Plantillas y ayuda administrativa", icon: Sparkles, group: "Administración" },
   { href: "/equipo", label: "Equipo y accesos", detail: "Usuarios, roles y contraseñas", icon: Users, group: "Administración" },
