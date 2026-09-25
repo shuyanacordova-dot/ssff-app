@@ -223,6 +223,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-25 | Cuentas por cobrar: pestaña "Todas", clasificación manual por tarjeta (Automática / Urgentes / Recientes / Mensuales / Convenios, guardada en `pacientes_clinicos.categoria_cobro`), "Ventas recientes" = hasta 3 meses (90 días). Migración `20260925180000_clasificar_deuda_manual.sql`. | (este commit) |
 | 2026-09-25 | Cuentas por cobrar: "Añadir pago" ahora es un solo botón visible que abre la carpeta del paciente en Ventas (si debe una sola venta, con el abono abierto). Se quitaron del menú las opciones por venta con fecha y valor. | (este commit) |
 | 2026-09-25 | Anulación de 34 ventas "Migración OPTOX" duplicadas y recuperación de 5 abonos ($540), con respaldo. | (este commit) |
+| 2026-09-25 | Canje en cuentas por cobrar (solo Superadministradora): botón "Canje" baja el saldo sin contar como abono, caja, ingreso ni venta; queda en `canjes_venta` con monto, motivo, quién y cuándo. `validar_transicion_venta` acepta esa única excepción. Migración `20260925200000_canje_cuentas_cobrar.sql`. Probado: superadmin sí, vendedora no; abonos posteriores siguen funcionando. | (este commit) |
 
 ---
 

@@ -3,14 +3,14 @@ import { paymentMethodLabels } from "@/lib/payment-methods";
 import { printDocumentById } from "@/lib/print-document";
 
 import Link from "next/link";
-import { AlertTriangle, CircleAlert, Copy, FileText, MessageCircle, MoreVertical, Printer, Wallet, X } from "lucide-react";
+import { AlertTriangle, CircleAlert, Copy, FileText, MessageCircle, MoreVertical, Printer, Repeat, Wallet, X } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { CategoriaDeuda, CuentasCobrarData, DeudaPaciente, EmpresaConvenio } from "@/lib/cuentas-cobrar";
 import { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
 import { construirMensajeContacto, plantillasContacto, type PlantillaContactoId } from "@/lib/mensajes";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import { crearAcuerdoPago, crearEmpresaConvenio, type AcuerdoPago } from "@/app/ventas/convenio-actions";
-import { activarCobroInsistente, actualizarFrecuenciaCobro, clasificarDeuda } from "./actions";
+import { activarCobroInsistente, actualizarFrecuenciaCobro, clasificarDeuda, registrarCanje } from "./actions";
 import Letterhead from "../print-letterhead";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
@@ -33,6 +33,8 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
   const [notice, setNotice] = useState(props.message ?? "");
   const [pending, startTransition] = useTransition();
   const [convenioDeuda, setConvenioDeuda] = useState<DeudaPaciente | null>(null);
+  const [canjeDeuda, setCanjeDeuda] = useState<DeudaPaciente | null>(null);
+  const esSuperadmin = props.profile?.rol === "superadmin";
   const [tab, setTab] = useState<Pestana>("urgentes");
 
   if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN COMERCIAL</p><h1>Cuentas por cobrar</h1><p className="subtitle">{props.message ?? "No se pudo abrir cuentas por cobrar."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/cuentas-cobrar">Iniciar sesión</Link>}</header></div></main>;
@@ -62,13 +64,14 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
     <section className="glass agenda-board">
       <div className="tabs" role="tablist" style={{ flexWrap: "wrap", marginBottom: 10 }}><button role="tab" type="button" className={tab === "todas" ? "active" : ""} onClick={() => setTab("todas")}>Todas ({props.deudas.length} · {money(totalDeuda)})</button>{categorias.map((c) => { const lista = props.deudas.filter((d) => d.categoria === c.id); return <button key={c.id} role="tab" type="button" className={tab === c.id ? "active" : ""} onClick={() => setTab(c.id)}>{c.label} ({lista.length} · {money(lista.reduce((sum, d) => sum + d.saldo_total, 0))})</button>; })}</div>
       <p className="field-hint">{tab === "todas" ? "Todas las deudas, de la más antigua a la más reciente. Usa \"Clasificación\" en cada tarjeta para moverla a otra pestaña." : categorias.find((c) => c.id === tab)?.ayuda}</p>
-      {visibles.length ? <div className="task-list">{visibles.map((deuda) => <DeudaCard key={deuda.paciente_id} deuda={deuda} pending={pending} mostrarCategoria={tab === "todas"} onClasificar={(c) => cambiarClasificacion(deuda.paciente_id, c)} onFrecuencia={(f) => cambiarFrecuencia(deuda.paciente_id, f)} onCobroInsistente={(activo) => cambiarCobroInsistente(deuda.paciente_id, activo)} onConvenio={() => setConvenioDeuda(deuda)} />)}</div> : <section className="empty-state"><Wallet size={27} /><h3>No hay saldos en esta pestaña</h3><p>Cuando una venta quede con saldo aparecerá en la pestaña que le corresponda.</p></section>}
+      {visibles.length ? <div className="task-list">{visibles.map((deuda) => <DeudaCard key={deuda.paciente_id} deuda={deuda} pending={pending} onCanje={esSuperadmin ? () => setCanjeDeuda(deuda) : undefined} mostrarCategoria={tab === "todas"} onClasificar={(c) => cambiarClasificacion(deuda.paciente_id, c)} onFrecuencia={(f) => cambiarFrecuencia(deuda.paciente_id, f)} onCobroInsistente={(activo) => cambiarCobroInsistente(deuda.paciente_id, activo)} onConvenio={() => setConvenioDeuda(deuda)} />)}</div> : <section className="empty-state"><Wallet size={27} /><h3>No hay saldos en esta pestaña</h3><p>Cuando una venta quede con saldo aparecerá en la pestaña que le corresponda.</p></section>}
     </section>
+    {canjeDeuda && <CanjeModal deuda={canjeDeuda} onClose={() => setCanjeDeuda(null)} onNotice={setNotice} />}
     {convenioDeuda && <ConvenioModal deuda={convenioDeuda} empresasConvenio={props.empresasConvenio} onClose={() => setConvenioDeuda(null)} onNotice={setNotice} />}
   </div></main>;
 }
 
-function DeudaCard({ deuda, pending, mostrarCategoria, onClasificar, onFrecuencia, onCobroInsistente, onConvenio }: { deuda: DeudaPaciente; pending: boolean; mostrarCategoria: boolean; onClasificar: (categoria: string) => void; onFrecuencia: (frecuencia: string) => void; onCobroInsistente: (activo: boolean) => void; onConvenio: () => void }) {
+function DeudaCard({ deuda, pending, onCanje, mostrarCategoria, onClasificar, onFrecuencia, onCobroInsistente, onConvenio }: { deuda: DeudaPaciente; pending: boolean; onCanje?: () => void; mostrarCategoria: boolean; onClasificar: (categoria: string) => void; onFrecuencia: (frecuencia: string) => void; onCobroInsistente: (activo: boolean) => void; onConvenio: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [origin, setOrigin] = useState("");
   const [plantilla, setPlantilla] = useState<PlantillaContactoId>(deuda.frecuencia_cobro === "mensual" ? "cobro_mensual" : "cobro_insistente");
@@ -107,6 +110,7 @@ function DeudaCard({ deuda, pending, mostrarCategoria, onClasificar, onFrecuenci
   </div><div className="task-actions">
     {wa ? <button className="new-consultation" type="button" onClick={() => setVerMensaje(true)}><MessageCircle size={14} /> Ver mensaje</button> : <span style={{ color: "#a24150", fontSize: 12, fontWeight: 700 }}>Sin WhatsApp registrado</span>}
     <Link className="outline-action" href={`/pacientes?paciente=${deuda.paciente_id}${deuda.ventas.length === 1 ? `&venta=${deuda.ventas[0].id}` : ""}`}><Wallet size={14} /> Añadir pago</Link>
+    {onCanje && <button className="outline-action" type="button" onClick={onCanje} title="Solo Superadministradora: baja el saldo sin contar como abono ni venta"><Repeat size={14} /> Canje</button>}
     <div className="menu-wrap" ref={menuRef}>
       <button className="outline-action" type="button" onClick={() => setMenuOpen((v) => !v)}><MoreVertical size={14} /> Más opciones</button>
       {menuOpen && <div className="menu-dropdown">
@@ -115,6 +119,35 @@ function DeudaCard({ deuda, pending, mostrarCategoria, onClasificar, onFrecuenci
       </div>}
     </div>
   </div></article>;
+}
+
+function CanjeModal({ deuda, onClose, onNotice }: { deuda: DeudaPaciente; onClose: () => void; onNotice: (message: string) => void }) {
+  const [pending, start] = useTransition();
+  const [ventaId, setVentaId] = useState(deuda.ventas[0]?.id ?? "");
+  const venta = deuda.ventas.find((v) => v.id === ventaId);
+  const [monto, setMonto] = useState(venta ? venta.saldo.toFixed(2) : "");
+  const [motivo, setMotivo] = useState("");
+  const [error, setError] = useState("");
+  const valor = Number(monto.replace(",", "."));
+  const valido = !!venta && Number.isFinite(valor) && valor > 0 && valor <= venta.saldo + 0.001 && motivo.trim().length >= 3;
+  const guardar = () => start(async () => {
+    setError("");
+    try { await registrarCanje(ventaId, monto, motivo); onNotice(`Canje de ${money(valor)} registrado para ${deuda.nombres} ${deuda.apellidos}. No cuenta como abono ni venta.`); onClose(); }
+    catch (err) { setError(err instanceof Error ? err.message : "No se pudo registrar el canje."); }
+  });
+  return <div className="modal-backdrop" onClick={onClose}><section className="new-patient-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+    <button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>
+    <p className="section-label">CANJE · SOLO SUPERADMINISTRADORA</p><h2>{deuda.nombres} {deuda.apellidos}</h2>
+    <p>El canje baja el saldo de la deuda, pero <strong>no se suma a abonos, caja, ingresos ni ventas</strong>. Queda registrado con tu nombre, la fecha y el motivo.</p>
+    <div className="new-patient-form">
+      {deuda.ventas.length > 1 && <label>Venta<select value={ventaId} onChange={(event) => { setVentaId(event.target.value); const v = deuda.ventas.find((x) => x.id === event.target.value); setMonto(v ? v.saldo.toFixed(2) : ""); }}>{deuda.ventas.map((v) => <option key={v.id} value={v.id}>{v.folio ? `Folio ${v.folio} · ` : ""}{formatDate(v.creado_en)} · saldo {money(v.saldo)}</option>)}</select></label>}
+      <label>Monto del canje{venta ? ` (saldo ${money(venta.saldo)})` : ""}<input type="text" inputMode="decimal" autoComplete="off" value={monto} onChange={(event) => setMonto(event.target.value.replace(/,/g, ".").replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1"))} /></label>
+      <label className="task-description" style={{ gridColumn: "1 / -1" }}>Motivo<textarea value={motivo} onChange={(event) => setMotivo(event.target.value)} placeholder="Ej.: canje por servicio, ajuste de cuenta con Optox" /></label>
+    </div>
+    {venta && Number.isFinite(valor) && valor > venta.saldo + 0.001 && <p className="notice">El canje no puede superar el saldo de esta venta.</p>}
+    {error && <p className="notice" role="alert">{error}</p>}
+    <div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" type="button" disabled={!valido || pending} onClick={guardar}>{pending ? "Guardando…" : "Registrar canje"}</button></div>
+  </section></div>;
 }
 
 function ConvenioModal({ deuda, empresasConvenio, onClose, onNotice }: { deuda: DeudaPaciente; empresasConvenio: EmpresaConvenio[]; onClose: () => void; onNotice: (message: string) => void }) {

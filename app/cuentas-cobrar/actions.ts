@@ -19,6 +19,17 @@ export async function clasificarDeuda(pacienteId: string, categoria: string) {
   revalidatePath("/cuentas-cobrar");
 }
 
+export async function registrarCanje(ventaId: string, monto: string, motivo: string) {
+  const supabase = await createSupabaseServerClient();
+  const valor = Number(String(monto).replace(",", "."));
+  if (!ventaId) throw new Error("Elige la venta.");
+  if (!Number.isFinite(valor) || valor <= 0) throw new Error("Indica un monto válido para el canje.");
+  if (!motivo.trim()) throw new Error("Escribe el motivo del canje.");
+  const { error } = await supabase.rpc("registrar_canje_venta", { p_venta: ventaId, p_monto: valor, p_motivo: motivo.trim() });
+  if (error) throw new Error(error.message || "No se pudo registrar el canje.");
+  revalidatePath("/cuentas-cobrar"); revalidatePath("/pacientes"); revalidatePath("/ventas");
+}
+
 export async function activarCobroInsistente(pacienteId: string, activo: boolean) {
   const supabase = await createSupabaseServerClient();
   if (!pacienteId) throw new Error("Falta identificar al paciente.");
