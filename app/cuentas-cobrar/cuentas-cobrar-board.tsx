@@ -24,9 +24,9 @@ const categorias: { id: CategoriaDeuda; label: string; ayuda: string }[] = [
   { id: "mensuales", label: "Cobros mensuales", ayuda: "Pacientes con frecuencia de cobro mensual." },
   { id: "convenio", label: "Convenios", ayuda: "Deudas con acuerdo de pago con una empresa (descuento a rol)." },
   { id: "apartados", label: "Apartados", ayuda: `Productos separados con abono: se entregan solo cuando el paciente paga todo. Plazo de ${DIAS_APARTADO} días desde la venta; si vence, decide si extender o liberar (anular la venta devuelve el producto al stock).` },
+  { id: "rezagados", label: "Lentes rezagados", ayuda: `Lentes listos que el paciente no retira: deudas que moviste aquí y órdenes de laboratorio listas o notificadas hace ${DIAS_REZAGO} días o más (tengan saldo o no).` },
 ];
-const categoriasManuales = categorias.filter((c) => c.id !== "apartados");
-type Pestana = CategoriaDeuda | "todas" | "rezagados";
+type Pestana = CategoriaDeuda | "todas";
 const categoriaLabel = (id: CategoriaDeuda) => categorias.find((c) => c.id === id)?.label ?? id;
 const hoyEcuador = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Guayaquil", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const apartadoInfo = (deuda: DeudaPaciente) => {
@@ -58,10 +58,25 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
     try { await actualizarFrecuenciaCobro(pacienteId, frecuencia); setNotice("Frecuencia de cobro actualizada."); }
     catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo actualizar la frecuencia."); }
   });
-  const cambiarClasificacion = (pacienteId: string, categoria: string) => startTransition(async () => {
-    try { await clasificarDeuda(pacienteId, categoria); setNotice(categoria ? `Deuda movida a "${categoriaLabel(categoria as CategoriaDeuda)}".` : "La deuda vuelve a clasificarse automáticamente."); }
-    catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo cambiar la clasificación."); }
-  });
+  const cambiarClasificacion = (deuda: DeudaPaciente, categoria: string) => {
+    const esApartado = !!apartadoInfo(deuda);
+    if (categoria === "apartados") {
+      if (esApartado) return;
+      if (deuda.ventas.length > 1) { setApartadoDeuda(deuda); return; }
+      startTransition(async () => {
+        try { await marcarApartado(deuda.ventas[0].id, true); setNotice(`${deuda.nombres} ${deuda.apellidos}: venta marcada como apartado (${DIAS_APARTADO} días).`); }
+        catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo marcar el apartado."); }
+      });
+      return;
+    }
+    startTransition(async () => {
+      try {
+        if (esApartado) for (const venta of deuda.ventas.filter((v) => v.apartado)) await marcarApartado(venta.id, false);
+        await clasificarDeuda(deuda.paciente_id, categoria);
+        setNotice(categoria ? `Deuda movida a "${categoriaLabel(categoria as CategoriaDeuda)}".` : "La deuda vuelve a clasificarse automáticamente.");
+      } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo cambiar la clasificación."); }
+    });
+  };
   const quitarApartado = (deuda: DeudaPaciente) => startTransition(async () => {
     try { for (const venta of deuda.ventas.filter((v) => v.apartado)) await marcarApartado(venta.id, false); setNotice(`${deuda.nombres} ${deuda.apellidos} ya no está como apartado.`); }
     catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo quitar el apartado."); }
@@ -70,7 +85,7 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
     try { await cambiarEstadoOrdenLaboratorio(lente.orden_id, "entregado"); setNotice(`Lentes de ${lente.paciente_nombre} marcados como entregados.`); }
     catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo marcar como entregado."); }
   });
-  const rezagados = props.rezagados.filter((r) => r.dias_listo >= DIAS_REZAGO);
+  const rezagadosLab = props.rezagados.filter((r) => r.dias_listo >= DIAS_REZAGO);
   const cambiarCobroInsistente = (pacienteId: string, activo: boolean) => startTransition(async () => {
     try { await activarCobroInsistente(pacienteId, activo); setNotice(activo ? "Cobro insistente marcado. La automatización con Make sigue pendiente; todavía no se enviaron mensajes." : "Cobro insistente desactivado."); }
     catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo actualizar el cobro insistente."); }
@@ -83,9 +98,10 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
     <div className="make-status"><AlertTriangle size={18} /><span><strong>Automatización diaria con Make:</strong> {props.makeConfigured ? "el enlace técnico está configurado, pero el envío de datos permanece pausado hasta tu autorización final." : "pendiente de conectar. Los mensajes manuales por WhatsApp ya se pueden usar y revisar."}</span></div>
 
     <section className="glass agenda-board">
-      <div className="tabs" role="tablist" style={{ flexWrap: "wrap", marginBottom: 10 }}><button role="tab" type="button" className={tab === "todas" ? "active" : ""} onClick={() => setTab("todas")}>Todas ({props.deudas.length} · {money(totalDeuda)})</button>{categorias.map((c) => { const lista = props.deudas.filter((d) => d.categoria === c.id); return <button key={c.id} role="tab" type="button" className={tab === c.id ? "active" : ""} onClick={() => setTab(c.id)}>{c.label} ({lista.length} · {money(lista.reduce((sum, d) => sum + d.saldo_total, 0))})</button>; })}<button role="tab" type="button" className={tab === "rezagados" ? "active" : ""} onClick={() => setTab("rezagados")}>Lentes rezagados ({rezagados.length})</button></div>
-      <p className="field-hint">{tab === "todas" ? "Todas las deudas, de la más antigua a la más reciente. Usa \"Clasificación\" en cada tarjeta para moverla a otra pestaña." : tab === "rezagados" ? `Lentes que llegaron del laboratorio (listos o ya notificados) y no se retiran desde hace ${DIAS_REZAGO} días o más, tengan saldo o no. Del más antiguo al más reciente.` : categorias.find((c) => c.id === tab)?.ayuda}</p>
-      {tab === "rezagados" ? (rezagados.length ? <div className="task-list">{rezagados.map((lente) => <RezagadoCard key={lente.orden_id} lente={lente} pending={pending} onEntregado={() => entregarLente(lente)} />)}</div> : <section className="empty-state"><FlaskConical size={27} /><h3>No hay lentes rezagados</h3><p>{`Cuando una orden lleve ${DIAS_REZAGO} días lista sin retirarse aparecerá aquí.`}</p></section>) : visibles.length ? <div className="task-list">{visibles.map((deuda) => <DeudaCard key={deuda.paciente_id} deuda={deuda} pending={pending} onCanje={esSuperadmin ? () => setCanjeDeuda(deuda) : undefined} mostrarCategoria={tab === "todas"} onClasificar={(c) => cambiarClasificacion(deuda.paciente_id, c)} onFrecuencia={(f) => cambiarFrecuencia(deuda.paciente_id, f)} onCobroInsistente={(activo) => cambiarCobroInsistente(deuda.paciente_id, activo)} onConvenio={() => setConvenioDeuda(deuda)} onApartado={() => apartadoInfo(deuda) ? quitarApartado(deuda) : setApartadoDeuda(deuda)} />)}</div> : <section className="empty-state"><Wallet size={27} /><h3>No hay saldos en esta pestaña</h3><p>Cuando una venta quede con saldo aparecerá en la pestaña que le corresponda.</p></section>}
+      <div className="tabs" role="tablist" style={{ flexWrap: "wrap", marginBottom: 10 }}><button role="tab" type="button" className={tab === "todas" ? "active" : ""} onClick={() => setTab("todas")}>Todas ({props.deudas.length} · {money(totalDeuda)})</button>{categorias.map((c) => { const lista = props.deudas.filter((d) => d.categoria === c.id); const extra = c.id === "rezagados" ? rezagadosLab.length : 0; return <button key={c.id} role="tab" type="button" className={tab === c.id ? "active" : ""} onClick={() => setTab(c.id)}>{c.label} ({lista.length + extra} · {money(lista.reduce((sum, d) => sum + d.saldo_total, 0))})</button>; })}</div>
+      <p className="field-hint">{tab === "todas" ? "Todas las deudas, de la más antigua a la más reciente. Usa \"Clasificación\" en cada tarjeta para moverla a otra pestaña." : categorias.find((c) => c.id === tab)?.ayuda}</p>
+      {tab === "rezagados" && rezagadosLab.length > 0 && <div className="task-list" style={{ marginBottom: 12 }}>{rezagadosLab.map((lente) => <RezagadoCard key={lente.orden_id} lente={lente} pending={pending} onEntregado={() => entregarLente(lente)} />)}</div>}
+      {tab === "rezagados" && !visibles.length && !rezagadosLab.length ? <section className="empty-state"><FlaskConical size={27} /><h3>No hay lentes rezagados</h3><p>{`Mueve aquí una deuda con "Clasificación", o espera a que una orden lleve ${DIAS_REZAGO} días lista sin retirarse.`}</p></section> : visibles.length ? <div className="task-list">{visibles.map((deuda) => <DeudaCard key={deuda.paciente_id} deuda={deuda} pending={pending} onCanje={esSuperadmin ? () => setCanjeDeuda(deuda) : undefined} mostrarCategoria={tab === "todas"} onClasificar={(c) => cambiarClasificacion(deuda, c)} onFrecuencia={(f) => cambiarFrecuencia(deuda.paciente_id, f)} onCobroInsistente={(activo) => cambiarCobroInsistente(deuda.paciente_id, activo)} onConvenio={() => setConvenioDeuda(deuda)} onApartado={() => apartadoInfo(deuda) ? quitarApartado(deuda) : setApartadoDeuda(deuda)} />)}</div> : <section className="empty-state"><Wallet size={27} /><h3>No hay saldos en esta pestaña</h3><p>Cuando una venta quede con saldo aparecerá en la pestaña que le corresponda.</p></section>}
     </section>
     {apartadoDeuda && <ApartadoModal deuda={apartadoDeuda} onClose={() => setApartadoDeuda(null)} onNotice={setNotice} />}
     {canjeDeuda && <CanjeModal deuda={canjeDeuda} onClose={() => setCanjeDeuda(null)} onNotice={setNotice} />}
@@ -96,7 +112,7 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
 function DeudaCard({ deuda, pending, onCanje, onApartado, mostrarCategoria, onClasificar, onFrecuencia, onCobroInsistente, onConvenio }: { deuda: DeudaPaciente; pending: boolean; onCanje?: () => void; onApartado: () => void; mostrarCategoria: boolean; onClasificar: (categoria: string) => void; onFrecuencia: (frecuencia: string) => void; onCobroInsistente: (activo: boolean) => void; onConvenio: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [origin, setOrigin] = useState("");
-  const [plantilla, setPlantilla] = useState<PlantillaContactoId>(deuda.frecuencia_cobro === "mensual" ? "cobro_mensual" : "cobro_insistente");
+  const [plantilla, setPlantilla] = useState<PlantillaContactoId>(deuda.categoria === "rezagados" ? "listo_retiro" : deuda.frecuencia_cobro === "mensual" ? "cobro_mensual" : "cobro_insistente");
   const [copied, setCopied] = useState(false);
   const [verMensaje, setVerMensaje] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -120,7 +136,7 @@ function DeudaCard({ deuda, pending, onCanje, onApartado, mostrarCategoria, onCl
     <h2>{nombre}</h2>
     <p>Saldo pendiente: <strong>{money(deuda.saldo_total)}</strong></p>
     <div className="collection-controls">
-      <label>Clasificación<select key={deuda.categoria_manual ?? "auto"} defaultValue={deuda.categoria_manual ?? ""} disabled={pending || !!apartado} title={apartado ? "Los apartados se quedan en su pestaña hasta que se pagan o se quita el apartado." : undefined} onChange={(event) => onClasificar(event.target.value)}><option value="">Automática ({categoriaLabel(deuda.categoria_auto)})</option>{categoriasManuales.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
+      <label>Clasificación<select value={apartado ? "apartados" : deuda.categoria_manual ?? ""} disabled={pending} onChange={(event) => onClasificar(event.target.value)}><option value="">{deuda.categoria_auto === "apartados" ? "Automática" : `Automática (${categoriaLabel(deuda.categoria_auto)})`}</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
       <label>Frecuencia de cobro<select defaultValue={deuda.frecuencia_cobro ?? ""} disabled={pending} onChange={(event) => onFrecuencia(event.target.value)}><option value="">Sin definir</option>{Object.entries(frecuenciaLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
     </div>
     {verMensaje && <div className="modal-backdrop" onClick={() => setVerMensaje(false)}><section className="new-patient-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>

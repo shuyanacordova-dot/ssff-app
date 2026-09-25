@@ -4,7 +4,7 @@ import { diasCalendarioGuayaquil } from "@/lib/record-date";
 
 export type DeudaVenta = { id: string; total: number; pagado: number; saldo: number; creado_en: string; fecha_entrega_estimada: string | null; recibo_token: string; folio: number | null; apartado: boolean; apartado_hasta: string | null };
 export type ConvenioDeuda = { empresa: string; cuotas: number; monto_cuota: number; fecha_primera_cuota: string | null };
-export type CategoriaDeuda = "urgentes" | "recientes" | "mensuales" | "convenio" | "apartados";
+export type CategoriaDeuda = "urgentes" | "recientes" | "mensuales" | "convenio" | "apartados" | "rezagados";
 export type DeudaPaciente = { paciente_id: string; nombres: string; apellidos: string; telefono: string | null; frecuencia_cobro: string | null; cobro_insistente: boolean; empresa_nombre: string; saldo_total: number; ventas: DeudaVenta[]; convenio: ConvenioDeuda | null; dias_mas_antigua: number; categoria: CategoriaDeuda; categoria_auto: CategoriaDeuda; categoria_manual: CategoriaDeuda | null };
 
 export { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
