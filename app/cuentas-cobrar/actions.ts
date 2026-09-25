@@ -30,6 +30,14 @@ export async function registrarCanje(ventaId: string, monto: string, motivo: str
   revalidatePath("/cuentas-cobrar"); revalidatePath("/pacientes"); revalidatePath("/ventas");
 }
 
+export async function marcarApartado(ventaId: string, activo: boolean) {
+  const supabase = await createSupabaseServerClient();
+  if (!ventaId) throw new Error("Elige la venta.");
+  const { error } = await supabase.rpc("marcar_apartado_venta", { p_venta: ventaId, p_activo: activo });
+  if (error) throw new Error(error.message || "No se pudo actualizar el apartado.");
+  revalidatePath("/cuentas-cobrar"); revalidatePath("/pacientes"); revalidatePath("/ventas");
+}
+
 export async function activarCobroInsistente(pacienteId: string, activo: boolean) {
   const supabase = await createSupabaseServerClient();
   if (!pacienteId) throw new Error("Falta identificar al paciente.");

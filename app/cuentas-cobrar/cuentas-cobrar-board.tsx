@@ -3,14 +3,16 @@ import { paymentMethodLabels } from "@/lib/payment-methods";
 import { printDocumentById } from "@/lib/print-document";
 
 import Link from "next/link";
-import { AlertTriangle, CircleAlert, Copy, FileText, MessageCircle, MoreVertical, Printer, Repeat, Wallet, X } from "lucide-react";
+import { AlertTriangle, CircleAlert, Copy, FileText, FlaskConical, MessageCircle, MoreVertical, PackageCheck, Printer, Repeat, Tag, Wallet, X } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
-import type { CategoriaDeuda, CuentasCobrarData, DeudaPaciente, EmpresaConvenio } from "@/lib/cuentas-cobrar";
-import { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
+import type { CategoriaDeuda, CuentasCobrarData, DeudaPaciente, EmpresaConvenio, LenteRezagado } from "@/lib/cuentas-cobrar";
+import { DIAS_APARTADO, DIAS_REZAGO, DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
+import { laboratorioLabels } from "@/lib/laboratorio";
+import { cambiarEstadoOrdenLaboratorio } from "@/app/ventas/lab-actions";
 import { construirMensajeContacto, plantillasContacto, type PlantillaContactoId } from "@/lib/mensajes";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import { crearAcuerdoPago, crearEmpresaConvenio, type AcuerdoPago } from "@/app/ventas/convenio-actions";
-import { activarCobroInsistente, actualizarFrecuenciaCobro, clasificarDeuda, registrarCanje } from "./actions";
+import { activarCobroInsistente, actualizarFrecuenciaCobro, clasificarDeuda, marcarApartado, registrarCanje } from "./actions";
 import Letterhead from "../print-letterhead";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
@@ -21,9 +23,18 @@ const categorias: { id: CategoriaDeuda; label: string; ayuda: string }[] = [
   { id: "recientes", label: "Ventas recientes", ayuda: `Saldos de ventas de hasta 3 meses (${DIAS_URGENTE} días), de la venta más nueva a la más antigua.` },
   { id: "mensuales", label: "Cobros mensuales", ayuda: "Pacientes con frecuencia de cobro mensual." },
   { id: "convenio", label: "Convenios", ayuda: "Deudas con acuerdo de pago con una empresa (descuento a rol)." },
+  { id: "apartados", label: "Apartados", ayuda: `Productos separados con abono: se entregan solo cuando el paciente paga todo. Plazo de ${DIAS_APARTADO} días desde la venta; si vence, decide si extender o liberar (anular la venta devuelve el producto al stock).` },
 ];
-type Pestana = CategoriaDeuda | "todas";
+const categoriasManuales = categorias.filter((c) => c.id !== "apartados");
+type Pestana = CategoriaDeuda | "todas" | "rezagados";
 const categoriaLabel = (id: CategoriaDeuda) => categorias.find((c) => c.id === id)?.label ?? id;
+const hoyEcuador = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Guayaquil", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+const apartadoInfo = (deuda: DeudaPaciente) => {
+  const venta = deuda.ventas.find((v) => v.apartado);
+  if (!venta) return null;
+  const vencido = !!venta.apartado_hasta && venta.apartado_hasta < hoyEcuador();
+  return { venta, vencido, texto: venta.apartado_hasta ? `${vencido ? "Apartado vencido el" : "Apartado hasta"} ${formatDate(`${venta.apartado_hasta}T12:00:00-05:00`)}` : "Apartado" };
+};
 const ordenar = (categoria: Pestana, deudas: DeudaPaciente[]) => [...deudas].sort((a, b) =>
   categoria === "recientes" ? a.dias_mas_antigua - b.dias_mas_antigua
   : categoria === "convenio" ? (a.convenio?.empresa ?? "").localeCompare(b.convenio?.empresa ?? "") || a.apellidos.localeCompare(b.apellidos)
@@ -34,6 +45,7 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
   const [pending, startTransition] = useTransition();
   const [convenioDeuda, setConvenioDeuda] = useState<DeudaPaciente | null>(null);
   const [canjeDeuda, setCanjeDeuda] = useState<DeudaPaciente | null>(null);
+  const [apartadoDeuda, setApartadoDeuda] = useState<DeudaPaciente | null>(null);
   const esSuperadmin = props.profile?.rol === "superadmin";
   const [tab, setTab] = useState<Pestana>("urgentes");
 
@@ -50,6 +62,15 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
     try { await clasificarDeuda(pacienteId, categoria); setNotice(categoria ? `Deuda movida a "${categoriaLabel(categoria as CategoriaDeuda)}".` : "La deuda vuelve a clasificarse automáticamente."); }
     catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo cambiar la clasificación."); }
   });
+  const quitarApartado = (deuda: DeudaPaciente) => startTransition(async () => {
+    try { for (const venta of deuda.ventas.filter((v) => v.apartado)) await marcarApartado(venta.id, false); setNotice(`${deuda.nombres} ${deuda.apellidos} ya no está como apartado.`); }
+    catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo quitar el apartado."); }
+  });
+  const entregarLente = (lente: LenteRezagado) => startTransition(async () => {
+    try { await cambiarEstadoOrdenLaboratorio(lente.orden_id, "entregado"); setNotice(`Lentes de ${lente.paciente_nombre} marcados como entregados.`); }
+    catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo marcar como entregado."); }
+  });
+  const rezagados = props.rezagados.filter((r) => r.dias_listo >= DIAS_REZAGO);
   const cambiarCobroInsistente = (pacienteId: string, activo: boolean) => startTransition(async () => {
     try { await activarCobroInsistente(pacienteId, activo); setNotice(activo ? "Cobro insistente marcado. La automatización con Make sigue pendiente; todavía no se enviaron mensajes." : "Cobro insistente desactivado."); }
     catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo actualizar el cobro insistente."); }
@@ -62,16 +83,17 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
     <div className="make-status"><AlertTriangle size={18} /><span><strong>Automatización diaria con Make:</strong> {props.makeConfigured ? "el enlace técnico está configurado, pero el envío de datos permanece pausado hasta tu autorización final." : "pendiente de conectar. Los mensajes manuales por WhatsApp ya se pueden usar y revisar."}</span></div>
 
     <section className="glass agenda-board">
-      <div className="tabs" role="tablist" style={{ flexWrap: "wrap", marginBottom: 10 }}><button role="tab" type="button" className={tab === "todas" ? "active" : ""} onClick={() => setTab("todas")}>Todas ({props.deudas.length} · {money(totalDeuda)})</button>{categorias.map((c) => { const lista = props.deudas.filter((d) => d.categoria === c.id); return <button key={c.id} role="tab" type="button" className={tab === c.id ? "active" : ""} onClick={() => setTab(c.id)}>{c.label} ({lista.length} · {money(lista.reduce((sum, d) => sum + d.saldo_total, 0))})</button>; })}</div>
-      <p className="field-hint">{tab === "todas" ? "Todas las deudas, de la más antigua a la más reciente. Usa \"Clasificación\" en cada tarjeta para moverla a otra pestaña." : categorias.find((c) => c.id === tab)?.ayuda}</p>
-      {visibles.length ? <div className="task-list">{visibles.map((deuda) => <DeudaCard key={deuda.paciente_id} deuda={deuda} pending={pending} onCanje={esSuperadmin ? () => setCanjeDeuda(deuda) : undefined} mostrarCategoria={tab === "todas"} onClasificar={(c) => cambiarClasificacion(deuda.paciente_id, c)} onFrecuencia={(f) => cambiarFrecuencia(deuda.paciente_id, f)} onCobroInsistente={(activo) => cambiarCobroInsistente(deuda.paciente_id, activo)} onConvenio={() => setConvenioDeuda(deuda)} />)}</div> : <section className="empty-state"><Wallet size={27} /><h3>No hay saldos en esta pestaña</h3><p>Cuando una venta quede con saldo aparecerá en la pestaña que le corresponda.</p></section>}
+      <div className="tabs" role="tablist" style={{ flexWrap: "wrap", marginBottom: 10 }}><button role="tab" type="button" className={tab === "todas" ? "active" : ""} onClick={() => setTab("todas")}>Todas ({props.deudas.length} · {money(totalDeuda)})</button>{categorias.map((c) => { const lista = props.deudas.filter((d) => d.categoria === c.id); return <button key={c.id} role="tab" type="button" className={tab === c.id ? "active" : ""} onClick={() => setTab(c.id)}>{c.label} ({lista.length} · {money(lista.reduce((sum, d) => sum + d.saldo_total, 0))})</button>; })}<button role="tab" type="button" className={tab === "rezagados" ? "active" : ""} onClick={() => setTab("rezagados")}>Lentes rezagados ({rezagados.length})</button></div>
+      <p className="field-hint">{tab === "todas" ? "Todas las deudas, de la más antigua a la más reciente. Usa \"Clasificación\" en cada tarjeta para moverla a otra pestaña." : tab === "rezagados" ? `Lentes que llegaron del laboratorio (listos o ya notificados) y no se retiran desde hace ${DIAS_REZAGO} días o más, tengan saldo o no. Del más antiguo al más reciente.` : categorias.find((c) => c.id === tab)?.ayuda}</p>
+      {tab === "rezagados" ? (rezagados.length ? <div className="task-list">{rezagados.map((lente) => <RezagadoCard key={lente.orden_id} lente={lente} pending={pending} onEntregado={() => entregarLente(lente)} />)}</div> : <section className="empty-state"><FlaskConical size={27} /><h3>No hay lentes rezagados</h3><p>{`Cuando una orden lleve ${DIAS_REZAGO} días lista sin retirarse aparecerá aquí.`}</p></section>) : visibles.length ? <div className="task-list">{visibles.map((deuda) => <DeudaCard key={deuda.paciente_id} deuda={deuda} pending={pending} onCanje={esSuperadmin ? () => setCanjeDeuda(deuda) : undefined} mostrarCategoria={tab === "todas"} onClasificar={(c) => cambiarClasificacion(deuda.paciente_id, c)} onFrecuencia={(f) => cambiarFrecuencia(deuda.paciente_id, f)} onCobroInsistente={(activo) => cambiarCobroInsistente(deuda.paciente_id, activo)} onConvenio={() => setConvenioDeuda(deuda)} onApartado={() => apartadoInfo(deuda) ? quitarApartado(deuda) : setApartadoDeuda(deuda)} />)}</div> : <section className="empty-state"><Wallet size={27} /><h3>No hay saldos en esta pestaña</h3><p>Cuando una venta quede con saldo aparecerá en la pestaña que le corresponda.</p></section>}
     </section>
+    {apartadoDeuda && <ApartadoModal deuda={apartadoDeuda} onClose={() => setApartadoDeuda(null)} onNotice={setNotice} />}
     {canjeDeuda && <CanjeModal deuda={canjeDeuda} onClose={() => setCanjeDeuda(null)} onNotice={setNotice} />}
     {convenioDeuda && <ConvenioModal deuda={convenioDeuda} empresasConvenio={props.empresasConvenio} onClose={() => setConvenioDeuda(null)} onNotice={setNotice} />}
   </div></main>;
 }
 
-function DeudaCard({ deuda, pending, onCanje, mostrarCategoria, onClasificar, onFrecuencia, onCobroInsistente, onConvenio }: { deuda: DeudaPaciente; pending: boolean; onCanje?: () => void; mostrarCategoria: boolean; onClasificar: (categoria: string) => void; onFrecuencia: (frecuencia: string) => void; onCobroInsistente: (activo: boolean) => void; onConvenio: () => void }) {
+function DeudaCard({ deuda, pending, onCanje, onApartado, mostrarCategoria, onClasificar, onFrecuencia, onCobroInsistente, onConvenio }: { deuda: DeudaPaciente; pending: boolean; onCanje?: () => void; onApartado: () => void; mostrarCategoria: boolean; onClasificar: (categoria: string) => void; onFrecuencia: (frecuencia: string) => void; onCobroInsistente: (activo: boolean) => void; onConvenio: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [origin, setOrigin] = useState("");
   const [plantilla, setPlantilla] = useState<PlantillaContactoId>(deuda.frecuencia_cobro === "mensual" ? "cobro_mensual" : "cobro_insistente");
@@ -79,6 +101,7 @@ function DeudaCard({ deuda, pending, onCanje, mostrarCategoria, onClasificar, on
   const [verMensaje, setVerMensaje] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const nombre = `${deuda.nombres} ${deuda.apellidos}`;
+  const apartado = apartadoInfo(deuda);
   const token = deuda.ventas[0]?.recibo_token;
   const ticketUrl = origin && token ? `${origin}/recibo/${token}` : null;
   const fechaCompra = deuda.ventas[0]?.creado_en ?? null;
@@ -93,11 +116,11 @@ function DeudaCard({ deuda, pending, onCanje, mostrarCategoria, onClasificar, on
   useEffect(() => { if (!menuOpen) return; const onClick = (event: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(event.target as Node)) closeMenu(); }; document.addEventListener("mousedown", onClick); return () => document.removeEventListener("mousedown", onClick); }, [menuOpen]);
 
   return <article className="task-card"><div className="task-status" /><div className="task-main">
-    <div className="task-meta"><span className={deuda.dias_mas_antigua > DIAS_URGENTE ? "urgente" : ""}>{deuda.dias_mas_antigua === 0 ? "Hoy" : deuda.dias_mas_antigua === 1 ? "Ayer" : `${deuda.dias_mas_antigua} días`}</span>{mostrarCategoria && <span>{categoriaLabel(deuda.categoria)}{deuda.categoria_manual ? " (manual)" : ""}</span>}{deuda.convenio && <span>Convenio {deuda.convenio.empresa} · {deuda.convenio.cuotas} cuotas de {money(deuda.convenio.monto_cuota)}</span>}<span>{deuda.telefono || "Sin WhatsApp registrado"}</span>{deuda.cobro_insistente && <span className="urgente"><AlertTriangle size={11} /> Cobro insistente</span>}</div>
+    <div className="task-meta"><span className={deuda.dias_mas_antigua > DIAS_URGENTE ? "urgente" : ""}>{deuda.dias_mas_antigua === 0 ? "Hoy" : deuda.dias_mas_antigua === 1 ? "Ayer" : `${deuda.dias_mas_antigua} días`}</span>{mostrarCategoria && <span>{categoriaLabel(deuda.categoria)}{deuda.categoria_manual ? " (manual)" : ""}</span>}{deuda.convenio && <span>Convenio {deuda.convenio.empresa} · {deuda.convenio.cuotas} cuotas de {money(deuda.convenio.monto_cuota)}</span>}{apartado && <span className={apartado.vencido ? "urgente" : ""}><Tag size={11} /> {apartado.texto}</span>}<span>{deuda.telefono || "Sin WhatsApp registrado"}</span>{deuda.cobro_insistente && <span className="urgente"><AlertTriangle size={11} /> Cobro insistente</span>}</div>
     <h2>{nombre}</h2>
     <p>Saldo pendiente: <strong>{money(deuda.saldo_total)}</strong></p>
     <div className="collection-controls">
-      <label>Clasificación<select key={deuda.categoria_manual ?? "auto"} defaultValue={deuda.categoria_manual ?? ""} disabled={pending} onChange={(event) => onClasificar(event.target.value)}><option value="">Automática ({categoriaLabel(deuda.categoria_auto)})</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
+      <label>Clasificación<select key={deuda.categoria_manual ?? "auto"} defaultValue={deuda.categoria_manual ?? ""} disabled={pending || !!apartado} title={apartado ? "Los apartados se quedan en su pestaña hasta que se pagan o se quita el apartado." : undefined} onChange={(event) => onClasificar(event.target.value)}><option value="">Automática ({categoriaLabel(deuda.categoria_auto)})</option>{categoriasManuales.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
       <label>Frecuencia de cobro<select defaultValue={deuda.frecuencia_cobro ?? ""} disabled={pending} onChange={(event) => onFrecuencia(event.target.value)}><option value="">Sin definir</option>{Object.entries(frecuenciaLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
     </div>
     {verMensaje && <div className="modal-backdrop" onClick={() => setVerMensaje(false)}><section className="new-patient-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
@@ -114,10 +137,44 @@ function DeudaCard({ deuda, pending, onCanje, mostrarCategoria, onClasificar, on
     <div className="menu-wrap" ref={menuRef}>
       <button className="outline-action" type="button" onClick={() => setMenuOpen((v) => !v)}><MoreVertical size={14} /> Más opciones</button>
       {menuOpen && <div className="menu-dropdown">
+        <button type="button" onClick={() => { onApartado(); closeMenu(); }}><Tag size={14} /> {apartado ? "Quitar apartado" : "Marcar como apartado"}</button>
         <button type="button" onClick={() => { onConvenio(); closeMenu(); }}><FileText size={14} /> Convenio de pago</button>
         <button type="button" className={deuda.cobro_insistente ? "danger" : ""} onClick={() => { onCobroInsistente(!deuda.cobro_insistente); closeMenu(); }}><AlertTriangle size={14} /> {deuda.cobro_insistente ? "Quitar cobro insistente" : "Activar cobro insistente"}</button>
       </div>}
     </div>
+  </div></article>;
+}
+
+function ApartadoModal({ deuda, onClose, onNotice }: { deuda: DeudaPaciente; onClose: () => void; onNotice: (message: string) => void }) {
+  const [pending, start] = useTransition();
+  const [ventaId, setVentaId] = useState(deuda.ventas[deuda.ventas.length - 1]?.id ?? "");
+  const [error, setError] = useState("");
+  const guardar = () => start(async () => {
+    setError("");
+    try { await marcarApartado(ventaId, true); onNotice(`${deuda.nombres} ${deuda.apellidos}: venta marcada como apartado (${DIAS_APARTADO} días).`); onClose(); }
+    catch (err) { setError(err instanceof Error ? err.message : "No se pudo marcar el apartado."); }
+  });
+  return <div className="modal-backdrop" onClick={onClose}><section className="new-patient-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+    <button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>
+    <p className="section-label">SISTEMA DE APARTADO</p><h2>{deuda.nombres} {deuda.apellidos}</h2>
+    <p>El producto queda separado y <strong>se entrega solo cuando el paciente paga todo</strong>. El plazo es de {DIAS_APARTADO} días desde la fecha de la venta.</p>
+    {deuda.ventas.length > 1 && <div className="new-patient-form"><label style={{ gridColumn: "1 / -1" }}>Venta que se aparta<select value={ventaId} onChange={(event) => setVentaId(event.target.value)}>{deuda.ventas.map((v) => <option key={v.id} value={v.id}>{v.folio ? `Folio ${v.folio} · ` : ""}{formatDate(v.creado_en)} · saldo {money(v.saldo)}</option>)}</select></label></div>}
+    {error && <p className="notice" role="alert">{error}</p>}
+    <div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" type="button" disabled={!ventaId || pending} onClick={guardar}>{pending ? "Guardando…" : "Marcar como apartado"}</button></div>
+  </section></div>;
+}
+
+function RezagadoCard({ lente, pending, onEntregado }: { lente: LenteRezagado; pending: boolean; onEntregado: () => void }) {
+  const mensaje = construirMensajeContacto("listo_retiro", { nombre: lente.paciente_nombre.split(" ")[0] ?? lente.paciente_nombre, empresa: lente.sucursal_nombre, saldo: lente.saldo, ticketUrl: null, fechaCompra: null });
+  const wa = enlaceWhatsapp(lente.telefono, mensaje);
+  return <article className="task-card"><div className="task-status" /><div className="task-main">
+    <div className="task-meta"><span className="urgente">Listo hace {lente.dias_listo} días</span><span>{lente.sucursal_nombre}</span><span>{(laboratorioLabels as Record<string, string>)[lente.laboratorio] ?? lente.laboratorio}</span><span>{lente.telefono || "Sin WhatsApp registrado"}</span></div>
+    <h2>{lente.paciente_nombre}</h2>
+    <p>{lente.saldo > 0 ? <>Saldo pendiente: <strong>{money(lente.saldo)}</strong></> : "Sin saldo pendiente"}</p>
+  </div><div className="task-actions">
+    {wa ? <a className="new-consultation" href={wa} target="_blank" rel="noreferrer"><MessageCircle size={14} /> Avisar por WhatsApp</a> : <span style={{ color: "#a24150", fontSize: 12, fontWeight: 700 }}>Sin WhatsApp registrado</span>}
+    {lente.paciente_id && <Link className="outline-action" href={`/pacientes?paciente=${lente.paciente_id}`}>Ver carpeta</Link>}
+    <button className="outline-action" type="button" disabled={pending} onClick={onEntregado}><PackageCheck size={14} /> Marcar entregado</button>
   </div></article>;
 }
 

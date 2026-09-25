@@ -12,7 +12,7 @@ export type SaleStock = { producto_id: string; sucursal_id: string; cantidad: nu
 export type SaleItem = { id: string; producto_id: string | null; descripcion: string; cantidad: number; precio_unitario: number; descuento: number; total_linea: number };
 export type SalePayment = { id: string; metodo: PaymentMethod; monto: number; referencia: string | null; banco: string | null; creado_en: string };
 export type SalePatient = { id: string; nombres: string; apellidos: string; cedula: string | null; telefono: string | null };
-export type Sale = { id: string; empresa_id: string; sucursal_id: string | null; paciente_id: string | null; cliente_nombre: string | null; estado: SaleStatus; subtotal: number; descuento: number; total: number; pagado: number; saldo: number; motivo_anulacion: string | null; recibo_token: string; fecha_entrega_estimada: string | null; creado_en: string; folio: number | null; venta_items: SaleItem[]; pagos_venta: SalePayment[] };
+export type Sale = { id: string; empresa_id: string; sucursal_id: string | null; paciente_id: string | null; cliente_nombre: string | null; estado: SaleStatus; subtotal: number; descuento: number; total: number; pagado: number; saldo: number; motivo_anulacion: string | null; recibo_token: string; fecha_entrega_estimada: string | null; creado_en: string; folio: number | null; apartado?: boolean; apartado_hasta?: string | null; venta_items: SaleItem[]; pagos_venta: SalePayment[] };
 export type SalesProfile = { id: string; empresa_id: string; sucursal_id: string | null; rol: string };
 export type SaleLabOrder = { id: string; venta_id: string; venta_item_id: string | null; estado: string; laboratorio: string; creado_en: string; tipo_lente: string; es_garantia: boolean };
 export type EmpresaConvenio = { id: string; nombre: string };
@@ -36,7 +36,7 @@ export async function getVentasData(): Promise<VentasData> {
 
     const [productsResult, salesResult, companiesResult, branchesResult, empresasConvenioResult, operationalContext] = await Promise.all([
       supabase.from("productos_catalogo").select("id,empresa_id,nombre,categoria,precio_venta,controla_inventario").eq("activo", true).order("nombre").limit(200),
-      supabase.from("ventas").select("id,empresa_id,sucursal_id,paciente_id,cliente_nombre,estado,subtotal,descuento,total,pagado,saldo,motivo_anulacion,recibo_token,fecha_entrega_estimada,creado_en,folio,venta_items(id,producto_id,descripcion,cantidad,precio_unitario,descuento,total_linea),pagos_venta(id,metodo,monto,referencia,banco,creado_en)").order("creado_en", { ascending: false }).limit(30),
+      supabase.from("ventas").select("id,empresa_id,sucursal_id,paciente_id,cliente_nombre,estado,subtotal,descuento,total,pagado,saldo,motivo_anulacion,recibo_token,fecha_entrega_estimada,creado_en,folio,apartado,apartado_hasta,venta_items(id,producto_id,descripcion,cantidad,precio_unitario,descuento,total_linea),pagos_venta(id,metodo,monto,referencia,banco,creado_en)").order("creado_en", { ascending: false }).limit(30),
       supabase.from("empresas").select("id,nombre,direccion,telefono,email,logo_url").eq("activo", true).order("nombre"),
       loadBranchIdentities(supabase),
       supabase.from("empresas_convenio").select("id,nombre").eq("activo", true).order("nombre"),

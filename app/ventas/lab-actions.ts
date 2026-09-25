@@ -78,5 +78,5 @@ export async function cambiarEstadoOrdenLaboratorio(ordenId: string, estado: str
   if (!(estado in estadoOrdenLabels)) throw new Error("El estado seleccionado no es válido.");
   const { error } = await supabase.from("ordenes_laboratorio").update({ estado, actualizado_en: new Date().toISOString() }).eq("id", ordenId);
   if (error) throw new Error(error.message || "No se pudo actualizar el estado de la orden.");
-  revalidatePath("/ventas"); revalidatePath("/pacientes"); revalidatePath("/laboratorio");
+  revalidatePath("/ventas"); revalidatePath("/pacientes"); revalidatePath("/laboratorio"); revalidatePath("/cuentas-cobrar");
 }

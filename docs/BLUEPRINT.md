@@ -226,6 +226,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-25 | Anulación de 34 ventas "Migración OPTOX" duplicadas y recuperación de 5 abonos ($540), con respaldo. | (este commit) |
 | 2026-09-25 | Canje en cuentas por cobrar (solo Superadministradora): botón "Canje" baja el saldo sin contar como abono, caja, ingreso ni venta; queda en `canjes_venta` con monto, motivo, quién y cuándo. `validar_transicion_venta` acepta esa única excepción. Migración `20260925200000_canje_cuentas_cobrar.sql`. Probado: superadmin sí, vendedora no; abonos posteriores siguen funcionando. | (este commit) |
 | 2026-09-25 | Primer canje real: José Vicente Zambrano, folio 5445, $5 (autorizado en chat). Tarjetas de cuentas por cobrar muestran solo "Saldo pendiente" bajo el nombre. Antigüedad de deudas y mensajes de cobro cuentan días de calendario en hora Ecuador (una venta de ayer ya no dice "Hoy"). Todas las fechas de ventas, pagos, garantías, órdenes, inventario, archivos y facturación se muestran en hora Ecuador. | (este commit) |
+| 2026-09-25 | Cuentas por cobrar: pestaña **Apartados** (Más opciones → Marcar como apartado; plazo 90 días desde la venta; aviso "entregar solo cuando pague todo" en la venta; liberar = anular, que devuelve stock) y pestaña **Lentes rezagados** (órdenes listas/notificadas hace 30+ días, con saldo o sin él; avisar por WhatsApp y marcar entregado). Nuevas columnas `ventas.apartado`, `ventas.apartado_hasta`, `ordenes_laboratorio.listo_en` (se llena sola al pasar a listo). Migración `20260925210000_apartados_y_rezagados.sql`. | (este commit) |
 
 ---
 
