@@ -2,7 +2,7 @@ import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supa
 import { getOperationalContext } from "@/lib/operational-context";
 import { diasCalendarioGuayaquil } from "@/lib/record-date";
 
-export type DeudaVenta = { id: string; total: number; pagado: number; saldo: number; creado_en: string; fecha_entrega_estimada: string | null; recibo_token: string; folio: number | null; apartado: boolean; apartado_hasta: string | null };
+export type DeudaVenta = { id: string; sucursal_id: string | null; total: number; pagado: number; saldo: number; creado_en: string; fecha_entrega_estimada: string | null; recibo_token: string; folio: number | null; apartado: boolean; apartado_hasta: string | null };
 export type ConvenioDeuda = { empresa: string; cuotas: number; monto_cuota: number; fecha_primera_cuota: string | null };
 export type CategoriaDeuda = "urgentes" | "recientes" | "semanales" | "quincenales" | "mensuales" | "convenio" | "apartados" | "rezagados";
 export type DeudaPaciente = { paciente_id: string; nombres: string; apellidos: string; telefono: string | null; sucursales: string[]; frecuencia_cobro: string | null; cobro_insistente: boolean; empresa_nombre: string; saldo_total: number; ventas: DeudaVenta[]; convenio: ConvenioDeuda | null; dias_mas_antigua: number; categoria: CategoriaDeuda; categoria_auto: CategoriaDeuda; categoria_manual: CategoriaDeuda | null };
@@ -10,9 +10,9 @@ export type DeudaPaciente = { paciente_id: string; nombres: string; apellidos: s
 export { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
 import { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
 export type EmpresaConvenio = { id: string; nombre: string };
-export type LenteRezagado = { orden_id: string; paciente_id: string | null; paciente_nombre: string; telefono: string | null; sucursal_nombre: string; laboratorio: string; estado: string; listo_en: string; dias_listo: number; venta_id: string | null; folio: number | null; saldo: number };
+export type LenteRezagado = { orden_id: string; sucursal_id: string | null; paciente_id: string | null; paciente_nombre: string; telefono: string | null; sucursal_nombre: string; laboratorio: string; estado: string; listo_en: string; dias_listo: number; venta_id: string | null; folio: number | null; saldo: number };
 export type CuentasCobrarProfile = { id: string; empresa_id: string; rol: string };
-export type CuentasCobrarData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: CuentasCobrarProfile; empresaNombre?: string; deudas: DeudaPaciente[]; rezagados: LenteRezagado[]; empresasConvenio: EmpresaConvenio[]; makeConfigured: boolean };
+export type CuentasCobrarData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: CuentasCobrarProfile; empresaNombre?: string; sucursalActivaId?: string; sucursalActivaNombre?: string; deudas: DeudaPaciente[]; rezagados: LenteRezagado[]; empresasConvenio: EmpresaConvenio[]; makeConfigured: boolean };
 
 const cobroRoles = new Set(["superadmin", "admin_sucursal", "vendedor", "caja", "optometra"]);
 const roleName = (roles: { nombre: string } | { nombre: string }[] | null) => Array.isArray(roles) ? roles[0]?.nombre : roles?.nombre;
@@ -33,16 +33,16 @@ export async function getCuentasCobrarData(): Promise<CuentasCobrarData> {
     const context = await getOperationalContext();
     const empresaActiva = context?.activeCompany.id ?? profile.empresa_id;
     const [ventasResult, empresasConvenioResult, rezagados] = await Promise.all([
-      supabase.from("ventas").select("id,empresa_id,paciente_id,total,pagado,saldo,fecha_entrega_estimada,creado_en,recibo_token,folio,apartado,apartado_hasta,empresas(nombre),sucursales(nombre)").eq("estado", "completada").eq("empresa_id", empresaActiva).gt("saldo", 0).not("paciente_id", "is", null).order("creado_en", { ascending: true }),
+      (() => { const q = supabase.from("ventas").select("id,empresa_id,sucursal_id,paciente_id,total,pagado,saldo,fecha_entrega_estimada,creado_en,recibo_token,folio,apartado,apartado_hasta,empresas(nombre),sucursales(nombre)").eq("estado", "completada").gt("saldo", 0).not("paciente_id", "is", null).order("creado_en", { ascending: true }); return role === "superadmin" ? q : q.eq("empresa_id", empresaActiva); })(),
       supabase.from("empresas_convenio").select("id,nombre").eq("activo", true).order("nombre"),
-      cargarRezagados(supabase, empresaActiva),
+      cargarRezagados(supabase, role === "superadmin" ? null : empresaActiva),
     ]);
     const { data: ventas, error: ventasError } = ventasResult;
     if (ventasError) return { status: "error", message: "No se pudieron cargar las cuentas por cobrar.", ...empty };
     const empresasConvenio = empresasConvenioResult.error ? [] : (empresasConvenioResult.data ?? []);
 
     const pacienteIds = Array.from(new Set((ventas ?? []).map((v) => v.paciente_id as string)));
-    if (!pacienteIds.length) return { status: "ready", profile: { id: profile.id, empresa_id: empresaActiva, rol: role }, empresaNombre: context?.activeCompany.nombre, deudas: [], rezagados, empresasConvenio, makeConfigured };
+    if (!pacienteIds.length) return { status: "ready", profile: { id: profile.id, empresa_id: empresaActiva, rol: role }, empresaNombre: role === "superadmin" ? undefined : context?.activeCompany.nombre, sucursalActivaId: context?.activeBranch.id, sucursalActivaNombre: context?.activeBranch.nombre, deudas: [], rezagados, empresasConvenio, makeConfigured };
 
     const { data: pacientes, error: pacientesError } = await supabase.from("pacientes_clinicos").select("id,nombres,apellidos,telefono,frecuencia_cobro,cobro_insistente,categoria_cobro").in("id", pacienteIds);
     if (pacientesError) return { status: "error", message: "No se pudieron cargar los pacientes con saldo pendiente.", ...empty };
@@ -62,7 +62,7 @@ export async function getCuentasCobrarData(): Promise<CuentasCobrarData> {
       const nombreEmpresa = Array.isArray(empresaNombre) ? empresaNombre[0]?.nombre : empresaNombre?.nombre;
       const key = paciente.id;
       const existente = grupos.get(key);
-      const ventaResumen: DeudaVenta = { id: venta.id, total: Number(venta.total), pagado: Number(venta.pagado), saldo: Number(venta.saldo), creado_en: venta.creado_en, fecha_entrega_estimada: venta.fecha_entrega_estimada, recibo_token: venta.recibo_token, folio: venta.folio, apartado: Boolean(venta.apartado), apartado_hasta: (venta.apartado_hasta as string | null) ?? null };
+      const ventaResumen: DeudaVenta = { id: venta.id, sucursal_id: (venta.sucursal_id as string | null) ?? null, total: Number(venta.total), pagado: Number(venta.pagado), saldo: Number(venta.saldo), creado_en: venta.creado_en, fecha_entrega_estimada: venta.fecha_entrega_estimada, recibo_token: venta.recibo_token, folio: venta.folio, apartado: Boolean(venta.apartado), apartado_hasta: (venta.apartado_hasta as string | null) ?? null };
       const suc = venta.sucursales as unknown as { nombre: string } | { nombre: string }[] | null;
       const sucursalNombre = (Array.isArray(suc) ? suc[0]?.nombre : suc?.nombre) ?? "Sin sucursal";
       if (existente) { existente.saldo_total += Number(venta.saldo); existente.ventas.push(ventaResumen); if (!existente.sucursales.includes(sucursalNombre)) existente.sucursales.push(sucursalNombre); }
@@ -80,17 +80,18 @@ export async function getCuentasCobrarData(): Promise<CuentasCobrarData> {
       // Un apartado siempre va a su pestaña: el producto no se entrega hasta pagar todo.
       return { ...d, dias_mas_antigua: dias, categoria_auto, categoria: tieneApartado ? "apartados" : d.categoria_manual ?? categoria_auto };
     });
-    return { status: "ready", profile: { id: profile.id, empresa_id: empresaActiva, rol: role }, empresaNombre: context?.activeCompany.nombre, deudas, rezagados, empresasConvenio, makeConfigured };
+    return { status: "ready", profile: { id: profile.id, empresa_id: empresaActiva, rol: role }, empresaNombre: role === "superadmin" ? undefined : context?.activeCompany.nombre, sucursalActivaId: context?.activeBranch.id, sucursalActivaNombre: context?.activeBranch.nombre, deudas, rezagados, empresasConvenio, makeConfigured };
   } catch {
     return { status: "error", message: "La conexión de cuentas por cobrar no está disponible.", ...empty };
   }
 }
 
 // Lentes listos (o ya notificados) que el paciente no ha retirado. La pestaña muestra los de DIAS_REZAGO días o más.
-async function cargarRezagados(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, empresaId: string): Promise<LenteRezagado[]> {
-  const { data: ordenes, error } = await supabase.from("ordenes_laboratorio")
+async function cargarRezagados(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, empresaId: string | null): Promise<LenteRezagado[]> {
+  const base = supabase.from("ordenes_laboratorio")
     .select("id,paciente_id,venta_id,sucursal_id,laboratorio,estado,listo_en,actualizado_en")
-    .eq("empresa_id", empresaId).in("estado", ["listo_entrega", "notificado"]).order("listo_en", { ascending: true });
+    .in("estado", ["listo_entrega", "notificado"]).order("listo_en", { ascending: true });
+  const { data: ordenes, error } = await (empresaId ? base.eq("empresa_id", empresaId) : base);
   if (error || !ordenes?.length) return [];
   const pacienteIds = Array.from(new Set(ordenes.map((o) => o.paciente_id).filter(Boolean))) as string[];
   const ventaIds = Array.from(new Set(ordenes.map((o) => o.venta_id).filter(Boolean))) as string[];
@@ -110,7 +111,7 @@ async function cargarRezagados(supabase: Awaited<ReturnType<typeof createSupabas
     const paciente = o.paciente_id ? pacienteById.get(o.paciente_id) : undefined;
     const listo = (o.listo_en ?? o.actualizado_en) as string;
     return [{
-      orden_id: o.id, paciente_id: o.paciente_id, paciente_nombre: paciente ? `${paciente.nombres} ${paciente.apellidos}`.trim() : "Paciente",
+      orden_id: o.id, sucursal_id: (o.sucursal_id as string | null) ?? null, paciente_id: o.paciente_id, paciente_nombre: paciente ? `${paciente.nombres} ${paciente.apellidos}`.trim() : "Paciente",
       telefono: (paciente?.telefono as string | null) ?? null, sucursal_nombre: sucursalById.get(o.sucursal_id as string) ?? "Sucursal",
       laboratorio: o.laboratorio, estado: o.estado, listo_en: listo, dias_listo: diasCalendarioGuayaquil(listo, ahora),
       venta_id: o.venta_id, folio: (venta?.folio as number | null) ?? null, saldo: Number(venta?.saldo ?? 0),

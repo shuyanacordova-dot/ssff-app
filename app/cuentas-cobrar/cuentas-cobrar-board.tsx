@@ -14,6 +14,7 @@ import { enlaceWhatsapp } from "@/lib/whatsapp";
 import { crearAcuerdoPago, crearEmpresaConvenio, type AcuerdoPago } from "@/app/ventas/convenio-actions";
 import { activarCobroInsistente, actualizarFrecuenciaCobro, clasificarDeuda, marcarApartado, registrarCanje } from "./actions";
 import Letterhead from "../print-letterhead";
+import { TodasSucursalesToggle, useTodasSucursales } from "@/app/todas-sucursales-toggle";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
 const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
@@ -50,11 +51,19 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
   const [apartadoDeuda, setApartadoDeuda] = useState<DeudaPaciente | null>(null);
   const esSuperadmin = props.profile?.rol === "superadmin";
   const [tab, setTab] = useState<Pestana>("urgentes");
+  const [todas, setTodas] = useTodasSucursales();
 
   if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN COMERCIAL</p><h1>Cuentas por cobrar</h1><p className="subtitle">{props.message ?? "No se pudo abrir cuentas por cobrar."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/cuentas-cobrar">Iniciar sesión</Link>}</header></div></main>;
 
-  const totalDeuda = props.deudas.reduce((sum, d) => sum + d.saldo_total, 0);
-  const visibles = ordenar(tab, tab === "todas" ? props.deudas : props.deudas.filter((d) => d.categoria === tab));
+  // Sin "Todas las sucursales" se ven solo las ventas de la sucursal donde se trabaja (la elegida en el menú).
+  const activa = props.sucursalActivaId;
+  const soloActiva = !todas && !!activa;
+  const deudas: DeudaPaciente[] = soloActiva ? props.deudas.flatMap((d) => {
+    const ventas = d.ventas.filter((v) => v.sucursal_id === activa);
+    return ventas.length ? [{ ...d, ventas, saldo_total: ventas.reduce((sum, v) => sum + v.saldo, 0), sucursales: props.sucursalActivaNombre ? [props.sucursalActivaNombre] : d.sucursales }] : [];
+  }) : props.deudas;
+  const totalDeuda = deudas.reduce((sum, d) => sum + d.saldo_total, 0);
+  const visibles = ordenar(tab, tab === "todas" ? deudas : deudas.filter((d) => d.categoria === tab));
 
   const cambiarFrecuencia = (pacienteId: string, frecuencia: string) => startTransition(async () => {
     try { await actualizarFrecuenciaCobro(pacienteId, frecuencia); setNotice("Frecuencia de cobro actualizada."); }
@@ -87,20 +96,20 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
     try { await cambiarEstadoOrdenLaboratorio(lente.orden_id, "entregado"); setNotice(`Lentes de ${lente.paciente_nombre} marcados como entregados.`); }
     catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo marcar como entregado."); }
   });
-  const rezagadosLab = props.rezagados.filter((r) => r.dias_listo >= DIAS_REZAGO);
+  const rezagadosLab = props.rezagados.filter((r) => r.dias_listo >= DIAS_REZAGO && (!soloActiva || r.sucursal_id === activa));
   const cambiarCobroInsistente = (pacienteId: string, activo: boolean) => startTransition(async () => {
     try { await activarCobroInsistente(pacienteId, activo); setNotice(activo ? "Cobro insistente marcado. La automatización con Make sigue pendiente; todavía no se enviaron mensajes." : "Cobro insistente desactivado."); }
     catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo actualizar el cobro insistente."); }
   });
 
   return <main className="page agenda-page"><div className="container agenda-shell">
-    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN COMERCIAL{props.empresaNombre ? ` · ${props.empresaNombre}` : ""}</p><h1>Cuentas por cobrar</h1><p className="subtitle">Pacientes con saldo pendiente, ordenados por prioridad.</p></div></header>
-    <section className="agenda-summary"><article><Wallet size={21} /><strong>{money(totalDeuda)}</strong><span>saldo total pendiente</span></article><article><CircleAlert size={21} /><strong>{props.deudas.length}</strong><span>pacientes con deuda</span></article></section>
+    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN COMERCIAL{props.empresaNombre ? ` · ${props.empresaNombre}` : ""}</p><h1>Cuentas por cobrar</h1><p className="subtitle">Pacientes con saldo pendiente, ordenados por prioridad.</p></div>{activa && <TodasSucursalesToggle todas={todas} onChange={setTodas} sucursalNombre={props.sucursalActivaNombre} />}</header>
+    <section className="agenda-summary"><article><Wallet size={21} /><strong>{money(totalDeuda)}</strong><span>saldo total pendiente</span></article><article><CircleAlert size={21} /><strong>{deudas.length}</strong><span>pacientes con deuda</span></article></section>
     <div className="notice"><CircleAlert size={18} /><span>{notice || "El saldo se calcula solo desde las ventas completadas; los abonos lo actualizan automáticamente."}</span></div>
     <div className="make-status"><AlertTriangle size={18} /><span><strong>Automatización diaria con Make:</strong> {props.makeConfigured ? "el enlace técnico está configurado, pero el envío de datos permanece pausado hasta tu autorización final." : "pendiente de conectar. Los mensajes manuales por WhatsApp ya se pueden usar y revisar."}</span></div>
 
     <section className="glass agenda-board">
-      <div className="tabs" role="tablist" style={{ flexWrap: "wrap", marginBottom: 10 }}><button role="tab" type="button" className={tab === "todas" ? "active" : ""} onClick={() => setTab("todas")}>Todas ({props.deudas.length} · {money(totalDeuda)})</button>{categorias.map((c) => { const lista = props.deudas.filter((d) => d.categoria === c.id); const extra = c.id === "rezagados" ? rezagadosLab.length : 0; return <button key={c.id} role="tab" type="button" className={tab === c.id ? "active" : ""} onClick={() => setTab(c.id)}>{c.label} ({lista.length + extra} · {money(lista.reduce((sum, d) => sum + d.saldo_total, 0))})</button>; })}</div>
+      <div className="tabs" role="tablist" style={{ flexWrap: "wrap", marginBottom: 10 }}><button role="tab" type="button" className={tab === "todas" ? "active" : ""} onClick={() => setTab("todas")}>Todas ({deudas.length} · {money(totalDeuda)})</button>{categorias.map((c) => { const lista = deudas.filter((d) => d.categoria === c.id); const extra = c.id === "rezagados" ? rezagadosLab.length : 0; return <button key={c.id} role="tab" type="button" className={tab === c.id ? "active" : ""} onClick={() => setTab(c.id)}>{c.label} ({lista.length + extra} · {money(lista.reduce((sum, d) => sum + d.saldo_total, 0))})</button>; })}</div>
       <p className="field-hint">{tab === "todas" ? "Todas las deudas, de la más antigua a la más reciente. Usa \"Clasificación\" en cada tarjeta para moverla a otra pestaña." : categorias.find((c) => c.id === tab)?.ayuda}</p>
       {tab === "rezagados" && rezagadosLab.length > 0 && <div className="task-list" style={{ marginBottom: 12 }}>{rezagadosLab.map((lente) => <RezagadoCard key={lente.orden_id} lente={lente} pending={pending} onEntregado={() => entregarLente(lente)} />)}</div>}
       {tab === "rezagados" && !visibles.length && !rezagadosLab.length ? <section className="empty-state"><FlaskConical size={27} /><h3>No hay lentes rezagados</h3><p>{`Mueve aquí una deuda con "Clasificación", o espera a que una orden lleve ${DIAS_REZAGO} días lista sin retirarse.`}</p></section> : visibles.length ? <div className="task-list">{visibles.map((deuda) => <DeudaCard key={deuda.paciente_id} deuda={deuda} pending={pending} onCanje={esSuperadmin ? () => setCanjeDeuda(deuda) : undefined} mostrarCategoria={tab === "todas"} onClasificar={(c) => cambiarClasificacion(deuda, c)} onFrecuencia={(f) => cambiarFrecuencia(deuda.paciente_id, f)} onCobroInsistente={(activo) => cambiarCobroInsistente(deuda.paciente_id, activo)} onConvenio={() => setConvenioDeuda(deuda)} onApartado={() => apartadoInfo(deuda) ? quitarApartado(deuda) : setApartadoDeuda(deuda)} />)}</div> : <section className="empty-state"><Wallet size={27} /><h3>No hay saldos en esta pestaña</h3><p>Cuando una venta quede con saldo aparecerá en la pestaña que le corresponda.</p></section>}

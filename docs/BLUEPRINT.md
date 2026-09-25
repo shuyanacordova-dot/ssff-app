@@ -238,6 +238,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-25 | Historia clínica: antecedente **Fotosensibilidad** (Sí/No) debajo de Hipersensibilidad (`antecedentes.fotosensibilidad`) y campo **Otros detalles** en Biomicroscopía (`biomicroscopia.otros_detalles`); se ven en el detalle y en la impresión. Duplicado "ZIMI ECONOMICO MORADO" (002090, creado hoy) desactivado a pedido de Shuyana. | (este commit) |
 | 2026-09-25 | Venta de lentes: precio editable para **armazones y lunas** (campo "Precio $"); mínimo recomendado = el menor de precio 1/2/3 del catálogo; si se escribe menos aparece en rojo "Estás colocando un precio menor al del recomendado". `registrar_venta` usa `precio_unitario` enviado solo para montura/lente (otras categorías siempre precio de catálogo). Migración `20260926010000_precio_editable_lunas_armazones.sql`. | (este commit) |
 | 2026-09-25 | Venta de lentes: mensaje "Precio mínimo de esta venta es de: Armazón $X · Lunas $Y (total)" bajo el total; se pone en rojo si el precio de armazones y lunas queda por debajo. | (este commit) |
+| 2026-09-25 | Caja y Cuentas por cobrar muestran solo la sucursal donde se trabaja (la elegida en el menú); casilla **"Todas las sucursales"** arriba para ver todas (se recuerda por navegador, `app/todas-sucursales-toggle.tsx`). En cuentas por cobrar la Superadministradora ve también las otras empresas al marcarla. | (este commit) |
 
 ---
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertCircle, Banknote, CheckCircle2, Plus, Receipt, XCircle, X } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { CajaData, CajaBranch, CierreCaja } from "@/lib/caja";
+import { TodasSucursalesToggle, useTodasSucursales } from "@/app/todas-sucursales-toggle";
 import { crearCierreCaja, crearGasto, registrarAperturaCaja, previsualizarCierre, type ResultadoCierre, type VistaCierre } from "./actions";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
@@ -25,14 +26,20 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean }) {
   const [cierreSucursalId, setCierreSucursalId] = useState("");
   const [pending, startTransition] = useTransition();
   const role = props.profile?.rol;
+  const [todas, setTodas] = useTodasSucursales();
   const canSaldos = role === "superadmin" || role === "admin_sucursal" || role === "caja";
 
   if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">FINANZAS</p><h1>Cuadre de caja</h1><p className="subtitle">{props.message ?? "No se pudo abrir caja."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/caja">Iniciar sesión</Link>}</header></div></main>;
 
-  const branches = props.branches.filter((branch) => branch.empresa_id === empresaId);
-  const cuentas = props.cuentas.filter((cuenta) => cuenta.empresa_id === empresaId);
-  const gastos = props.gastos.filter((gasto) => gasto.empresa_id === empresaId);
-  const cierres = props.cierres.filter((cierre) => cierre.empresa_id === empresaId);
+  // Sin "Todas las sucursales" se ve solo la sucursal donde se trabaja (la elegida en el menú).
+  const sucursalActiva = props.profile?.sucursal_id ?? "";
+  const verSoloActiva = !todas && props.branches.some((branch) => branch.id === sucursalActiva);
+  const empresaVista = verSoloActiva ? (props.branches.find((branch) => branch.id === sucursalActiva)?.empresa_id ?? empresaId) : empresaId;
+  const branches = props.branches.filter((branch) => branch.empresa_id === empresaVista && (!verSoloActiva || branch.id === sucursalActiva));
+  const cuentas = props.cuentas.filter((cuenta) => cuenta.empresa_id === empresaVista);
+  const gastos = props.gastos.filter((gasto) => gasto.empresa_id === empresaVista && (!verSoloActiva || gasto.sucursal_id === sucursalActiva));
+  const cierres = props.cierres.filter((cierre) => cierre.empresa_id === empresaVista && (!verSoloActiva || cierre.sucursal_id === sucursalActiva));
+  const sucursalActivaNombre = props.branches.find((branch) => branch.id === sucursalActiva)?.nombre;
   const cuentaById = new Map(cuentas.map((cuenta) => [cuenta.id, cuenta]));
 
   const runAction = (action: () => Promise<unknown>, onOk: string) => startTransition(async () => {
@@ -41,18 +48,18 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean }) {
   });
 
   return <main className="page agenda-page"><div className="container agenda-shell">
-    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">FINANZAS</p><h1>Cuadre de caja</h1><p className="subtitle">Cuadre diario y gastos, separados por empresa.</p></div><div className="tabs">{props.companies.map((company) => <button key={company.id} className={company.id === empresaId ? "active" : ""} onClick={() => setEmpresaId(company.id)}>{company.nombre}</button>)}</div></header>
+    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">FINANZAS</p><h1>Cuadre de caja</h1><p className="subtitle">Cuadre diario y gastos, separados por empresa.</p></div><div style={{ display: "grid", gap: 8, justifyItems: "end" }}>{props.branches.length > 1 && <TodasSucursalesToggle todas={todas} onChange={setTodas} sucursalNombre={sucursalActivaNombre} />}{!verSoloActiva && <div className="tabs">{props.companies.map((company) => <button key={company.id} className={company.id === empresaId ? "active" : ""} onClick={() => setEmpresaId(company.id)}>{company.nombre}</button>)}</div>}</div></header>
     <section className="agenda-summary"><article><Receipt size={21} /><strong>{gastos.length}</strong><span>gastos registrados</span></article><article><Banknote size={21} /><strong>{cierres.filter((c) => c.cuadre_correcto).length}/{cierres.length}</strong><span>cuadres correctos</span></article></section>
     <div className="notice"><AlertCircle size={18} /><span>{notice || "Un cuadre solo puede registrarse una vez por sucursal y fecha; verifica los datos antes de guardar."}</span></div>
 
-    <ResumenCajaHoy empresaId={empresaId} branches={branches} cierres={cierres} defaultSucursalId={props.profile?.sucursal_id ?? ""} onNuevoCuadre={(sucursalId) => { setCierreSucursalId(sucursalId); setShowCierre(true); }} />
+    <ResumenCajaHoy key={`${empresaVista}:${verSoloActiva}`} empresaId={empresaVista} branches={branches} cierres={cierres} defaultSucursalId={props.profile?.sucursal_id ?? ""} onNuevoCuadre={(sucursalId) => { setCierreSucursalId(sucursalId); setShowCierre(true); }} />
 
     <section className="glass agenda-board" style={{ marginBottom: 18 }}><div className="agenda-toolbar"><div><p className="section-label">EGRESOS</p><h2>Gastos recientes</h2></div><button className="new-task" type="button" onClick={() => setShowGasto(true)}><Plus size={18} /> Nuevo gasto</button></div>{gastos.length ? <div className="task-list">{gastos.slice(0, 15).map((gasto) => <article className="task-card" key={gasto.id}><div className="task-status"><span className="status-dot" /></div><div className="task-main"><div className="task-meta"><span>{clasificacionLabel[gasto.clasificacion]}</span><span>{gasto.origen === "banco" ? bancoLabel[cuentaById.get(gasto.cuenta_bancaria_id ?? "")?.banco ?? ""] || "Banco" : "Efectivo"}</span><span>{formatDate(gasto.fecha)}</span></div><h2>{gasto.concepto}</h2>{gasto.observaciones && <p>{gasto.observaciones}</p>}</div><div className="task-actions"><strong>{money(gasto.monto)}</strong></div></article>)}</div> : <section className="empty-state"><Receipt size={27} /><h3>Aún no hay gastos</h3><p>Registra el primer egreso de esta empresa.</p></section>}</section>
 
     <section className="glass agenda-board"><div className="agenda-toolbar"><div><p className="section-label">CIERRE DIARIO</p><h2>Cuadre de caja</h2></div><button className="new-task" type="button" onClick={() => { setCierreSucursalId(""); setShowCierre(true); }}><Plus size={18} /> Nuevo cuadre</button></div>{cierres.length ? <div className="task-list">{cierres.map((cierre) => <CierreCard key={cierre.id} cierre={cierre} sucursalNombre={props.branches.find((b) => b.id === cierre.sucursal_id)?.nombre ?? "Sucursal"} />)}</div> : <section className="empty-state"><Banknote size={27} /><h3>Sin cuadres registrados</h3><p>El primer cierre diario aparecerá aquí.</p></section>}</section>
 
-    {showGasto && <GastoModal empresaId={empresaId} branches={branches} cuentas={cuentas} canSaldos={canSaldos} pending={pending} onClose={() => setShowGasto(false)} onSubmit={(form) => runAction(() => crearGasto(form), "Gasto registrado.")} />}
-    {showCierre && <CierreModal key={`${empresaId}:${cierreSucursalId}`} empresaId={empresaId} branches={branches} initialSucursalId={cierreSucursalId || props.profile?.sucursal_id || ""} onClose={(message) => { setShowCierre(false); if (message) setNotice(message); }} />}
+    {showGasto && <GastoModal empresaId={empresaVista} branches={branches} cuentas={cuentas} canSaldos={canSaldos} pending={pending} onClose={() => setShowGasto(false)} onSubmit={(form) => runAction(() => crearGasto(form), "Gasto registrado.")} />}
+    {showCierre && <CierreModal key={`${empresaVista}:${cierreSucursalId}`} empresaId={empresaVista} branches={branches} initialSucursalId={cierreSucursalId || props.profile?.sucursal_id || ""} onClose={(message) => { setShowCierre(false); if (message) setNotice(message); }} />}
   </div></main>;
 }
 
