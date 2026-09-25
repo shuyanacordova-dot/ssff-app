@@ -14,7 +14,7 @@ import { activarCobroInsistente, actualizarFrecuenciaCobro, clasificarDeuda, reg
 import Letterhead from "../print-letterhead";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
-const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
+const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
 const frecuenciaLabel: Record<string, string> = { semanal: "Semanal", quincenal: "Quincenal", mensual: "Mensual" };
 const categorias: { id: CategoriaDeuda; label: string; ayuda: string }[] = [
   { id: "urgentes", label: "Urgentes", ayuda: `Deudas de más de 3 meses (${DIAS_URGENTE} días), de la más antigua a la más reciente.` },
@@ -93,9 +93,9 @@ function DeudaCard({ deuda, pending, onCanje, mostrarCategoria, onClasificar, on
   useEffect(() => { if (!menuOpen) return; const onClick = (event: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(event.target as Node)) closeMenu(); }; document.addEventListener("mousedown", onClick); return () => document.removeEventListener("mousedown", onClick); }, [menuOpen]);
 
   return <article className="task-card"><div className="task-status" /><div className="task-main">
-    <div className="task-meta"><span className={deuda.dias_mas_antigua > DIAS_URGENTE ? "urgente" : ""}>{deuda.dias_mas_antigua === 0 ? "Hoy" : `${deuda.dias_mas_antigua} días`}</span>{mostrarCategoria && <span>{categoriaLabel(deuda.categoria)}{deuda.categoria_manual ? " (manual)" : ""}</span>}{deuda.convenio && <span>Convenio {deuda.convenio.empresa} · {deuda.convenio.cuotas} cuotas de {money(deuda.convenio.monto_cuota)}</span>}<span>{deuda.telefono || "Sin WhatsApp registrado"}</span>{deuda.cobro_insistente && <span className="urgente"><AlertTriangle size={11} /> Cobro insistente</span>}</div>
+    <div className="task-meta"><span className={deuda.dias_mas_antigua > DIAS_URGENTE ? "urgente" : ""}>{deuda.dias_mas_antigua === 0 ? "Hoy" : deuda.dias_mas_antigua === 1 ? "Ayer" : `${deuda.dias_mas_antigua} días`}</span>{mostrarCategoria && <span>{categoriaLabel(deuda.categoria)}{deuda.categoria_manual ? " (manual)" : ""}</span>}{deuda.convenio && <span>Convenio {deuda.convenio.empresa} · {deuda.convenio.cuotas} cuotas de {money(deuda.convenio.monto_cuota)}</span>}<span>{deuda.telefono || "Sin WhatsApp registrado"}</span>{deuda.cobro_insistente && <span className="urgente"><AlertTriangle size={11} /> Cobro insistente</span>}</div>
     <h2>{nombre}</h2>
-    <p>Deuda: <strong>{money(deuda.saldo_total)}</strong> · {deuda.ventas.length} venta(s) pendiente(s): {deuda.ventas.map((v) => `${formatDate(v.creado_en)} (${money(v.saldo)})`).join(", ")}</p>
+    <p>Saldo pendiente: <strong>{money(deuda.saldo_total)}</strong></p>
     <div className="collection-controls">
       <label>Clasificación<select key={deuda.categoria_manual ?? "auto"} defaultValue={deuda.categoria_manual ?? ""} disabled={pending} onChange={(event) => onClasificar(event.target.value)}><option value="">Automática ({categoriaLabel(deuda.categoria_auto)})</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
       <label>Frecuencia de cobro<select defaultValue={deuda.frecuencia_cobro ?? ""} disabled={pending} onChange={(event) => onFrecuencia(event.target.value)}><option value="">Sin definir</option>{Object.entries(frecuenciaLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>

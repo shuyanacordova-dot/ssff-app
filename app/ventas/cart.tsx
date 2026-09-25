@@ -14,7 +14,7 @@ type Modo = "" | "rapida" | "lentes";
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 const primeraCuotaFecha = () => { const d = new Date(); d.setMonth(d.getMonth() + 1); d.setDate(1); return d; };
-const formatFecha = (d: Date) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "long", year: "numeric" }).format(d);
+const formatFecha = (d: Date) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "long", year: "numeric" }).format(d);
 const productCategoryLabel: Record<string, string> = { montura: "Armazón", lente: "Luna", accesorio: "Accesorio", gafas_sol: "Gafas", servicio: "Examen" };
 
 export default function Cart({ products, stock, branches, patients, empresasConvenio, defaultCompany, defaultBranch, defaultPacienteId, lockPatient, onDone }: { products: SaleProduct[]; stock: SaleStock[]; companies: SaleCompany[]; branches: SaleBranch[]; patients: SalePatient[]; empresasConvenio: EmpresaConvenio[]; defaultCompany: string; defaultBranch: string; defaultPacienteId?: string; lockPatient?: boolean; onDone: (message: string) => void }) {

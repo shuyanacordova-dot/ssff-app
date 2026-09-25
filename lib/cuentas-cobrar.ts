@@ -1,5 +1,6 @@
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 import { getOperationalContext } from "@/lib/operational-context";
+import { diasCalendarioGuayaquil } from "@/lib/record-date";
 
 export type DeudaVenta = { id: string; total: number; pagado: number; saldo: number; creado_en: string; fecha_entrega_estimada: string | null; recibo_token: string; folio: number | null };
 export type ConvenioDeuda = { empresa: string; cuotas: number; monto_cuota: number; fecha_primera_cuota: string | null };
@@ -67,10 +68,9 @@ export async function getCuentasCobrarData(): Promise<CuentasCobrarData> {
       if (acuerdo && !grupo.convenio) grupo.convenio = acuerdo;
     }
 
-    const ahora = Date.now();
+    const ahora = new Date();
     const deudas = Array.from(grupos.values()).map((d) => {
-      const masAntigua = Math.min(...d.ventas.map((v) => new Date(v.creado_en).getTime()));
-      const dias = Math.max(0, Math.floor((ahora - masAntigua) / 86_400_000));
+      const dias = Math.max(0, ...d.ventas.map((v) => diasCalendarioGuayaquil(v.creado_en, ahora)));
       const categoria_auto: CategoriaDeuda = d.convenio ? "convenio" : d.frecuencia_cobro === "mensual" ? "mensuales" : dias > DIAS_URGENTE ? "urgentes" : "recientes";
       return { ...d, dias_mas_antigua: dias, categoria_auto, categoria: d.categoria_manual ?? categoria_auto };
     });

@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { subirArchivoClinico } from "./actions";
 import type { ClinicalPhoto, Consultation } from "@/lib/clinical";
 
-const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
+const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
 const isImagePath = (path: string) => /\.(png|jpe?g|gif|webp|heic)$/i.test(path);
 
 export default function FilesPanel({ pacienteId, photos, consultations, onNotice }: { pacienteId: string; photos: ClinicalPhoto[]; consultations: Consultation[]; onNotice: (message: string) => void }) {

@@ -1,3 +1,4 @@
+import { diasCalendarioGuayaquil } from "@/lib/record-date";
 export type PlantillaContactoId = "listo_retiro" | "cobro_insistente" | "cobro_mensual";
 
 export type ContextoMensaje = {
@@ -22,11 +23,11 @@ export function mensajeTicketVirtual({ nombre, ticketUrl }: Pick<ContextoMensaje
   return `Hola ${nombre}.\n\n🌿 Cuidemos el medio ambiente. Consulta tu ticket virtual desde el siguiente enlace: ${ticketUrl ?? ""}`;
 }
 
-const formatFecha = (iso: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(iso));
+const formatFecha = (iso: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "long", year: "numeric" }).format(new Date(iso));
 
 const diasVencidos = (iso?: string | null) => {
   if (!iso) return null;
-  const dias = Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
+  const dias = diasCalendarioGuayaquil(iso);
   return dias > 0 ? dias : 0;
 };
 

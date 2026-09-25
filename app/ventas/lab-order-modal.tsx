@@ -12,7 +12,7 @@ import rxStyles from "../pacientes/rx-number-field.module.css";
 import { parseRxNumber } from "@/lib/rx-number";
 import { printDocumentById } from "@/lib/print-document";
 
-const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
+const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
 const estadoOrder = Object.keys(estadoOrdenLabels) as EstadoOrdenLaboratorio[];
 type UsoLente = UsoCalculado | "intermedio";
 const distanciaUsoLabel: Record<UsoLente, string> = { lejos: "Lejos", cerca: "Cerca (lectura)", intermedio: "Intermedio/Ocupacional (computadora)", lejos_y_cerca: "Lejos y cerca (bifocal/progresivo)" };

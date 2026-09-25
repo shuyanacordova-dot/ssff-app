@@ -8,7 +8,7 @@ import { actualizarProductoInventario, actualizarStockMinimo, crearArmazonesMasi
 
 const normalizeSearch = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
-const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
+const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
 const categorias = ["montura", "gafas_sol", "lente", "accesorio", "servicio", "tratamiento", "otro"];
 const categoriaLabel: Record<string, string> = { montura: "Monturas", gafas_sol: "Gafas de sol", lente: "Lunas", accesorio: "Accesorios", servicio: "Servicios", tratamiento: "Tratamientos", otro: "Otros" };
 const tipoLabel: Record<string, string> = { entrada: "Entrada", salida: "Salida", ajuste: "Ajuste", transferencia_salida: "Transferencia (salida)", transferencia_entrada: "Transferencia (entrada)" };
