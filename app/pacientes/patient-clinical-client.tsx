@@ -134,14 +134,15 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
     && (props.profile?.rol === "superadmin" || !!selected?.empresa_ids.includes(props.profile?.empresa_id ?? ""));
   const canAnular = props.profile?.rol === "superadmin";
   const canAuthorClinical = props.profile?.rol !== "vendedor";
-  const abonar = (sale: PatientSale, data: FormData) => start(async () => { data.set("venta_id", sale.id); try { await registrarAbono(data); setNotice("Abono registrado."); } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo registrar el abono."); } });
-  const anular = (sale: PatientSale, motivo: string) => start(async () => { const data = new FormData(); data.set("venta_id", sale.id); data.set("motivo", motivo); try { await anularVenta(data); setNotice("Venta anulada."); setAnulling(null); } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo anular la venta."); } });
+  const abonar = (sale: PatientSale, data: FormData) => start(async () => { data.set("venta_id", sale.id); try { await registrarAbono(data); setNotice("Abono registrado."); refreshSelected(); } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo registrar el abono."); } });
+  const anular = (sale: PatientSale, motivo: string) => start(async () => { const data = new FormData(); data.set("venta_id", sale.id); data.set("motivo", motivo); try { await anularVenta(data); setNotice("Venta anulada."); setAnulling(null); refreshSelected(); } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo anular la venta."); } });
   const crearGarantiaSubmit = (form: HTMLFormElement) => start(async () => {
     try {
       const garantiaId = await crearGarantia(new FormData(form));
       const ventaId = new FormData(form).get("venta_id") as string;
       const tipo = new FormData(form).get("tipo") as string;
       setNotice("Garantía registrada.");
+      refreshSelected();
       setGarantiaModal(null);
       form.reset();
       if (tipo === "luna") { const sale = sales.find((s) => s.id === ventaId); if (sale) setLabOrderContext({ sale, esGarantia: true }); }
@@ -158,9 +159,10 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
   };
 
   const closeCreating = () => { setEditingPatient(null); setPatientFormError(""); setIsCreating(false); setEdadNuevoPaciente(null); setTieneResponsable(false); setResponsableId(""); setBuscarResponsable(""); setResponsableResults([]); };
-  const refreshPatientHistory = () => {
+  const refreshSelected = () => {
+    if (demoMode || !selected) return;
     router.refresh();
-    if (selected && usingExtraHistorial) {
+    if (usingExtraHistorial) {
       const id = selected.id;
       obtenerHistorialPaciente(id).then((data) => setHistorial((prev) => ({ ...prev, [id]: data })))
         .catch(() => setNotice("Los cambios se guardaron, pero no se pudo recargar el historial. Vuelve a abrir la carpeta."));
@@ -186,7 +188,7 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
       setSearchResults((prev) => prev.map((item) => item.id === patient.id ? patient : item));
       setNotice("Datos del paciente actualizados.");
       closeCreating();
-      router.refresh();
+      refreshSelected();
     } catch (err) {
       const message = err instanceof Error ? err.message : "No se pudo actualizar el paciente.";
       setNotice(message); setPatientFormError(message);
@@ -259,12 +261,12 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
       <span className="patient-row-text"><strong>{formatTimestamp(sale.creado_en)} · {money(sale.total)}</strong><small>{sale.venta_items.map((item) => `${item.descripcion} ×${item.cantidad}`).join(", ") || "Sin artículos registrados"}</small></span><ChevronRight size={16} />
     </button>)}</div></> : <><p>Para crear una orden primero registra la venta de los lentes.</p><button className="new-consultation" type="button" onClick={() => { setShowLabSalePicker(false); setIsSelling(true); }}><ReceiptText size={17} /> Nueva venta</button></>}
   </section></div>}
-  {(isConsulting || editingConsultation) && selected && <ConsultationModal pacienteId={selected.id} optometrists={props.optometrists} defaultOptometristId={props.optometrists.some((person) => person.id === props.profile?.id) ? props.profile?.id : undefined} initial={editingConsultation ?? undefined} onClose={() => { setIsConsulting(false); setEditingConsultation(null); }} onSaved={setNotice} />}
-  {isSelling && selected && !demoMode && <div className="modal-backdrop"><div className="sale-modal-shell"><button className="modal-close" onClick={() => setIsSelling(false)} aria-label="Cerrar"><X size={19} /></button><Cart products={props.products} stock={props.stock} companies={props.companies} branches={props.branches} patients={[selected]} empresasConvenio={props.empresasConvenio} defaultCompany={props.profile?.empresa_id ?? props.companies[0]?.id ?? ""} defaultBranch={props.profile?.sucursal_id ?? ""} defaultPacienteId={selected.id} lockPatient onDone={(message) => { setNotice(message); setSection("sales"); setIsSelling(false); refreshPatientHistory(); }} /></div></div>}
+  {(isConsulting || editingConsultation) && selected && <ConsultationModal pacienteId={selected.id} optometrists={props.optometrists} defaultOptometristId={props.optometrists.some((person) => person.id === props.profile?.id) ? props.profile?.id : undefined} initial={editingConsultation ?? undefined} onClose={() => { setIsConsulting(false); setEditingConsultation(null); }} onSaved={(message) => { setNotice(message); refreshSelected(); }} />}
+  {isSelling && selected && !demoMode && <div className="modal-backdrop"><div className="sale-modal-shell"><button className="modal-close" onClick={() => setIsSelling(false)} aria-label="Cerrar"><X size={19} /></button><Cart products={props.products} stock={props.stock} companies={props.companies} branches={props.branches} patients={[selected]} empresasConvenio={props.empresasConvenio} defaultCompany={props.profile?.empresa_id ?? props.companies[0]?.id ?? ""} defaultBranch={props.profile?.sucursal_id ?? ""} defaultPacienteId={selected.id} lockPatient onDone={(message) => { setNotice(message); setSection("sales"); setIsSelling(false); refreshSelected(); }} /></div></div>}
   {viewingConsultation && selected && <ConsultationDetailModal consultation={viewingConsultation} patient={selected} company={branchLetterhead(props.companies.find((c) => c.id === viewingConsultation.empresa_atencion_id) ?? props.companies[0], props.branches.find((b) => b.id === viewingConsultation.sucursal_atencion_id)) ?? undefined} branchName={props.branches.find((b) => b.id === viewingConsultation.sucursal_atencion_id)?.nombre} onClose={() => setViewingConsultation(null)} onEdit={() => { setEditingConsultation(viewingConsultation); setViewingConsultation(null); }} />}
   {viewingSale && selected && <VentaDetailModal sale={viewingSale} companyName={companyName(viewingSale.empresa_id)} patient={selected} onClose={() => setViewingSale(null)} />}
-  {labOrderContext && selected && <LabOrderModal sale={labOrderContext.sale} lensItems={labOrderItemsFor(labOrderContext.sale)} productoById={productoById} existingOrderId={labOrderContext.orderId} esGarantia={labOrderContext.esGarantia} patientName={fullName(selected)} patientPhone={selected.telefono} company={branchLetterhead(props.companies.find((c) => c.id === labOrderContext.sale.empresa_id), props.branches.find((b) => b.id === labOrderContext.sale.sucursal_id)) ?? undefined} branchName={props.branches.find((b) => b.id === labOrderContext.sale.sucursal_id)?.nombre} onClose={() => setLabOrderContext(null)} onCreated={(message) => { setNotice(message); refreshPatientHistory(); }} />}
-  {reciboSale && selected && <ReciboModal sale={reciboSale} patient={selected} onClose={() => setReciboSale(null)} onSaved={(message) => setNotice(message)} />}
+  {labOrderContext && selected && <LabOrderModal sale={labOrderContext.sale} lensItems={labOrderItemsFor(labOrderContext.sale)} productoById={productoById} existingOrderId={labOrderContext.orderId} esGarantia={labOrderContext.esGarantia} patientName={fullName(selected)} patientPhone={selected.telefono} company={branchLetterhead(props.companies.find((c) => c.id === labOrderContext.sale.empresa_id), props.branches.find((b) => b.id === labOrderContext.sale.sucursal_id)) ?? undefined} branchName={props.branches.find((b) => b.id === labOrderContext.sale.sucursal_id)?.nombre} onClose={() => setLabOrderContext(null)} onCreated={(message) => { setNotice(message); setSection("laboratory"); refreshSelected(); }} />}
+  {reciboSale && selected && <ReciboModal sale={reciboSale} patient={selected} onClose={() => setReciboSale(null)} onSaved={(message) => { setNotice(message); refreshSelected(); }} />}
   {anulling && <AnularModal sale={anulling} pending={pending} onClose={() => setAnulling(null)} onConfirm={(motivo) => anular(anulling, motivo)} />}
   {garantiaModal && selected && <GarantiaModal sales={sales.filter((sale) => sale.estado === "completada")} defaultVentaId={garantiaModal.defaultVentaId} productoById={productoById} patients={[selected]} onClose={() => setGarantiaModal(null)} onCreate={crearGarantiaSubmit} pending={pending} />}
   </main>;

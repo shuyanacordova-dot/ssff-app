@@ -1,10 +1,14 @@
+import { normalizeRxNumber, parseRxNumber } from "./rx-number";
+
 export type LaboratorioProveedor = "provision" | "optec" | "indulentes" | "importlens" | "otro";
 export type UsoCalculado = "lejos" | "cerca" | "lejos_y_cerca";
 export type TipoLente = "monofocal_lejos" | "monofocal_cerca" | "bifocal" | "progresivo";
 export type EstadoOrdenLaboratorio = "pendiente" | "enviado" | "recibido" | "notificado" | "entregado" | "rechazado";
 
 export type RxEye = { esfera: string; cilindro: string; eje: string; add: string; dnp: string; procesar: boolean };
-export type OrdenLaboratorioRx = { od: RxEye; oi: RxEye };
+export type RxExamen = { od: RxEye; oi: RxEye };
+// Optional snapshot inside the existing Rx JSON; older orders still load unchanged.
+export type OrdenLaboratorioRx = RxExamen & { examen_lejos?: RxExamen; dnp_lejos?: string };
 export type OrdenLaboratorioMedidas = { vertical: string; horizontal_mayor: string; puente: string; altura: string; dnp: string };
 
 export type OrdenLaboratorio = {
@@ -63,7 +67,7 @@ export const usoCalculadoLabels: Record<UsoCalculado, string> = {
   lejos_y_cerca: "Lejos y cerca",
 };
 
-const necesita = (values: (string | undefined)[]) => values.some((v) => v && Number(v) !== 0);
+const necesita = (values: (string | undefined)[]) => values.some((v) => v && (parseRxNumber(v) ?? 0) !== 0);
 
 export function calcularUso(rx: OrdenLaboratorioRx): UsoCalculado {
   const necesitaLejos = necesita([rx.od.esfera, rx.od.cilindro, rx.oi.esfera, rx.oi.cilindro]);
@@ -103,3 +107,33 @@ export function rxFromRefraccion(refraccion: Record<string, string>): OrdenLabor
     oi: { esfera: refraccion.oi_esfera || "", cilindro: refraccion.oi_cilindro || "", eje: refraccion.oi_eje || "", add: refraccion.oi_add || "", dnp: refraccion.oi_dnp || "", procesar: true },
   };
 }
+
+// These helpers never mutate the exam prescription.
+export function transponer(eye: Pick<RxEye, "esfera" | "cilindro" | "eje">): Pick<RxEye, "esfera" | "cilindro" | "eje"> {
+  const sphere = parseRxNumber(eye.esfera) ?? 0;
+  const cylinder = parseRxNumber(eye.cilindro) ?? 0;
+  const axis = parseRxNumber(eye.eje) ?? 0;
+  const rotated = ((axis + 90 - 1) % 180 + 180) % 180 + 1;
+  return { esfera: normalizeRxNumber(String(sphere + cylinder), "esfera"), cilindro: normalizeRxNumber(String(-cylinder), "esfera"), eje: String(rotated) };
+}
+
+export function normalizarRx(rx: OrdenLaboratorioRx): OrdenLaboratorioRx {
+  const eye = (v: RxEye): RxEye => ({ ...v, esfera: normalizeRxNumber(v.esfera, "esfera"), cilindro: normalizeRxNumber(v.cilindro, "cilindro"), eje: normalizeRxNumber(v.eje, "eje"), add: normalizeRxNumber(v.add, "add"), dnp: v.dnp.replace(/,/g, ".") });
+  return { od: eye(rx.od), oi: eye(rx.oi) };
+}
+
+export function dnpCerca(value: string, binocular = false): string {
+  const n = parseRxNumber(value);
+  return n === null ? "" : String(Math.max(0, n - (binocular ? 3 : 1.5)));
+}
+
+function rxConAdicion(rx: OrdenLaboratorioRx, factor: number): OrdenLaboratorioRx {
+  const eye = (v: RxEye): RxEye => {
+    const add = parseRxNumber(normalizeRxNumber(v.add, "add"));
+    const sphere = parseRxNumber(v.esfera) ?? (v.esfera.trim() === "" ? 0 : null);
+    return { ...v, esfera: add && sphere !== null ? normalizeRxNumber(String(factor === 1 ? sphere + add : Math.round((sphere + add * factor) * 4) / 4), "esfera") : v.esfera, add: "0.00", dnp: factor === 1 ? dnpCerca(v.dnp) : v.dnp };
+  };
+  return { od: eye(rx.od), oi: eye(rx.oi) };
+}
+export const rxCerca = (rx: OrdenLaboratorioRx) => rxConAdicion(rx, 1);
+export const rxIntermedia = (rx: OrdenLaboratorioRx) => rxConAdicion(rx, .5);

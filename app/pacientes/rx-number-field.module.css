@@ -1,0 +1,15 @@
+.field { display: grid; align-content: start; gap: 4px; min-width: 0; color: #5d7086; font-size: 11px; text-align: center; }
+.value { display: flex; min-width: 0; gap: 2px; }
+.field .value input { width: 100%; min-width: 0; padding: 8px 2px; border: 1px solid #d4e0ea; border-radius: 8px; text-align: center; font-size: 16px; }
+.field button { border: 1px solid #d4e0ea; border-radius: 8px; background: rgba(255,255,255,.8); color: #274c77; min-height: 36px; cursor: pointer; font-size: 16px; }
+.value button { padding: 0 6px; }
+.steps { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.field small { font-size: 10px; line-height: 1.4; }
+.field .link { min-height: 28px; padding: 0; font-size: 11px; border: 0; background: transparent; text-decoration: underline; }
+.field button:disabled { opacity: .5; cursor: default; }
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.card { min-width: 0; border: 1px solid #d4e0ea; border-radius: 14px; background: rgba(255,255,255,.6); overflow: hidden; }
+.body { padding: 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.body > label { display: grid; gap: 4px; min-width: 0; align-content: start; font-size: 11px; color: #5d7086; }
+.body > label input { min-width: 0; width: 100%; padding: 8px 4px; border: 1px solid #d4e0ea; border-radius: 8px; font-size: 16px; }
+@media (max-width: 640px) { .cards { grid-template-columns: minmax(0, 1fr); } }

@@ -1,4 +1,7 @@
 "use client";
+import RxNumberField from "./rx-number-field";
+import { transponer } from "@/lib/laboratorio";
+import rxStyles from "./rx-number-field.module.css";
 import { Plus, Trash2, X } from "lucide-react";
 import { useState, useTransition } from "react";
 import { crearConsulta, actualizarConsulta } from "./actions";
@@ -7,7 +10,6 @@ import type { ClinicalOptometrist, Consultation } from "@/lib/clinical";
 const astig = (k1: string, k2: string) => { const a = Number(k1); const b = Number(k2); return k1 !== "" && k2 !== "" && Number.isFinite(a) && Number.isFinite(b) ? `${Math.abs(a - b).toFixed(2)} D estimado` : ""; };
 const hyloSystaneProductos = ["Hylo-Comod", "Hylo-Gel", "Hylo-Forte", "Hylo-Fresh", "Hylo Dual", "Hylo Care", "Systane Ultra", "Systane Balance", "Systane Complete", "Systane Gel", "Systane Hydration", "Systane Ultra PF"];
 const vitaminasProductos = ["Luteína", "Zeaxantina", "Omega-3", "Vitamina C", "Vitamina E", "Zinc", "Multivitamínico ocular (AREDS2)"];
-const signedRxPattern = /^[+-](?:\d+(?:[.,]\d*)?|[.,]\d+)$/;
 type RxDiagnosticValues = { od_esfera: string; od_cilindro: string; od_add: string; oi_esfera: string; oi_cilindro: string; oi_add: string };
 const numberValue = (value: string) => Number(value.replace(",", "."));
 const diagnosticoDesdeRx = (rx: RxDiagnosticValues) => (["od", "oi"] as const).flatMap((eye) => {
@@ -67,16 +69,24 @@ function ComplementaryExams({ initialValue }: { initialValue?: string }) {
 
 function EyeRxCard({ eye, prefix, showDnp, showAv = true, defaults, onRxChange }: { eye: "OD" | "OI"; prefix: string; showDnp?: boolean; showAv?: boolean; defaults?: Record<string, string>; onRxChange?: (field: "esfera" | "cilindro" | "add", value: string) => void }) {
   const d = (key: string) => defaults?.[key] ?? "";
-  return <div className="eye-card">
+  const [rx, setRx] = useState({ esfera: d("esfera"), cilindro: d("cilindro"), eje: d("eje"), add: d("add") });
+  const update = (field: keyof typeof rx, value: string) => {
+    setRx((current) => ({ ...current, [field]: value }));
+    if (field !== "eje") onRxChange?.(field, value);
+  };
+  return <div className={`eye-card ${rxStyles.card}`}>
     <div className="eye-card-header">{eye}</div>
-    <div className="eye-card-body">
-      <label>Esf<input name={`${prefix}_esfera`} defaultValue={d("esfera")} data-rx-sign="true" inputMode="decimal" placeholder="+0.00 / -0.00" onChange={(event) => onRxChange?.("esfera", event.target.value)} /></label>
-      <label>Cil<input name={`${prefix}_cilindro`} defaultValue={d("cilindro")} data-rx-sign="true" inputMode="decimal" placeholder="+0.00 / -0.00" onChange={(event) => onRxChange?.("cilindro", event.target.value)} /></label>
-      <label>Eje<input name={`${prefix}_eje`} defaultValue={d("eje")} /></label>
+    <div className={rxStyles.body}>
+      <RxNumberField label="Esf" kind="esfera" name={`${prefix}_esfera`} value={rx.esfera} onChange={(v) => update("esfera", v)} />
+      <RxNumberField label="Cil" kind="cilindro" name={`${prefix}_cilindro`} value={rx.cilindro} onChange={(v) => update("cilindro", v)} onTranspose={(cilindro) => {
+        const next = { ...rx, ...transponer({ ...rx, cilindro }) }; setRx(next);
+        onRxChange?.("esfera", next.esfera); onRxChange?.("cilindro", next.cilindro);
+      }} />
+      <RxNumberField label="Eje" kind="eje" name={`${prefix}_eje`} value={rx.eje} onChange={(v) => update("eje", v)} />
       {showAv && <label>Av lejos c/rx<input name={`${prefix}_av_lejos`} defaultValue={d("av_lejos")} placeholder="20/20" /></label>}
-      <label>Add<input name={`${prefix}_add`} defaultValue={d("add")} data-rx-sign="true" inputMode="decimal" placeholder="+0.00 / -0.00" onChange={(event) => onRxChange?.("add", event.target.value)} /></label>
+      <RxNumberField label="Add" kind="add" name={`${prefix}_add`} value={rx.add} onChange={(v) => update("add", v)} />
       {showAv && <label>Av cerca c/rx<input name={`${prefix}_av_cerca`} defaultValue={d("av_cerca")} placeholder="0.5M" /></label>}
-      {showDnp && <label>DNP<input name={`${prefix}_dnp`} defaultValue={d("dnp")} placeholder="mm" /></label>}
+      {showDnp && <label>DNP<input name={`${prefix}_dnp`} inputMode="decimal" defaultValue={d("dnp")} placeholder="mm" /></label>}
     </div>
   </div>;
 }
@@ -90,20 +100,9 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
   const [diagnostico, setDiagnostico] = useState(initial?.impresion_diagnostica ?? "");
   const [diagnosticoManual, setDiagnosticoManual] = useState(Boolean(initial));
   const updateFinalRx = (eye: "od" | "oi", field: "esfera" | "cilindro" | "add", value: string) => {
-    const next = { ...rxDiagnostico, [`${eye}_${field}`]: value };
-    setRxDiagnostico(next);
-    if (!diagnosticoManual) setDiagnostico(diagnosticoDesdeRx(next));
+    setRxDiagnostico((current) => ({ ...current, [`${eye}_${field}`]: value }));
   };
   const submit = (form: HTMLFormElement) => {
-    const invalid = Array.from(form.querySelectorAll<HTMLInputElement>("input[data-rx-sign='true']")).find((input) => input.value.trim() && !signedRxPattern.test(input.value.trim()));
-    if (invalid) {
-      window.alert("Cada valor de Esfera, Cilindro o Adición debe comenzar con + o -. Corrige el campo marcado antes de guardar.");
-      invalid.focus();
-      invalid.setCustomValidity("Es obligatorio escribir + o - al inicio.");
-      invalid.reportValidity();
-      window.setTimeout(() => invalid.setCustomValidity(""), 2500);
-      return;
-    }
     start(async () => {
       const data = new FormData(form); data.set("paciente_id", pacienteId);
       try {
@@ -138,7 +137,7 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
 
     <p className="section-label">CON CORRECCIÓN · RX ANTIGUA (LENSOMETRÍA)</p>
     <p className="field-hint">Mide la fórmula de los lentes que trae el paciente y su agudeza visual, lejos y cerca, con esa corrección.</p>
-    <div className="eye-grid"><EyeRxCard eye="OD" prefix="lens_od" defaults={initial?.lensometria ? { esfera: initial.lensometria.od_esfera, cilindro: initial.lensometria.od_cilindro, eje: initial.lensometria.od_eje, av_lejos: initial.lensometria.od_av_lejos, add: initial.lensometria.od_add, av_cerca: initial.lensometria.od_av_cerca } : undefined} /><EyeRxCard eye="OI" prefix="lens_oi" defaults={initial?.lensometria ? { esfera: initial.lensometria.oi_esfera, cilindro: initial.lensometria.oi_cilindro, eje: initial.lensometria.oi_eje, av_lejos: initial.lensometria.oi_av_lejos, add: initial.lensometria.oi_add, av_cerca: initial.lensometria.oi_av_cerca } : undefined} /></div>
+    <div className={rxStyles.cards}><EyeRxCard eye="OD" prefix="lens_od" defaults={initial?.lensometria ? { esfera: initial.lensometria.od_esfera, cilindro: initial.lensometria.od_cilindro, eje: initial.lensometria.od_eje, av_lejos: initial.lensometria.od_av_lejos, add: initial.lensometria.od_add, av_cerca: initial.lensometria.od_av_cerca } : undefined} /><EyeRxCard eye="OI" prefix="lens_oi" defaults={initial?.lensometria ? { esfera: initial.lensometria.oi_esfera, cilindro: initial.lensometria.oi_cilindro, eje: initial.lensometria.oi_eje, av_lejos: initial.lensometria.oi_av_lejos, add: initial.lensometria.oi_add, av_cerca: initial.lensometria.oi_av_cerca } : undefined} /></div>
 
     <p className="section-label">QUERATOMETRÍA</p>
     <div className="quera-entry-grid">
@@ -148,7 +147,7 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
     <p className="astig-value">Astigmatismo corneal estimado — OD: {astig(k.odK1, k.odK2) || "—"} · OI: {astig(k.oiK1, k.oiK2) || "—"}</p>
 
     <p className="section-label">AUTORREFRACTOR</p>
-    <div className="eye-grid"><EyeRxCard eye="OD" prefix="auto_od" showAv={false} defaults={initial?.autorefractor ? { esfera: initial.autorefractor.od_esfera, cilindro: initial.autorefractor.od_cilindro, eje: initial.autorefractor.od_eje, add: initial.autorefractor.od_add } : undefined} /><EyeRxCard eye="OI" prefix="auto_oi" showAv={false} defaults={initial?.autorefractor ? { esfera: initial.autorefractor.oi_esfera, cilindro: initial.autorefractor.oi_cilindro, eje: initial.autorefractor.oi_eje, add: initial.autorefractor.oi_add } : undefined} /></div>
+    <div className={rxStyles.cards}><EyeRxCard eye="OD" prefix="auto_od" showAv={false} defaults={initial?.autorefractor ? { esfera: initial.autorefractor.od_esfera, cilindro: initial.autorefractor.od_cilindro, eje: initial.autorefractor.od_eje, add: initial.autorefractor.od_add } : undefined} /><EyeRxCard eye="OI" prefix="auto_oi" showAv={false} defaults={initial?.autorefractor ? { esfera: initial.autorefractor.oi_esfera, cilindro: initial.autorefractor.oi_cilindro, eje: initial.autorefractor.oi_eje, add: initial.autorefractor.oi_add } : undefined} /></div>
 
     <p className="section-label">VISIÓN BINOCULAR</p>
     <div className="new-patient-form"><label>Cover test<input name="bino_cover_test" defaultValue={bino.cover_test ?? ""} /></label><label>Motilidad ocular<input name="bino_motilidad" defaultValue={bino.motilidad ?? ""} /></label><label>Estereopsis<input name="bino_estereopsis" defaultValue={bino.estereopsis ?? ""} /></label></div>
@@ -162,11 +161,11 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
     <ComplementaryExams initialValue={bino.complementarios} />
 
     <p className="section-label">RX FINAL</p>
-    <p className="field-hint">Esfera, cilindro y adición deben llevar + o -. La RX sugiere miopía, hipermetropía, astigmatismo y presbicia con su CIE-10; el profesional puede corregir el texto.</p>
-    <div className="eye-grid"><EyeRxCard eye="OD" prefix="ref_od" showDnp defaults={initial?.refraccion ? { esfera: initial.refraccion.od_esfera, cilindro: initial.refraccion.od_cilindro, eje: initial.refraccion.od_eje, av_lejos: initial.refraccion.od_av_lejos, add: initial.refraccion.od_add, av_cerca: initial.refraccion.od_av_cerca, dnp: initial.refraccion.od_dnp } : undefined} onRxChange={(field, value) => updateFinalRx("od", field, value)} /><EyeRxCard eye="OI" prefix="ref_oi" showDnp defaults={initial?.refraccion ? { esfera: initial.refraccion.oi_esfera, cilindro: initial.refraccion.oi_cilindro, eje: initial.refraccion.oi_eje, av_lejos: initial.refraccion.oi_av_lejos, add: initial.refraccion.oi_add, av_cerca: initial.refraccion.oi_av_cerca, dnp: initial.refraccion.oi_dnp } : undefined} onRxChange={(field, value) => updateFinalRx("oi", field, value)} /></div>
+    <p className="field-hint">Usa el botón de signo para la esfera y los botones −/+ para ajustar 0,25. El cilindro se registra negativo. La RX sugiere miopía, hipermetropía, astigmatismo y presbicia con su CIE-10; el profesional puede corregir el texto.</p>
+    <div className={rxStyles.cards}><EyeRxCard eye="OD" prefix="ref_od" showDnp defaults={initial?.refraccion ? { esfera: initial.refraccion.od_esfera, cilindro: initial.refraccion.od_cilindro, eje: initial.refraccion.od_eje, av_lejos: initial.refraccion.od_av_lejos, add: initial.refraccion.od_add, av_cerca: initial.refraccion.od_av_cerca, dnp: initial.refraccion.od_dnp } : undefined} onRxChange={(field, value) => updateFinalRx("od", field, value)} /><EyeRxCard eye="OI" prefix="ref_oi" showDnp defaults={initial?.refraccion ? { esfera: initial.refraccion.oi_esfera, cilindro: initial.refraccion.oi_cilindro, eje: initial.refraccion.oi_eje, av_lejos: initial.refraccion.oi_av_lejos, add: initial.refraccion.oi_add, av_cerca: initial.refraccion.oi_av_cerca, dnp: initial.refraccion.oi_dnp } : undefined} onRxChange={(field, value) => updateFinalRx("oi", field, value)} /></div>
 
     <p className="section-label">DIAGNÓSTICO</p>
-    <div className="new-patient-form"><label className="task-description"><textarea name="impresion_diagnostica" value={diagnostico} onChange={(event) => { setDiagnostico(event.target.value); setDiagnosticoManual(true); }} placeholder="Se completa con la RX final y puedes editarlo" /></label></div>
+    <div className="new-patient-form"><label className="task-description"><textarea name="impresion_diagnostica" value={diagnosticoManual ? diagnostico : diagnosticoDesdeRx(rxDiagnostico)} onChange={(event) => { setDiagnostico(event.target.value); setDiagnosticoManual(true); }} placeholder="Se completa con la RX final y puedes editarlo" /></label></div>
 
     <p className="section-label">RECETA</p>
     <div className="receta-list">

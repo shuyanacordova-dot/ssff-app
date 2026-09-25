@@ -1,5 +1,6 @@
 // Print only a snapshot of the requested document, never the surrounding app/modal.
 let printing = false;
+let cleanupPreviousFrame: (() => void) | undefined;
 
 function waitForAsset(element: HTMLLinkElement | HTMLImageElement): Promise<void> {
   return new Promise((resolve) => {
@@ -16,9 +17,78 @@ function waitForAsset(element: HTMLLinkElement | HTMLImageElement): Promise<void
   });
 }
 
+async function prepareDocument(doc: Document, target: HTMLElement) {
+  doc.open();
+  doc.write("<!doctype html><html lang='es'><head></head><body class='print-context'></body></html>");
+  doc.close();
+  doc.title = document.title;
+  const base = doc.createElement("base");
+  base.href = document.baseURI;
+  doc.head.appendChild(base);
+  const assets: Promise<void>[] = [];
+  document.head.querySelectorAll('link[rel="stylesheet"], style').forEach((node) => {
+    const copy = node.cloneNode(true) as HTMLLinkElement | HTMLStyleElement;
+    if (copy instanceof HTMLLinkElement) assets.push(waitForAsset(copy));
+    doc.head.appendChild(copy);
+  });
+  const copy = target.cloneNode(true) as HTMLElement;
+  // Snapshot current values as text, including uncontrolled inputs/textareas.
+  const controls = target.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input, textarea, select");
+  copy.querySelectorAll("input, textarea, select").forEach((control, index) => {
+    const source = controls[index];
+    const text = doc.createElement("span");
+    text.className = "print-field-value";
+    text.textContent = source instanceof HTMLSelectElement
+      ? Array.from(source.selectedOptions, (option) => option.text).join(", ")
+      : source instanceof HTMLInputElement && ["checkbox", "radio"].includes(source.type)
+        ? (source.checked ? "Sí" : "No") : source.value;
+    if (source instanceof HTMLInputElement && source.type === "hidden") text.hidden = true;
+    control.replaceWith(text);
+  });
+  copy.querySelectorAll(".no-print, script").forEach((node) => node.remove());
+  copy.querySelectorAll("img").forEach((img) => {
+    img.loading = "eager";
+    assets.push(waitForAsset(img));
+  });
+  doc.body.appendChild(copy);
+  await Promise.all(assets);
+  let fontTimeout: number | undefined;
+  await Promise.race([doc.fonts.ready, new Promise<void>((resolve) => { fontTimeout = window.setTimeout(resolve, 15000); })]);
+  window.clearTimeout(fontTimeout);
+  // Force layout after fonts and images have settled, before opening preview.
+  void doc.body.offsetHeight;
+}
+
+async function printInNewWindow(target: HTMLElement) {
+  // Open before waiting for assets so iOS retains the user gesture.
+  const popup = window.open("", "_blank");
+  if (!popup) {
+    window.alert("No se pudo abrir la impresión. Permite las ventanas emergentes de LumOS e intenta imprimir nuevamente.");
+    return;
+  }
+  try {
+    await prepareDocument(popup.document, target);
+    popup.focus();
+    popup.print();
+  } catch (error) {
+    console.error("Error al imprimir en una ventana nueva", error);
+    window.alert("No se pudo preparar la impresión. Cierra la ventana de impresión e intenta nuevamente.");
+  }
+  // Leave the document available: Safari can return before preview opens.
+}
+
 async function printDocument(target: HTMLElement | null) {
   if (!target || printing) return;
   printing = true;
+  cleanupPreviousFrame?.();
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  if (isIOS) {
+    try { await printInNewWindow(target); }
+    finally { printing = false; }
+    return;
+  }
+
   const frame = document.createElement("iframe");
   frame.title = "Documento para imprimir";
   frame.setAttribute("aria-hidden", "true");
@@ -28,60 +98,27 @@ async function printDocument(target: HTMLElement | null) {
   const cleanup = () => {
     window.clearTimeout(cleanupTimer);
     frame.remove();
-    printing = false;
+    if (cleanupPreviousFrame === cleanup) cleanupPreviousFrame = undefined;
   };
+  cleanupPreviousFrame = cleanup;
   try {
     document.body.appendChild(frame);
     const doc = frame.contentDocument;
     const printWindow = frame.contentWindow;
     if (!doc || !printWindow) throw new Error("No se pudo preparar la impresión.");
-    doc.open();
-    doc.write("<!doctype html><html lang='es'><head></head><body class='print-context'></body></html>");
-    doc.close();
-    doc.title = document.title;
-    const base = doc.createElement("base");
-    base.href = document.baseURI;
-    doc.head.appendChild(base);
-    const assets: Promise<void>[] = [];
-    document.head.querySelectorAll('link[rel="stylesheet"], style').forEach((node) => {
-      const copy = node.cloneNode(true) as HTMLLinkElement | HTMLStyleElement;
-      if (copy instanceof HTMLLinkElement) assets.push(waitForAsset(copy));
-      doc.head.appendChild(copy);
-    });
-    const copy = target.cloneNode(true) as HTMLElement;
-    // Snapshot current values as text, including uncontrolled inputs/textareas.
-    const controls = target.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input, textarea, select");
-    copy.querySelectorAll("input, textarea, select").forEach((control, index) => {
-      const source = controls[index];
-      const text = doc.createElement("span");
-      text.className = "print-field-value";
-      text.textContent = source instanceof HTMLSelectElement
-        ? Array.from(source.selectedOptions, (option) => option.text).join(", ")
-        : source instanceof HTMLInputElement && ["checkbox", "radio"].includes(source.type)
-          ? (source.checked ? "Sí" : "No") : source.value;
-      if (source instanceof HTMLInputElement && source.type === "hidden") text.hidden = true;
-      control.replaceWith(text);
-    });
-    copy.querySelectorAll(".no-print, script").forEach((node) => node.remove());
-    copy.querySelectorAll("img").forEach((img) => {
-      img.loading = "eager";
-      assets.push(waitForAsset(img));
-    });
-    doc.body.appendChild(copy);
-    await Promise.all(assets);
-    let fontTimeout: number | undefined;
-    await Promise.race([doc.fonts.ready, new Promise<void>((resolve) => { fontTimeout = window.setTimeout(resolve, 15000); })]);
-    window.clearTimeout(fontTimeout);
-    // Force layout after fonts and images have settled, before opening preview.
-    void doc.body.offsetHeight;
+    await prepareDocument(doc, target);
     printWindow.addEventListener("afterprint", cleanup, { once: true });
-    cleanupTimer = window.setTimeout(cleanup, 300000);
     printWindow.focus();
     printWindow.print();
+    printing = false;
+    // Lifetime of the document is independent of the lock on new print requests.
+    if (frame.isConnected) cleanupTimer = window.setTimeout(cleanup, 60000);
   } catch (error) {
     cleanup();
-    console.error("Error al imprimir el documento", error);
-    window.alert("No se pudo preparar la impresión. Intenta nuevamente.");
+    console.error("Error al imprimir el documento; intentando una ventana nueva", error);
+    await printInNewWindow(target);
+  } finally {
+    printing = false;
   }
 }
 

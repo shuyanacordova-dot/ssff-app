@@ -1,28 +1,34 @@
 "use client";
 import { Pencil, Printer, X } from "lucide-react";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import type { Sale, SaleCompany, SaleItem, SaleProduct } from "@/lib/ventas";
-import { calcularUso, emptyMedidas, emptyRx, estadoOrdenLabels, laboratorioLabels, rxFromRefraccion, tipoLenteDesdeDescripcion, tipoLenteLabels, tipoLenteSugerido, usoCalculadoLabels, usoDesdeTipoLente } from "@/lib/laboratorio";
+import { calcularUso, emptyMedidas, emptyRx, estadoOrdenLabels, laboratorioLabels, rxFromRefraccion, tipoLenteLabels, tipoLenteSugerido, rxCerca, rxIntermedia, dnpCerca, transponer, normalizarRx } from "@/lib/laboratorio";
 import type { EstadoOrdenLaboratorio, LaboratorioProveedor, OrdenLaboratorioMedidas, OrdenLaboratorioRx, RefraccionOption, RxEye, TipoLente, UsoCalculado } from "@/lib/laboratorio";
 import { actualizarOrdenLaboratorio, cambiarEstadoOrdenLaboratorio, crearOrdenLaboratorio, getOrdenLaboratorio, getRefraccionesPaciente } from "./lab-actions";
 import LabOrderPrint from "../lab-order-print";
+import RxNumberField from "../pacientes/rx-number-field";
+import rxStyles from "../pacientes/rx-number-field.module.css";
+import { parseRxNumber } from "@/lib/rx-number";
 import { printDocumentById } from "@/lib/print-document";
 
 const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
 const estadoOrder = Object.keys(estadoOrdenLabels) as EstadoOrdenLaboratorio[];
-const distanciaUsoLabel: Record<UsoCalculado, string> = { lejos: "Lejos", cerca: "Cerca", lejos_y_cerca: "Todas" };
+type UsoLente = UsoCalculado | "intermedio";
+const distanciaUsoLabel: Record<UsoLente, string> = { lejos: "Lejos", cerca: "Cerca (lectura)", intermedio: "Intermedio/Ocupacional (computadora)", lejos_y_cerca: "Lejos y cerca (bifocal/progresivo)" };
+const usoDb = (uso: UsoLente): UsoCalculado => uso === "intermedio" ? "cerca" : uso;
+const calcularRx = (rx: OrdenLaboratorioRx, uso: UsoLente) => uso === "cerca" ? rxCerca(rx) : uso === "intermedio" ? rxIntermedia(rx) : { od: { ...rx.od }, oi: { ...rx.oi } };
 
-function RxEyeCard({ eye, value, onChange, disabled }: { eye: "OD" | "OI"; value: RxEye; onChange: (v: RxEye) => void; disabled?: boolean }) {
+function RxEyeCard({ eye, value, onChange, disabled, cerca = false }: { eye: "OD" | "OI"; value: RxEye; onChange: (v: RxEye) => void; disabled?: boolean; cerca?: boolean }) {
   const set = (k: keyof RxEye) => (event: React.ChangeEvent<HTMLInputElement>) => onChange({ ...value, [k]: event.target.value });
   const off = disabled || !value.procesar;
-  return <div className="eye-card">
+  return <div className={`eye-card ${rxStyles.card}`}>
     <div className="eye-card-header with-toggle"><span>{eye}</span><label className="eye-toggle"><input type="checkbox" checked={value.procesar} onChange={(event) => onChange({ ...value, procesar: event.target.checked })} disabled={disabled} /> Procesar</label></div>
-    <div className="eye-card-body">
-      <label>Esf<input value={value.esfera} onChange={set("esfera")} placeholder="0.00" disabled={off} /></label>
-      <label>Cil<input value={value.cilindro} onChange={set("cilindro")} placeholder="0.00" disabled={off} /></label>
-      <label>Eje<input value={value.eje} onChange={set("eje")} disabled={off} /></label>
-      <label>Add<input value={value.add} onChange={set("add")} placeholder="0.00" disabled={off} /></label>
-      <label>DNP<input value={value.dnp} onChange={set("dnp")} placeholder="mm" disabled={off} /></label>
+    <div className={rxStyles.body}>
+      <RxNumberField label="Esf" kind="esfera" value={value.esfera} onChange={(v) => onChange({ ...value, esfera: v })} disabled={off} />
+      <RxNumberField label="Cil" kind="cilindro" value={value.cilindro} onChange={(v) => onChange({ ...value, cilindro: v })} disabled={off} onTranspose={(cilindro) => onChange({ ...value, ...transponer({ ...value, cilindro }) })} />
+      <RxNumberField label="Eje" kind="eje" value={value.eje} onChange={(v) => onChange({ ...value, eje: v })} disabled={off} />
+      <RxNumberField label="Add" kind="add" value={value.add} onChange={(v) => onChange({ ...value, add: v })} disabled={off} />
+      <label>{cerca ? "DNP de cerca (sugerida)" : "DNP"}<input inputMode="decimal" value={value.dnp} onChange={set("dnp")} placeholder="mm" disabled={off} /></label>
     </div>
   </div>;
 }
@@ -45,6 +51,10 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
   const [loadingRx, setLoadingRx] = useState(true);
   const [consultaId, setConsultaId] = useState("");
   const [rx, setRx] = useState<OrdenLaboratorioRx>(emptyRx());
+  const [examenManual, setExamenManual] = useState<OrdenLaboratorioRx | null>(existingOrderId ? null : emptyRx());
+  const [uso, setUso] = useState<UsoLente>("lejos");
+  const [usoElegido, setUsoElegido] = useState(false);
+  const [dnpLejos, setDnpLejos] = useState("");
   const [medidas, setMedidas] = useState<OrdenLaboratorioMedidas>(emptyMedidas());
   const [tipoLente, setTipoLente] = useState<TipoLente>("monofocal_lejos");
   const [notas, setNotas] = useState("");
@@ -52,7 +62,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
 
   useEffect(() => {
     let active = true;
-    getRefraccionesPaciente(sale.paciente_id ?? "").then((rows) => { if (active) setRefracciones(rows); }).finally(() => { if (active) setLoadingRx(false); });
+    getRefraccionesPaciente(sale.paciente_id ?? "").then((rows) => { if (active) setRefracciones(rows); }).catch(() => { if (active) setError("No se pudo cargar el historial; puedes ingresar la Rx manualmente."); }).finally(() => { if (active) setLoadingRx(false); });
     return () => { active = false; };
   }, [sale.paciente_id]);
 
@@ -62,23 +72,41 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
     getOrdenLaboratorio(existingOrderId).then((orden) => {
       if (!active || !orden) return;
       setEstado(orden.estado); setItemId(orden.venta_item_id ?? lensItems[0]?.id ?? ""); setLaboratorio(orden.laboratorio); setOrderCreatedAt(orden.creado_en);
-      setConsultaId(orden.consulta_id ?? ""); setRx(orden.rx); setMedidas(orden.medidas); setTipoLente(orden.tipo_lente); setNotas(orden.notas ?? "");
-    }).finally(() => { if (active) setLoadingExisting(false); });
+      setConsultaId(orden.consulta_id ?? ""); setRx(orden.rx); setMedidas(orden.medidas); setTipoLente(orden.tipo_lente); setNotas((orden.notas ?? "").replace(/^Intermedio\s*[:·—-]?\s*/i, ""));
+      setUso(/^Intermedio\b/i.test(orden.notas ?? "") ? "intermedio" : orden.uso_calculado);
+      setUsoElegido(true);
+      if (orden.rx.examen_lejos) { setExamenManual(orden.rx.examen_lejos); setDnpLejos(orden.rx.dnp_lejos ?? ""); }
+      else if (!orden.consulta_id && orden.uso_calculado !== "cerca") { setExamenManual(orden.rx); setDnpLejos(orden.medidas.dnp); }
+    }).catch(() => { if (active) setError("No se pudo cargar la orden."); }).finally(() => { if (active) setLoadingExisting(false); });
     return () => { active = false; };
   }, [existingOrderId, lensItems]);
 
   const selectedItem = lensItems.find((item) => item.id === itemId);
-  const tipoLenteDetectado = selectedItem ? tipoLenteDesdeDescripcion(selectedItem.descripcion) : null;
-  const uso = useMemo(() => tipoLenteDetectado ? usoDesdeTipoLente(tipoLenteDetectado) : calcularUso(rx), [tipoLenteDetectado, rx]);
-  useEffect(() => { if (!existingOrderId) setTipoLente(tipoLenteDetectado ?? tipoLenteSugerido(uso)); }, [tipoLenteDetectado, uso, existingOrderId]);
-
+  const selectedRefraction = refracciones.find((option) => option.id === consultaId);
+  const examen = examenManual ?? (selectedRefraction ? rxFromRefraccion(selectedRefraction.refraccion) : null);
+  const dnpExamen = (source: OrdenLaboratorioRx, fallback = dnpLejos) => {
+    const od = parseRxNumber(source.od.dnp); const oi = parseRxNumber(source.oi.dnp);
+    return od !== null && oi !== null ? String(od + oi) : fallback;
+  };
+  const aplicarUso = (next: UsoLente, source: OrdenLaboratorioRx, resetDnp = false) => {
+    setUso(next); setTipoLente((current) => next === "lejos_y_cerca" && current === "bifocal" ? current : tipoLenteSugerido(usoDb(next)));
+    setRx(calcularRx(source, next));
+    const total = dnpExamen(source, resetDnp ? "" : dnpLejos);
+    setMedidas((m) => ({ ...m, dnp: next === "cerca" ? dnpCerca(total, true) : total }));
+  };
+  const updateExamen = (source: OrdenLaboratorioRx) => {
+    setExamenManual(source);
+    if (!examen) setConsultaId("");
+    aplicarUso(usoElegido ? uso : calcularUso(source), source);
+  };
   const selectConsulta = (id: string) => {
     setConsultaId(id);
     const found = refracciones.find((r) => r.id === id);
-    setRx(found ? rxFromRefraccion(found.refraccion) : emptyRx());
-    const dnpTotal = found ? (Number(found.refraccion.od_dnp) || 0) + (Number(found.refraccion.oi_dnp) || 0) : 0;
-    if (dnpTotal) setMedidas((m) => ({ ...m, dnp: String(dnpTotal) }));
+    const source = found ? rxFromRefraccion(found.refraccion) : emptyRx();
+    setExamenManual(source); setDnpLejos("");
+    aplicarUso(usoElegido ? uso : calcularUso(source), source, true);
   };
+  const notasGuardadas = [uso === "intermedio" ? "Intermedio" : "", notas.trim()].filter(Boolean).join(": ");
 
   const frameItems = productoById ? sale.venta_items.filter((item) => item.producto_id && productoById.get(item.producto_id)?.categoria === "montura") : [];
   const lensSaleItems = productoById ? sale.venta_items.filter((item) => item.producto_id && productoById.get(item.producto_id)?.categoria === "lente") : lensItems;
@@ -89,11 +117,15 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
     start(async () => {
       const data = new FormData();
       data.set("laboratorio", laboratorio);
-      data.set("uso_calculado", uso);
+      data.set("uso_calculado", usoDb(uso));
       data.set("tipo_lente", tipoLente);
-      data.set("rx", JSON.stringify(rx));
+      const normalizedRx: OrdenLaboratorioRx = {
+        ...normalizarRx(rx),
+        ...(examen ? { examen_lejos: { od: { ...examen.od }, oi: { ...examen.oi } }, dnp_lejos: dnpExamen(examen) } : {}),
+      };
+      data.set("rx", JSON.stringify(normalizedRx));
       data.set("medidas", JSON.stringify(medidas));
-      data.set("notas", notas);
+      data.set("notas", notasGuardadas);
       try {
         if (orderId) { data.set("orden_id", orderId); await actualizarOrdenLaboratorio(data); onCreated("Orden de laboratorio actualizada."); }
         else {
@@ -101,6 +133,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
           if (esGarantia) { data.set("es_garantia", "1"); if (ordenOriginalId) data.set("orden_original_id", ordenOriginalId); }
           const id = await crearOrdenLaboratorio(data); setOrderId(id); setOrderCreatedAt(new Date().toISOString()); onCreated("Orden de laboratorio creada.");
         }
+        setRx(normalizedRx);
         setStep("created");
       } catch (err) { setError(err instanceof Error ? err.message : "No se pudo guardar la orden de laboratorio."); }
     });
@@ -118,7 +151,6 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
       {lensSaleItems.map((item) => <span key={item.id}><strong>Luna</strong>{item.descripcion}</span>)}
     </div>}
   </>;
-  const selectedRefraction = refracciones.find((option) => option.id === consultaId);
   const productDescription = [selectedItem?.descripcion, ...frameItems.map((item) => item.descripcion)].filter(Boolean).join(" + ");
 
   if (loadingExisting) return <div className="modal-backdrop"><section className="new-patient-modal task-modal lab-modal" role="dialog" aria-modal="true"><p className="field-hint">Cargando orden…</p></section></div>;
@@ -137,12 +169,20 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
         <p className="section-label" style={{ marginTop: 14 }}>ELEGIR REFRACCIÓN</p>
         {loadingRx ? <p className="field-hint">Cargando historial…</p> : refracciones.length ? <div className="new-patient-form"><label className="task-description">Refracción del historial (cualquier revisión)<select value={consultaId} onChange={(event) => selectConsulta(event.target.value)}><option value="">Ingresar manualmente</option>{refracciones.map((option) => <option key={option.id} value={option.id}>{formatDate(option.fecha_consulta)} · OD {option.refraccion.od_esfera || "—"} {option.refraccion.od_cilindro || ""} · OI {option.refraccion.oi_esfera || "—"} {option.refraccion.oi_cilindro || ""}</option>)}</select></label></div> : <p className="field-hint">No hay historial clínico disponible con tu perfil; ingresa la graduación manualmente.</p>}
 
-        <div className="eye-grid" style={{ marginTop: 10 }}><RxEyeCard eye="OD" value={rx.od} onChange={(value) => setRx({ ...rx, od: value })} /><RxEyeCard eye="OI" value={rx.oi} onChange={(value) => setRx({ ...rx, oi: value })} /></div>
-
         <div className="new-patient-form" style={{ marginTop: 10 }}>
-          <label>Uso calculado<input value={usoCalculadoLabels[uso]} disabled /></label>
-          <label>Tipo de lente{tipoLenteDetectado ? <input value={`${tipoLenteLabels[tipoLente]} (según la venta)`} disabled /> : <select value={tipoLente} onChange={(event) => setTipoLente(event.target.value as TipoLente)}>{Object.entries(tipoLenteLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>}</label>
+          <label>Uso del lente<select value={uso} disabled={!examen} onChange={(event) => { setUsoElegido(true); if (examen) aplicarUso(event.target.value as UsoLente, examen); }}>{Object.entries(distanciaUsoLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label>Tipo de lente<select value={tipoLente} onChange={(event) => setTipoLente(event.target.value as TipoLente)}>{Object.entries(tipoLenteLabels).filter(([value]) => uso === "lejos_y_cerca" ? value === "bifocal" || value === "progresivo" : value === tipoLenteSugerido(usoDb(uso))).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         </div>
+        <p className="section-label" style={{ marginTop: 14 }}>Rx de lejos (examen)</p>
+        {examen ? <div className="consultation-stats">{(["od", "oi"] as const).map((eye) => <span key={eye}><strong>{eye.toUpperCase()}</strong> Esf {examen[eye].esfera || "—"} · Cil {examen[eye].cilindro || "—"} · Eje {examen[eye].eje || "—"} · Add {examen[eye].add || "—"} · DNP {examen[eye].dnp || "—"}</span>)}</div> : <p className="field-hint">No está disponible la Rx del examen. La Rx guardada del laboratorio se conserva; selecciona una revisión o ingresa el examen para recalcular.</p>}
+        {(!consultaId || !examen) && <details open={!orderId && !consultaId ? true : undefined}><summary>Ingresar o corregir Rx de lejos manualmente</summary><p className="field-hint">Estos cambios recalculan la Rx del laboratorio y reemplazan sus ajustes manuales.</p><div className={rxStyles.cards}>
+          <RxEyeCard eye="OD" value={examen?.od ?? emptyRx().od} onChange={(value) => updateExamen({ ...(examen ?? emptyRx()), od: value })} />
+          <RxEyeCard eye="OI" value={examen?.oi ?? emptyRx().oi} onChange={(value) => updateExamen({ ...(examen ?? emptyRx()), oi: value })} />
+        </div><label>DNP de lejos binocular (mm)<input inputMode="decimal" value={dnpLejos} onChange={(event) => { const value = event.target.value; setDnpLejos(value); setMedidas((m) => ({ ...m, dnp: uso === "cerca" ? dnpCerca(value, true) : value })); }} /></label></details>}
+        {(uso === "cerca" || uso === "intermedio") && examen && (["od", "oi"] as const).some((eye) => rx[eye].procesar && !(parseRxNumber(examen[eye].add) ?? 0)) && <p className="notice" role="status">Falta la adición para calcular la visión de cerca</p>}
+        <p className="section-label" style={{ marginTop: 14 }}>Rx calculada para el laboratorio</p>
+        <p className="field-hint">Puedes ajustar la receta calculada. Cambiar el uso o el examen vuelve a calcularla.{uso === "intermedio" ? " Intermedio: se aplica la mitad de la adición, redondeada a 0,25 D." : ""}</p>
+        <div className={rxStyles.cards} style={{ marginTop: 10 }} key={`${consultaId}-${uso}`}><RxEyeCard eye="OD" value={rx.od} cerca={uso === "cerca"} onChange={(value) => setRx({ ...rx, od: value })} /><RxEyeCard eye="OI" value={rx.oi} cerca={uso === "cerca"} onChange={(value) => setRx({ ...rx, oi: value })} /></div>
 
         <p className="section-label" style={{ marginTop: 14 }}>PARÁMETROS DEL ARMAZÓN (MM)</p>
         <div className="new-patient-form">
@@ -150,7 +190,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
           <label>Horizontal mayor<input value={medidas.horizontal_mayor} onChange={(event) => setMedidas({ ...medidas, horizontal_mayor: event.target.value })} /></label>
           <label>Puente<input value={medidas.puente} onChange={(event) => setMedidas({ ...medidas, puente: event.target.value })} /></label>
           <label>Altura<input value={medidas.altura} onChange={(event) => setMedidas({ ...medidas, altura: event.target.value })} /></label>
-          <label>DNP<input value={medidas.dnp} onChange={(event) => setMedidas({ ...medidas, dnp: event.target.value })} /></label>
+          <label>{uso === "cerca" ? "DNP de cerca (sugerida, binocular)" : "DNP binocular"}<input inputMode="decimal" value={medidas.dnp} onChange={(event) => setMedidas({ ...medidas, dnp: event.target.value })} /></label>
         </div>
 
         <div className="new-patient-form" style={{ marginTop: 10 }}><label className="task-description">Observaciones<textarea value={notas} onChange={(event) => setNotas(event.target.value)} placeholder="Indicaciones para el laboratorio" /></label></div>
@@ -158,7 +198,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
         {error && <p className="notice">{error}</p>}
         <div className="modal-actions no-print"><button className="outline-action" type="button" onClick={() => (orderId ? setStep("created") : onClose())}>Cancelar</button><button className="new-consultation" disabled={pending || (!orderId && !itemId)} type="button" onClick={submit}>{pending ? "Guardando…" : orderId ? "Guardar cambios" : "Crear orden de laboratorio"}</button></div>
       </> : <>
-        <LabOrderPrint orderId={orderId} createdAt={orderCreatedAt} branchName={branchName || "Sucursal"} patientName={patientName} patientPhone={patientPhone} productDescription={productDescription} rx={rx} medidas={medidas} reviewerName={selectedRefraction?.optometrista_nombre} useLabel={distanciaUsoLabel[uso]} notes={[`Laboratorio: ${laboratorioLabels[laboratorio]}`, `Tipo de lente: ${tipoLenteLabels[tipoLente]}`, notas].filter(Boolean).join(". ")} deliveryDate={sale.fecha_entrega_estimada} saleFolio={sale.folio} company={company} warranty={esGarantia} />
+        <LabOrderPrint orderId={orderId} createdAt={orderCreatedAt} branchName={branchName || "Sucursal"} patientName={patientName} patientPhone={patientPhone} productDescription={productDescription} rx={rx} medidas={medidas} reviewerName={selectedRefraction?.optometrista_nombre} useLabel={distanciaUsoLabel[uso]} notes={[`Laboratorio: ${laboratorioLabels[laboratorio]}`, `Tipo de lente: ${tipoLenteLabels[tipoLente]}`, notasGuardadas].filter(Boolean).join(". ")} deliveryDate={sale.fecha_entrega_estimada} saleFolio={sale.folio} company={company} warranty={esGarantia} />
 
         {orderId && <div className="new-patient-form no-print" style={{ marginTop: 14, maxWidth: 280 }}><label>Estado de la orden<select value={estado} disabled={pending} onChange={(event) => changeEstado(event.target.value as EstadoOrdenLaboratorio)}>{estadoOrder.map((value) => <option key={value} value={value}>{estadoOrdenLabels[value]}</option>)}</select></label></div>}
         {error && <p className="notice no-print">{error}</p>}

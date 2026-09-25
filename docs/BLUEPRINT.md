@@ -53,12 +53,12 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | Inicio / tareas y supervisión | ✅ | Tareas como checklist |
 | Pacientes — crear ficha | ✅ | Edad calculada, ocupación, responsable de cuenta |
 | Pacientes — editar ficha | ✅ | Botón "Editar datos" en la carpeta. Todo el equipo puede editar. Cada cambio queda en `pacientes_cambios` (antes/después, quién, cuándo). Falta probar con sesión real. |
-| Historia clínica / revisiones | ✅ | Crear, ver detalle, **editar** (desde 2026-09-24), imprimir |
+| Historia clínica / revisiones | ✅ | Crear, ver, editar, imprimir. En celular: botones −/+ (pasos de 0,25), chip de signo para esfera, cilindro siempre negativo, botón "Transponer", eje 0–180 |
 | Carpeta del paciente | 🟡 | Cuatro pestañas: Revisiones, Ventas, Fotos y documentos, Laboratorio con contador y órdenes. Pendientes Citas, Estado de cuenta, Comunicaciones. |
 | Ventas y cobros | ✅ | Pantalla general: solo venta rápida. Lentes solo desde la carpeta del paciente. El formulario pide **solo sucursal** (la empresa sale de la sucursal). Métodos de pago: Efectivo, Transferencia, Tarjeta de crédito, Otro ("Crédito" solo en historial). Duplicados de importación jul–sep 2026 limpiados |
-| Laboratorio | 🟡 | Pestaña propia en carpeta con nueva orden, selector de ventas completadas y acceso al modal existente. Sin venta ofrece registrarla. Tarjetas con fecha, lente, estado y garantía; acceso en ventas renombrado. Pendiente prueba con sesión real. |
-| Impresiones (receta, revisión, orden, recibo) | 🟡 | Implementado, pendiente prueba en navegador: contexto aislado por documento, A4 con márgenes de 12 mm, logos y espacios compactos, paginación sin modales. Incluye acuerdos, resumen del día e informes. TypeScript correcto. |
-| Inventario | ✅ | Stock por sucursal, transferencias, alertas, pestañas por categoría |
+| Laboratorio | ✅ | Pestaña propia en la carpeta; la carpeta se recarga al crear/editar (antes no se veía la orden nueva, pero sí se guardaba). "Uso del lente": lejos / cerca / intermedio / lejos y cerca; cerca = esfera + adición, intermedio = esfera + 50 % de la adición; DNP de cerca sugerida (−3 mm binocular). Guarda la Rx original del examen |
+| Impresiones (receta, revisión, orden, recibo) | 🟡 | Hoja A4 aislada. Arreglado bloqueo de 5 minutos tras la primera impresión; en iPhone/iPad imprime en una ventana nueva. Falta prueba en el navegador real |
+| Inventario | ✅ | Stock por sucursal, transferencias, alertas, pestañas por categoría. **Búsqueda** por marca, modelo, código, código de barras y color + filtro de marca |
 | Caja, resumen del día | ✅ | Cuadre diario convive con la herramienta vieja de Notion (no tocar esa) |
 | Cuentas de bancos / cuadre global | 🟡 | Enlace existe pero apunta a la misma caja diaria |
 | Cuentas por cobrar | ✅ | Incluye mensaje de cobro con días de atraso. Vendedores y caja ya ven los nombres de los pacientes (2026-09-24) |
@@ -151,6 +151,8 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | L15 | 2026-09-24 | Las ventas se importaron **tres veces** (folios 5120–5223, 5489–5601 y 5757–5768 solo con saldo). Metas, cuentas por cobrar y reportes salían inflados (Shuvision: $16,498 vs $7,839 real). | Toda importación debe guardar el folio de origen (Optox) y no insertar si ya existe. Comparar totales contra el sistema de origen después de importar. |
 | L16 | 2026-09-24 | La anulación masiva de 118 ventas fue bloqueada por el control de permisos (cambio grande en datos compartidos). | Para cambios masivos de datos: mostrar el plan con números, pedir autorización explícita en el chat y dejar el SQL listo en `docs/pendientes/`. |
 | L17 | 2026-09-24 | Con autorización explícita en el chat, la anulación masiva sí se pudo aplicar. Se usó el Excel completo de Optox como referencia y se revisó a mano cada caso dudoso (nombres escritos distinto, ventas con orden/garantía enlazada). | Cruzar siempre contra el sistema de origen, mostrar el resultado esperado por mes antes de aplicar, y nunca anular una copia con registros enlazados. |
+| L18 | 2026-09-24 | "La orden no se guarda": sí se guardaba; la carpeta de un paciente abierto por búsqueda guardaba sus datos en memoria y no se recargaba. | Después de cada cambio, volver a leer los datos de la pantalla. Antes de decir "no se guardó", revisar la base de datos. |
+| L19 | 2026-09-24 | Imprimir se bloqueaba 5 minutos: se esperaba un aviso "impresión terminada" que Safari no envía. | Nunca bloquear una acción del usuario esperando un evento del navegador; liberar enseguida. |
 
 ---
 
@@ -201,6 +203,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-24 | Impresión aislada A4. Archivos: `lib/print-document.ts`, `app/globals.css`, `app/recibo/[token]/page.tsx`, `app/recibo/print-button.tsx`, `app/ventas/lab-order-modal.tsx`, `app/laboratorio/lab-monitor-board.tsx`, `app/ventas/acuerdo-pago-view.tsx`, `app/cuentas-cobrar/cuentas-cobrar-board.tsx`, `app/resumen-dia/resumen-dia-board.tsx`, `app/informes/informes-board.tsx`, `docs/BLUEPRINT.md`. Receta/revisión conservan sus IDs existentes; componentes clínicos, orden y membrete reciben ajustes solo al imprimir. Modal de recibo en ventas/carpeta gestiona el enlace público, no contiene un documento imprimible propio. TypeScript correcto; prueba visual pendiente de Claude. Sin commit/push ni cambios de base de datos por instrucción expresa. Probado por Claude: recibo en una hoja A4. | `2cb18f1` |
 | 2026-09-24 | Ícono para Dock/inicio, metas por dinero cobrado, venta rápida sin lentes, sucursales renombradas, vendedor con pacientes/agenda/cuentas por cobrar. Migración `20260924220247_vendedor_pacientes_agenda_metas_cobradas.sql` aplicada. | (este commit) |
 | 2026-09-24 | Solo sucursal en ventas, métodos de pago, metas "A cuenta", fechas visibles, resumen del día sin anuladas, tabla de referencia Optox. | (este commit) |
+| 2026-09-24 | Depuración de 332 duplicados (jul–sep), carpeta se recarga tras cambios, impresión sin bloqueo, búsqueda en inventario, Rx con botones −/+ en celular, uso del lente con cálculo de cerca/intermedio. | (este commit) |
 
 ---
 
@@ -212,6 +215,10 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 4. Inconsistencias: ventas con total $0 pero con pagos (ej. Lady Gómez 13-sep, $180 dos veces); ventas con `pagado` distinto a la suma de sus pagos.
 5. **Resumen del día**: solo muestra abonos de ventas creadas ese día; debe mostrar todos los abonos recibidos ese día.
 6. **Elegir fecha**: permitir registrar revisión, venta, orden, cita y cuadre con fecha anterior (con registro de quién lo hizo), y evitar duplicados por fecha.
+
+7. **Fechas de ventas "del día de la carga"**: en la base de datos las ventas importadas tienen el día correcto (hora 12:00 porque Optox no se importó con hora) y los pagos también. Falta que Shuyana indique en qué pantalla ve la fecha incorrecta (ejemplo: paciente y venta). Opción: corregir la hora con la columna "Hora" de Optox (`optox_ventas_referencia`).
+8. **Make – Focus separado**: plan Free (2 escenarios activos, 1.000 operaciones/mes). Todos los escenarios (Cumpleaños, Cobros, Control anual, Convenios) envían desde un solo número y leen de Notion. Para separar Focus: registrar el número de Focus en Meta (WhatsApp Cloud API), crear su conexión en Make y filtrar por empresa. Probablemente requiere subir de plan en Make.
+9. **WhatsApp Business de las 3 ópticas dentro de LumOS** (propuesta): conectar cada número a la API oficial de WhatsApp (Meta Cloud API, con "coexistencia" para seguir usando la app en el celular), bandeja de mensajes en LumOS ligada a la carpeta del paciente (pestaña Comunicaciones), asistente con IA que sugiere o envía respuestas a preguntas frecuentes (horarios, estado de la orden, saldo) y siempre pide confirmación en lo sensible. Make queda solo para campañas.
 
 ---
 
