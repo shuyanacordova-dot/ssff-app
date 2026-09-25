@@ -63,7 +63,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | Cuentas de bancos / cuadre global | 🟡 | Enlace existe pero apunta a la misma caja diaria |
 | Cuentas por cobrar | ✅ | Pestañas por prioridad: **Urgentes** (> 30 días, más antigua primero), **Ventas recientes** (≤ 30 días), **Cobros mensuales** (frecuencia mensual), **Convenios** (acuerdo de pago con empresa). Cada paciente en una sola pestaña. Mensaje de WhatsApp guardado tras "Ver mensaje". Muestra solo la empresa activa (Shuvision o Focus) |
 | Agenda | ✅ | Vista día y mes. Vendedores agendan. 29 controles futuros agendados desde las historias (estado "Programada" = por confirmar); 250 revisiones con fecha de control para el CRM. Falta Google Calendar |
-| Convenios | ✅ | Empresas con descuento a rol |
+| Convenios | ✅ | Empresas con descuento a rol. **Personas del convenio** (`/convenios/[id]`): clientes potenciales aunque no sean pacientes, estados (nuevo → contactado → interesado → agendó → cliente / no interesado), WhatsApp con mensaje de invitación editable por empresa, enlace automático con paciente por cédula. Plantilla Excel en `docs/plantillas/` |
 | Informes y metas | ✅ | Las metas usan **"A cuenta del mes"** = lo pagado de las ventas creadas en el mes (igual que la columna "A cuenta" de Optox). Queda también `ingresos_total` (abonos por fecha de pago) disponible |
 | Facturación SRI | 🟡 | Borradores internos. Tabla `emisores_sri` por **sucursal** (Shuvision 1804006391001 ✔; Sacha 2100060470001 y Focus 1722305412001 **por confirmar**, se entregaron con 10 dígitos). Falta todo el envío al SRI (proyecto P1) |
 | Asistente Shu (IA) | 🟡 | Ayuda administrativa básica (`app/asistente`). **Fase D** |
@@ -211,6 +211,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-25 | Cuentas por cobrar ordenadas por prioridad en 4 pestañas y mensaje guardado. | (este commit) |
 | 2026-09-25 | Pestaña Comunicaciones en la carpeta; tabla de emisores SRI por sucursal; proyectos largos y plan de salida de Optox en el Blueprint. | (este commit) |
 | 2026-09-25 | Sucursal destacada en Laboratorio; 29 controles agendados desde historias; banco de lunas con alerta en la orden de laboratorio. | (este commit) |
+| 2026-09-25 | Personas del convenio (clientes potenciales) y plantillas Excel (banco de lunas, personas de convenio). | (este commit) |
 
 ---
 
@@ -281,5 +282,5 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | P5 | **Inicio por cargo y menú corto** | Yuli: caja, cobros, CRM; optometristas: agenda y revisiones; Shuyana: metas, alertas, supervisión; menú con Pacientes, Agenda, Caja, CRM, Laboratorio y "Administración" | — |
 | P6 | **Fidelización y referidos** | Código/QR por paciente, "¿quién te refirió?", beneficios, ranking | Reglas de beneficios (Shuyana) |
 | P7 | **Lentes de contacto** | Plantillas por marca/duración y recordatorio de reposición en el CRM | — |
-| P8 | **Proveedores y compras** | Órdenes de compra, cuentas por pagar, costo real por producto | — |
+| P8 | **Proveedores y compras** (siguiente) | Ficha de proveedor (laboratorios Provisión, OPTEC, Indulentes, Importlens y proveedores de armazones), órdenes de compra, recepción que suma al inventario, cuentas por pagar con vencimientos, costo real por producto | Lista de proveedores (Notion o Excel) |
 | P9 | **Respaldo externo** | Copia diaria fuera de Supabase | — |
