@@ -5,7 +5,7 @@ import { printDocumentById } from "@/lib/print-document";
 import Link from "next/link";
 import { AlertTriangle, CircleAlert, Copy, FileText, MessageCircle, MoreVertical, Printer, Wallet, X } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
-import type { CuentasCobrarData, DeudaPaciente, EmpresaConvenio } from "@/lib/cuentas-cobrar";
+import { DIAS_URGENTE, type CategoriaDeuda, type CuentasCobrarData, type DeudaPaciente, type EmpresaConvenio } from "@/lib/cuentas-cobrar";
 import { construirMensajeContacto, plantillasContacto, type PlantillaContactoId } from "@/lib/mensajes";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import { crearAcuerdoPago, crearEmpresaConvenio, type AcuerdoPago } from "@/app/ventas/convenio-actions";
@@ -15,15 +15,27 @@ import Letterhead from "../print-letterhead";
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
 const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
 const frecuenciaLabel: Record<string, string> = { semanal: "Semanal", quincenal: "Quincenal", mensual: "Mensual" };
+const categorias: { id: CategoriaDeuda; label: string; ayuda: string }[] = [
+  { id: "urgentes", label: "Urgentes", ayuda: `Deudas con más de ${DIAS_URGENTE} días, de la más antigua a la más reciente.` },
+  { id: "recientes", label: "Ventas recientes", ayuda: `Saldos de los últimos ${DIAS_URGENTE} días, de la venta más nueva a la más antigua.` },
+  { id: "mensuales", label: "Cobros mensuales", ayuda: "Pacientes con frecuencia de cobro mensual." },
+  { id: "convenio", label: "Convenios", ayuda: "Deudas con acuerdo de pago con una empresa (descuento a rol)." },
+];
+const ordenar = (categoria: CategoriaDeuda, deudas: DeudaPaciente[]) => [...deudas].sort((a, b) =>
+  categoria === "recientes" ? a.dias_mas_antigua - b.dias_mas_antigua
+  : categoria === "convenio" ? (a.convenio?.empresa ?? "").localeCompare(b.convenio?.empresa ?? "") || a.apellidos.localeCompare(b.apellidos)
+  : b.dias_mas_antigua - a.dias_mas_antigua);
 
 export default function CuentasCobrarBoard(props: CuentasCobrarData) {
   const [notice, setNotice] = useState(props.message ?? "");
   const [pending, startTransition] = useTransition();
   const [convenioDeuda, setConvenioDeuda] = useState<DeudaPaciente | null>(null);
+  const [tab, setTab] = useState<CategoriaDeuda>("urgentes");
 
   if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN COMERCIAL</p><h1>Cuentas por cobrar</h1><p className="subtitle">{props.message ?? "No se pudo abrir cuentas por cobrar."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/cuentas-cobrar">Iniciar sesión</Link>}</header></div></main>;
 
   const totalDeuda = props.deudas.reduce((sum, d) => sum + d.saldo_total, 0);
+  const visibles = ordenar(tab, props.deudas.filter((d) => d.categoria === tab));
 
   const cambiarFrecuencia = (pacienteId: string, frecuencia: string) => startTransition(async () => {
     try { await actualizarFrecuenciaCobro(pacienteId, frecuencia); setNotice("Frecuencia de cobro actualizada."); }
@@ -35,14 +47,15 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
   });
 
   return <main className="page agenda-page"><div className="container agenda-shell">
-    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN COMERCIAL</p><h1>Cuentas por cobrar</h1><p className="subtitle">Pacientes con saldo pendiente, listos para contactar por WhatsApp.</p></div></header>
+    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN COMERCIAL{props.empresaNombre ? ` · ${props.empresaNombre}` : ""}</p><h1>Cuentas por cobrar</h1><p className="subtitle">Pacientes con saldo pendiente, ordenados por prioridad.</p></div></header>
     <section className="agenda-summary"><article><Wallet size={21} /><strong>{money(totalDeuda)}</strong><span>saldo total pendiente</span></article><article><CircleAlert size={21} /><strong>{props.deudas.length}</strong><span>pacientes con deuda</span></article></section>
     <div className="notice"><CircleAlert size={18} /><span>{notice || "El saldo se calcula solo desde las ventas completadas; los abonos lo actualizan automáticamente."}</span></div>
     <div className="make-status"><AlertTriangle size={18} /><span><strong>Automatización diaria con Make:</strong> {props.makeConfigured ? "el enlace técnico está configurado, pero el envío de datos permanece pausado hasta tu autorización final." : "pendiente de conectar. Los mensajes manuales por WhatsApp ya se pueden usar y revisar."}</span></div>
 
     <section className="glass agenda-board">
-      <p className="section-label">PACIENTES CON SALDO PENDIENTE</p><h2>Cuentas por cobrar</h2>
-      {props.deudas.length ? <div className="task-list">{props.deudas.map((deuda) => <DeudaCard key={deuda.paciente_id} deuda={deuda} pending={pending} onFrecuencia={(f) => cambiarFrecuencia(deuda.paciente_id, f)} onCobroInsistente={(activo) => cambiarCobroInsistente(deuda.paciente_id, activo)} onConvenio={() => setConvenioDeuda(deuda)} />)}</div> : <section className="empty-state"><Wallet size={27} /><h3>No hay saldos pendientes</h3><p>Cuando una venta quede con saldo aparecerá aquí.</p></section>}
+      <div className="tabs" role="tablist" style={{ flexWrap: "wrap", marginBottom: 10 }}>{categorias.map((c) => { const lista = props.deudas.filter((d) => d.categoria === c.id); return <button key={c.id} role="tab" type="button" className={tab === c.id ? "active" : ""} onClick={() => setTab(c.id)}>{c.label} ({lista.length} · {money(lista.reduce((sum, d) => sum + d.saldo_total, 0))})</button>; })}</div>
+      <p className="field-hint">{categorias.find((c) => c.id === tab)?.ayuda}</p>
+      {visibles.length ? <div className="task-list">{visibles.map((deuda) => <DeudaCard key={deuda.paciente_id} deuda={deuda} pending={pending} onFrecuencia={(f) => cambiarFrecuencia(deuda.paciente_id, f)} onCobroInsistente={(activo) => cambiarCobroInsistente(deuda.paciente_id, activo)} onConvenio={() => setConvenioDeuda(deuda)} />)}</div> : <section className="empty-state"><Wallet size={27} /><h3>No hay saldos en esta pestaña</h3><p>Cuando una venta quede con saldo aparecerá en la pestaña que le corresponda.</p></section>}
     </section>
     {convenioDeuda && <ConvenioModal deuda={convenioDeuda} empresasConvenio={props.empresasConvenio} onClose={() => setConvenioDeuda(null)} onNotice={setNotice} />}
   </div></main>;
@@ -53,6 +66,7 @@ function DeudaCard({ deuda, pending, onFrecuencia, onCobroInsistente, onConvenio
   const [origin, setOrigin] = useState("");
   const [plantilla, setPlantilla] = useState<PlantillaContactoId>(deuda.frecuencia_cobro === "mensual" ? "cobro_mensual" : "cobro_insistente");
   const [copied, setCopied] = useState(false);
+  const [verMensaje, setVerMensaje] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const nombre = `${deuda.nombres} ${deuda.apellidos}`;
   const token = deuda.ventas[0]?.recibo_token;
@@ -69,16 +83,21 @@ function DeudaCard({ deuda, pending, onFrecuencia, onCobroInsistente, onConvenio
   useEffect(() => { if (!menuOpen) return; const onClick = (event: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(event.target as Node)) closeMenu(); }; document.addEventListener("mousedown", onClick); return () => document.removeEventListener("mousedown", onClick); }, [menuOpen]);
 
   return <article className="task-card"><div className="task-status" /><div className="task-main">
-    <div className="task-meta"><span>{deuda.empresa_nombre}</span><span>{deuda.telefono || "Sin WhatsApp registrado"}</span>{deuda.cobro_insistente && <span className="urgente"><AlertTriangle size={11} /> Cobro insistente</span>}</div>
+    <div className="task-meta"><span className={deuda.dias_mas_antigua > DIAS_URGENTE ? "urgente" : ""}>{deuda.dias_mas_antigua === 0 ? "Hoy" : `${deuda.dias_mas_antigua} días`}</span>{deuda.convenio && <span>Convenio {deuda.convenio.empresa} · {deuda.convenio.cuotas} cuotas de {money(deuda.convenio.monto_cuota)}</span>}<span>{deuda.telefono || "Sin WhatsApp registrado"}</span>{deuda.cobro_insistente && <span className="urgente"><AlertTriangle size={11} /> Cobro insistente</span>}</div>
     <h2>{nombre}</h2>
     <p>Deuda: <strong>{money(deuda.saldo_total)}</strong> · {deuda.ventas.length} venta(s) pendiente(s): {deuda.ventas.map((v) => `${formatDate(v.creado_en)} (${money(v.saldo)})`).join(", ")}</p>
     <div className="collection-controls">
-      <label>Mensaje a enviar<select value={plantilla} onChange={(event) => setPlantilla(event.target.value as PlantillaContactoId)}>{plantillasContacto.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select></label>
       <label>Frecuencia de cobro<select defaultValue={deuda.frecuencia_cobro ?? ""} disabled={pending} onChange={(event) => onFrecuencia(event.target.value)}><option value="">Sin definir</option>{Object.entries(frecuenciaLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
     </div>
-    <div className="message-preview"><span>Vista previa</span><p>{mensaje}</p><button className="outline-action" type="button" onClick={copiarMensaje}><Copy size={13} /> {copied ? "Copiado" : "Copiar mensaje"}</button></div>
+    {verMensaje && <div className="modal-backdrop" onClick={() => setVerMensaje(false)}><section className="new-patient-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+      <button className="modal-close" onClick={() => setVerMensaje(false)} aria-label="Cerrar"><X size={19} /></button>
+      <p className="section-label">MENSAJE GUARDADO</p><h2>{nombre}</h2>
+      <label className="task-description">Plantilla<select value={plantilla} onChange={(event) => setPlantilla(event.target.value as PlantillaContactoId)}>{plantillasContacto.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select></label>
+      <div className="message-preview"><span>Mensaje</span><p>{mensaje}</p></div>
+      <div className="modal-actions"><button className="outline-action" type="button" onClick={copiarMensaje}><Copy size={13} /> {copied ? "Copiado" : "Copiar"}</button>{wa && <a className="new-consultation" href={wa} target="_blank" rel="noreferrer"><MessageCircle size={14} /> Enviar por WhatsApp</a>}</div>
+    </section></div>}
   </div><div className="task-actions">
-    {wa ? <a className="new-consultation" href={wa} target="_blank" rel="noreferrer"><MessageCircle size={14} /> Enviar mensaje elegido</a> : <span style={{ color: "#a24150", fontSize: 12, fontWeight: 700 }}>Sin WhatsApp registrado</span>}
+    {wa ? <button className="new-consultation" type="button" onClick={() => setVerMensaje(true)}><MessageCircle size={14} /> Ver mensaje</button> : <span style={{ color: "#a24150", fontSize: 12, fontWeight: 700 }}>Sin WhatsApp registrado</span>}
     <div className="menu-wrap" ref={menuRef}>
       <button className="outline-action" type="button" onClick={() => setMenuOpen((v) => !v)}><MoreVertical size={14} /> Más opciones</button>
       {menuOpen && <div className="menu-dropdown">

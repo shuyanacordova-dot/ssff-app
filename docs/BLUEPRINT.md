@@ -61,7 +61,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | Inventario | ✅ | Stock por sucursal, transferencias, alertas, pestañas por categoría. **Búsqueda** por marca, modelo, código, código de barras y color + filtro de marca |
 | Caja, resumen del día | ✅ | Arranque real 25-sep-2026 (Yuli hace el cuadre de Shuvision). Días en hora de Ecuador (antes UTC). **Apertura de caja** (efectivo inicial) antes del primer cuadre. Abonos por transferencia piden banco. Resumen del día incluye abonos de ventas antiguas. Cuadre único por sucursal y fecha |
 | Cuentas de bancos / cuadre global | 🟡 | Enlace existe pero apunta a la misma caja diaria |
-| Cuentas por cobrar | ✅ | Incluye mensaje de cobro con días de atraso. Vendedores y caja ya ven los nombres de los pacientes (2026-09-24) |
+| Cuentas por cobrar | ✅ | Pestañas por prioridad: **Urgentes** (> 30 días, más antigua primero), **Ventas recientes** (≤ 30 días), **Cobros mensuales** (frecuencia mensual), **Convenios** (acuerdo de pago con empresa). Cada paciente en una sola pestaña. Mensaje de WhatsApp guardado tras "Ver mensaje". Muestra solo la empresa activa (Shuvision o Focus) |
 | Agenda | ✅ | Vista día y mes. Vendedores pueden ver y agendar citas (2026-09-24). Falta Google Calendar |
 | Convenios | ✅ | Empresas con descuento a rol |
 | Informes y metas | ✅ | Las metas usan **"A cuenta del mes"** = lo pagado de las ventas creadas en el mes (igual que la columna "A cuenta" de Optox). Queda también `ingresos_total` (abonos por fecha de pago) disponible |
@@ -207,6 +207,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-24 | Solo sucursal en ventas, métodos de pago, metas "A cuenta", fechas visibles, resumen del día sin anuladas, tabla de referencia Optox. | (este commit) |
 | 2026-09-24 | Depuración de 332 duplicados (jul–sep), carpeta se recarga tras cambios, impresión sin bloqueo, búsqueda en inventario, Rx con botones −/+ en celular, uso del lente con cálculo de cerca/intermedio. | (este commit) |
 | 2026-09-25 | Caja lista para el arranque (hora Ecuador, apertura, banco en abonos), cálculos ópticos avanzados, CRM v1, 2.897 pacientes vinculados a su empresa. | (este commit) |
+| 2026-09-25 | Cuentas por cobrar ordenadas por prioridad en 4 pestañas y mensaje guardado. | (este commit) |
 
 ---
 
