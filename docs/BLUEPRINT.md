@@ -155,6 +155,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | L19 | 2026-09-24 | Imprimir se bloqueaba 5 minutos: se esperaba un aviso "impresión terminada" que Safari no envía. | Nunca bloquear una acción del usuario esperando un evento del navegador; liberar enseguida. |
 | L20 | 2026-09-25 | La caja calculaba el día en UTC (lo de después de las 19:00 caía al día siguiente) y el CRM salía vacío porque solo 10 de 3.021 pacientes importados estaban vinculados a su empresa. | Revisar en cada función `::date` sobre timestamptz (usar `at time zone \'America/Guayaquil\'`). Al importar, crear también los vínculos paciente–empresa. |
 | L21 | 2026-09-25 | Codex alcanzó el límite de uso de la cuenta (hasta 28-sep) a mitad de 3 tareas. Claude revisó y terminó el trabajo parcial (faltaba mostrar la apertura de caja y toda la pantalla del CRM). | Revisar siempre el estado real de los archivos cuando una tarea falla; no asumir que quedó completa. |
+| L22 | 2026-09-25 | Un componente de pantalla importó un valor (no solo tipos) desde un archivo de servidor y rompió la compilación de producción; además el comando siguió y publicó el intento. | Constantes compartidas en archivos sin código de servidor (`*-config.ts` / `*-labels.ts`). Publicar solo si `next build` termina con código 0. |
 
 ---
 
