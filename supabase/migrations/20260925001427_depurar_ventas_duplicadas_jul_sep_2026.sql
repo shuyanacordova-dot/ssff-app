@@ -1,4 +1,4 @@
--- PROPUESTA NO APLICADA. Requiere autorización explícita de Shuyana en el chat.
+-- APLICADA el 2026-09-24 con autorización explícita de Shuyana ("Sí, anula las 332 ventas duplicadas de julio a septiembre").
 -- Anula (NO borra) 332 ventas de julio a septiembre de 2026 duplicadas por importación (o canceladas en Optox),
 -- y respalda cada una (venta + items + pagos) en public.depuracion_ventas_duplicadas.
 -- Referencia: public.optox_ventas_referencia (Excel "Ventas por sucursal" de Optox, cargado 2026-09-24).

@@ -55,7 +55,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | Pacientes — editar ficha | ✅ | Botón "Editar datos" en la carpeta. Todo el equipo puede editar. Cada cambio queda en `pacientes_cambios` (antes/después, quién, cuándo). Falta probar con sesión real. |
 | Historia clínica / revisiones | ✅ | Crear, ver detalle, **editar** (desde 2026-09-24), imprimir |
 | Carpeta del paciente | 🟡 | Cuatro pestañas: Revisiones, Ventas, Fotos y documentos, Laboratorio con contador y órdenes. Pendientes Citas, Estado de cuenta, Comunicaciones. |
-| Ventas y cobros | 🟡 | Pantalla general: solo venta rápida. Lentes solo desde la carpeta del paciente. El formulario pide **solo sucursal** (la empresa sale de la sucursal). Métodos de pago: Efectivo, Transferencia, Tarjeta de crédito, Otro ("Crédito" solo en historial). **Datos importados duplicados: ver sección 11** |
+| Ventas y cobros | ✅ | Pantalla general: solo venta rápida. Lentes solo desde la carpeta del paciente. El formulario pide **solo sucursal** (la empresa sale de la sucursal). Métodos de pago: Efectivo, Transferencia, Tarjeta de crédito, Otro ("Crédito" solo en historial). Duplicados de importación jul–sep 2026 limpiados |
 | Laboratorio | 🟡 | Pestaña propia en carpeta con nueva orden, selector de ventas completadas y acceso al modal existente. Sin venta ofrece registrarla. Tarjetas con fecha, lente, estado y garantía; acceso en ventas renombrado. Pendiente prueba con sesión real. |
 | Impresiones (receta, revisión, orden, recibo) | 🟡 | Implementado, pendiente prueba en navegador: contexto aislado por documento, A4 con márgenes de 12 mm, logos y espacios compactos, paginación sin modales. Incluye acuerdos, resumen del día e informes. TypeScript correcto. |
 | Inventario | ✅ | Stock por sucursal, transferencias, alertas, pestañas por categoría |
@@ -150,6 +150,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | L14 | 2026-09-24 | Shuyana no veía ningún cambio del día (metas, ícono, laboratorio): Vercel no estaba conectado a GitHub; las publicaciones se hacían a mano con la herramienta de Vercel y la última era de 23 h antes. | "Subido a GitHub" no es "publicado". Publicar con `npx vercel --prod` y comprobar en el sitio real (por ejemplo, que `/apple-icon.png` responda). |
 | L15 | 2026-09-24 | Las ventas se importaron **tres veces** (folios 5120–5223, 5489–5601 y 5757–5768 solo con saldo). Metas, cuentas por cobrar y reportes salían inflados (Shuvision: $16,498 vs $7,839 real). | Toda importación debe guardar el folio de origen (Optox) y no insertar si ya existe. Comparar totales contra el sistema de origen después de importar. |
 | L16 | 2026-09-24 | La anulación masiva de 118 ventas fue bloqueada por el control de permisos (cambio grande en datos compartidos). | Para cambios masivos de datos: mostrar el plan con números, pedir autorización explícita en el chat y dejar el SQL listo en `docs/pendientes/`. |
+| L17 | 2026-09-24 | Con autorización explícita en el chat, la anulación masiva sí se pudo aplicar. Se usó el Excel completo de Optox como referencia y se revisó a mano cada caso dudoso (nombres escritos distinto, ventas con orden/garantía enlazada). | Cruzar siempre contra el sistema de origen, mostrar el resultado esperado por mes antes de aplicar, y nunca anular una copia con registros enlazados. |
 
 ---
 
@@ -205,9 +206,9 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 
 ## 11. Pendientes abiertos (2026-09-24)
 
-1. **Aplicar depuración julio–septiembre 2026** (`docs/pendientes/depurar_ventas_duplicadas_jul_sep_2026.sql`): anula 332 copias (Shuvision 234, Focus 50, Sacha 48). Verificado: julio y agosto idénticos a Optox en las 3 sucursales; septiembre idéntico salvo ventas del 24-sep y 2 pagos de Focus. Requiere autorización explícita en el chat.
+1. ✅ **Depuración julio–septiembre 2026 aplicada** (2026-09-24, autorizada por Shuyana): 332 ventas anuladas a su nombre, respaldadas en `depuracion_ventas_duplicadas` (migración `20260925001427`). Julio y agosto idénticos a Optox en las 3 sucursales. Cuentas por cobrar: 110 ventas con saldo, $17,590.
 2. **Historial**: Excel completo de Optox recibido (7,627 ventas desde nov-2022). Enero–junio 2026 y años anteriores **no tienen duplicados** (el sistema tiene igual o menos que Optox). Sacha antes de junio 2026 no es válido (indicación de Shuyana); el sistema no tiene ventas de Sacha antes de julio.
-3. Faltan en el sistema: ventas de Optox del 24-sep (Shuvision folio 6802 $200; Focus 6565 $100 y 6566 $70) y un abono de $100 de Adriana Hurtado (Focus 6563).
+3. **Pendiente de Shuyana (archivo no llegó en el chat)**: historias y pagos de estos días. Faltan en el sistema: ventas de Optox del 24-sep (Shuvision folio 6802 $200; Focus 6565 $100 y 6566 $70) y un abono de $100 de Adriana Hurtado (Focus 6563).
 4. Inconsistencias: ventas con total $0 pero con pagos (ej. Lady Gómez 13-sep, $180 dos veces); ventas con `pagado` distinto a la suma de sus pagos.
 5. **Resumen del día**: solo muestra abonos de ventas creadas ese día; debe mostrar todos los abonos recibidos ese día.
 6. **Elegir fecha**: permitir registrar revisión, venta, orden, cita y cuadre con fecha anterior (con registro de quién lo hizo), y evitar duplicados por fecha.
