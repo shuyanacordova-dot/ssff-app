@@ -36,3 +36,31 @@ export async function guardarMensajeInvitacion(empresaConvenioId: string, mensaj
   if (error) throw new Error("No se pudo guardar el mensaje.");
   revalidatePath(`/convenios/${empresaConvenioId}`);
 }
+
+// Crea (o reutiliza, si la cédula ya existe) la carpeta del paciente con los datos de la persona del convenio.
+export async function crearCarpetaDesdePersona(personaId: string, empresaConvenioId: string): Promise<string> {
+  const supabase = await createSupabaseServerClient();
+  const { data: persona, error } = await supabase.from("convenio_personas")
+    .select("id,nombres,apellidos,cedula,telefono,email,cargo,paciente_id,empresas_convenio(nombre)").eq("id", personaId).maybeSingle();
+  if (error || !persona) throw new Error("No se encontró la persona.");
+  if (persona.paciente_id) return persona.paciente_id as string;
+  const partes = String(persona.nombres).split(/\s+/);
+  const apellidos = (persona.apellidos as string | null)?.trim() || (partes.length > 1 ? partes.slice(-1).join(" ") : "");
+  const nombres = persona.apellidos ? String(persona.nombres) : (partes.length > 1 ? partes.slice(0, -1).join(" ") : String(persona.nombres));
+  if (!apellidos) throw new Error("Agrega el apellido de la persona antes de crear su carpeta.");
+  const digitos = String(persona.telefono ?? "").replace(/\D/g, "");
+  const local = digitos.startsWith("593") ? digitos.slice(3) : digitos.startsWith("0") ? digitos.slice(1) : digitos;
+  const emp = persona.empresas_convenio as unknown as { nombre: string } | { nombre: string }[] | null;
+  const convenio = (Array.isArray(emp) ? emp[0]?.nombre : emp?.nombre) ?? "";
+  const ocupacion = [persona.cargo, convenio && `Convenio ${convenio}`].filter(Boolean).join(" · ") || null;
+  const { data: result, error: rpcError } = await supabase.rpc("registrar_paciente_clinico", {
+    p_nombres: nombres, p_apellidos: apellidos, p_cedula: persona.cedula || null, p_telefono: local ? `+593 ${local}` : null,
+    p_email: persona.email || null, p_direccion: null, p_fecha_nacimiento: null, p_sexo: null, p_ocupacion: ocupacion, p_responsable_id: null,
+  });
+  if (rpcError) throw new Error(rpcError.message || "No se pudo crear la carpeta.");
+  const pacienteId = (result as { paciente_id: string }).paciente_id;
+  const { error: linkError } = await supabase.from("convenio_personas").update({ paciente_id: pacienteId }).eq("id", personaId);
+  if (linkError) throw new Error("La carpeta se creó, pero no se pudo enlazar con la persona del convenio.");
+  revalidatePath(`/convenios/${empresaConvenioId}`); revalidatePath("/pacientes");
+  return pacienteId;
+}

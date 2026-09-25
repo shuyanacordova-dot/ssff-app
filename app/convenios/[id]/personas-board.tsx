@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { MessageCircle, UserPlus, Users, X } from "lucide-react";
+import { FolderOpen, FolderPlus, MessageCircle, UserPlus, Users, X } from "lucide-react";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import { formatRecordDate } from "@/lib/record-date";
-import { actualizarEstadoPersona, agregarPersonaConvenio, guardarMensajeInvitacion } from "../personas-actions";
+import { actualizarEstadoPersona, agregarPersonaConvenio, guardarMensajeInvitacion, crearCarpetaDesdePersona } from "../personas-actions";
 
 export type PersonaConvenio = {
   id: string; nombres: string; apellidos: string | null; cedula: string | null; telefono: string | null; email: string | null; cargo: string | null;
@@ -25,6 +25,10 @@ export default function PersonasBoard(props: Props) {
   const [mensaje, setMensaje] = useState(props.mensaje ?? plantillaBase(props.empresaNombre, props.opticaNombre));
   const [notice, setNotice] = useState("");
   const [pending, startTransition] = useTransition();
+  const crearCarpeta = (p: PersonaConvenio) => startTransition(async () => {
+    try { const pacienteId = await crearCarpetaDesdePersona(p.id, props.empresaConvenioId); router.push(`/pacientes?paciente=${pacienteId}`); }
+    catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo crear la carpeta."); }
+  });
   const conteo = (e: string) => props.personas.filter((p) => e === "todos" || p.estado === e).length;
   const visibles = useMemo(() => {
     const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -61,6 +65,7 @@ export default function PersonasBoard(props: Props) {
             <h2>{nombre}</h2>{p.notas && <p>{p.notas}</p>}</div>
           <div className="task-actions">
             {wa ? <a className="new-consultation" href={wa} target="_blank" rel="noreferrer" onClick={() => { if (p.estado === "nuevo") cambiarEstado(p, "contactado", true); }}><MessageCircle size={14} /> WhatsApp</a> : <span className="field-hint">Sin teléfono</span>}
+            {p.paciente_id ? <Link className="outline-action" href={`/pacientes?paciente=${p.paciente_id}`}><FolderOpen size={14} /> Abrir carpeta</Link> : <button className="outline-action" type="button" disabled={pending} onClick={() => crearCarpeta(p)}><FolderPlus size={14} /> Crear carpeta</button>}
             <select value={p.estado} disabled={pending} onChange={(e) => cambiarEstado(p, e.target.value, e.target.value === "contactado")}>{Object.entries(estadoLabel).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
           </div></article>;
       })}</div> : <section className="empty-state"><Users size={27} /><h3>No hay personas en esta vista</h3><p>Agrégalas una por una o envía la lista en la plantilla de Excel para cargarla.</p></section>}

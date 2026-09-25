@@ -40,7 +40,7 @@ const calcularEdad = (fechaISO: string): number | null => {
   return edad >= 0 ? edad : null;
 };
 
-export default function PatientClinicalClient(props: ClinicalData & { autoCreate?: boolean; initialSearch?: string; initialPacienteId?: string; initialVentaId?: string }) {
+export default function PatientClinicalClient(props: ClinicalData & { autoCreate?: boolean; initialSearch?: string; initialPacienteId?: string; initialVentaId?: string; initialTab?: string }) {
   const router = useRouter();
   const demoMode = props.status !== "ready";
   const patients = demoMode ? demoPatients : props.patients;
@@ -166,7 +166,7 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
     const id = props.initialPacienteId;
     if (demoMode || !id || abrirEnlaceInicial.current) return;
     abrirEnlaceInicial.current = true;
-    const abrir = () => { selectPatient(id); setSection("sales"); };
+    const abrir = () => { selectPatient(id); if (props.initialVentaId || props.initialTab === "ventas") setSection("sales"); };
     if (allPatients.has(id)) { abrir(); return; }
     obtenerPacienteClinico(id).then((patient) => {
       if (!patient) { setNotice("No se encontró la carpeta de este paciente."); return; }

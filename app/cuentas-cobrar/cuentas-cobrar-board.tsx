@@ -150,7 +150,7 @@ function DeudaCard({ deuda, pending, onCanje, onApartado, mostrarCategoria, onCl
     </section></div>}
   </div><div className="task-actions">
     {wa ? <button className="new-consultation" type="button" onClick={() => setVerMensaje(true)}><MessageCircle size={14} /> Ver mensaje</button> : <span style={{ color: "#a24150", fontSize: 12, fontWeight: 700 }}>Sin WhatsApp registrado</span>}
-    <Link className="outline-action" href={`/pacientes?paciente=${deuda.paciente_id}${deuda.ventas.length === 1 ? `&venta=${deuda.ventas[0].id}` : ""}`}><Wallet size={14} /> Añadir pago</Link>
+    <Link className="outline-action" href={`/pacientes?paciente=${deuda.paciente_id}${deuda.ventas.length === 1 ? `&venta=${deuda.ventas[0].id}` : "&tab=ventas"}`}><Wallet size={14} /> Añadir pago</Link>
     {onCanje && <button className="outline-action" type="button" onClick={onCanje} title="Solo Superadministradora: baja el saldo sin contar como abono ni venta"><Repeat size={14} /> Canje</button>}
     <div className="menu-wrap" ref={menuRef}>
       <button className="outline-action" type="button" onClick={() => setMenuOpen((v) => !v)}><MoreVertical size={14} /> Más opciones</button>
