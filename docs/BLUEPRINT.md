@@ -65,9 +65,9 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | Agenda | ✅ | Vista día y mes. Vendedores pueden ver y agendar citas (2026-09-24). Falta Google Calendar |
 | Convenios | ✅ | Empresas con descuento a rol |
 | Informes y metas | ✅ | Las metas usan **"A cuenta del mes"** = lo pagado de las ventas creadas en el mes (igual que la columna "A cuenta" de Optox). Queda también `ingresos_total` (abonos por fecha de pago) disponible |
-| Facturación SRI | 🟡 | Solo **borradores** internos (`app/facturacion`). No firma ni envía al SRI. **Fase C**: 3 RUC con su firma .p12 (se suben por pantalla segura, nunca por chat); la clave del portal SRI no se necesita |
+| Facturación SRI | 🟡 | Borradores internos. Tabla `emisores_sri` por **sucursal** (Shuvision 1804006391001 ✔; Sacha 2100060470001 y Focus 1722305412001 **por confirmar**, se entregaron con 10 dígitos). Falta todo el envío al SRI (proyecto P1) |
 | Asistente Shu (IA) | 🟡 | Ayuda administrativa básica (`app/asistente`). **Fase D** |
-| CRM / seguimiento de pacientes | 🟡 | `/crm` "A quién contactar hoy": controles, examen sin compra, lentes listos, postventa, cumpleaños, inactivos. WhatsApp con mensaje listo (envío manual) y registro de contacto. Pacientes contactados se ocultan 14 días. Falta: pestaña "Comunicaciones" en la carpeta, lealtad/referidos, lentes de contacto |
+| CRM / seguimiento de pacientes | 🟡 | `/crm` general "A quién contactar hoy" + pestaña **Comunicaciones** en la carpeta del paciente (historial y registro de contactos). Falta: lealtad/referidos, lentes de contacto |
 | Tarjeta de lealtad y referidos | ❌ | **Fase B** |
 | Auditoría general de cambios | 🟡 | `pacientes_cambios` activa para ediciones de pacientes. Falta pantalla para verla y auditoría de otros módulos. |
 | Seguridad de funciones de base de datos | ✅ | 2026-09-24: se quitó el acceso sin sesión a 7 funciones. Solo `obtener_recibo_publico` es pública (a propósito). |
@@ -209,6 +209,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-24 | Depuración de 332 duplicados (jul–sep), carpeta se recarga tras cambios, impresión sin bloqueo, búsqueda en inventario, Rx con botones −/+ en celular, uso del lente con cálculo de cerca/intermedio. | (este commit) |
 | 2026-09-25 | Caja lista para el arranque (hora Ecuador, apertura, banco en abonos), cálculos ópticos avanzados, CRM v1, 2.897 pacientes vinculados a su empresa. | (este commit) |
 | 2026-09-25 | Cuentas por cobrar ordenadas por prioridad en 4 pestañas y mensaje guardado. | (este commit) |
+| 2026-09-25 | Pestaña Comunicaciones en la carpeta; tabla de emisores SRI por sucursal; proyectos largos y plan de salida de Optox en el Blueprint. | (este commit) |
 
 ---
 
@@ -253,3 +254,31 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 **Otros módulos sugeridos**
 - Proveedores y compras (órdenes de compra, cuentas por pagar).
 - Portal del paciente: receta digital, recibo y estado de su orden con un enlace.
+
+---
+
+## 12. Proyectos largos (hoja de ruta para dejar Optox)
+
+**Meta de Shuyana (2026-09-25): dejar de pagar Optox a fin de septiembre de 2026.** Arranque real de LumOS: 25-sep-2026 (cuadres de caja de las 3 sucursales empiezan ese día con una apertura).
+
+### Antes de apagar Optox (bloqueantes)
+| # | Qué | Por qué bloquea | Estado |
+|---|---|---|---|
+| B1 | **Facturación electrónica** | Si hoy las facturas salen desde Optox, al apagarlo no se puede facturar legalmente. Puente mientras LumOS factura: el facturador gratuito del SRI en línea. | ❌ (P1) |
+| B2 | Exportar de Optox todo lo que falte: ventas y abonos desde 22/23/24-sep, historias clínicas desde 23-sep, inventario actual, catálogo y precios | Después no habrá acceso | 🟡 esperando capturas/Excel |
+| B3 | Una semana de marcha blanca: cada cuadre de LumOS comparado con el conteo real | Confirmar que los números cuadran | ⏳ desde 25-sep |
+| B4 | Inventario inicial contado por sucursal | El stock debe partir de un conteo real | ❌ |
+| B5 | Equipo capacitado (Yuli caja; optometristas historia + orden; vendedoras venta + CRM) | Evitar volver a Optox "por costumbre" | ❌ |
+
+### Proyectos largos
+| # | Proyecto | Contenido | Depende de |
+|---|---|---|---|
+| P1 | **Facturación electrónica SRI** | XML factura v1.1, firma XAdES-BES con .p12 por RUC, envío a web services de recepción/autorización, RIDE PDF, correo/WhatsApp al paciente, notas de crédito, ambiente pruebas → producción. Firma y clave cifradas (nunca por chat). No se necesita usuario/clave del portal SRI. | Datos de cada RUC: razón social, dirección, establecimiento/punto de emisión, régimen, contabilidad, último secuencial; archivos .p12 |
+| P2 | **Asistente virtual de gestión** ("Asistente Shu") | Responde en lenguaje natural sobre ventas, cobros, caja, laboratorio, metas; alertas proactivas ("trabajos atrasados", "diferencias de caja recurrentes"); acciones con confirmación | Datos limpios (hecho), P5 |
+| P3 | **Asistente clínico** | Resume la historia completa, compara revisiones, sugiere exámenes complementarios; apoyo, no reemplaza el criterio clínico; control estricto de qué datos salen a la IA | P2 |
+| P4 | **WhatsApp Business de las 3 ópticas en LumOS** | API oficial por número (coexistencia con la app), bandeja ligada a Comunicaciones, respuestas sugeridas por IA, Make solo para campañas | Registro de números en Meta; separar Focus en Make |
+| P5 | **Inicio por cargo y menú corto** | Yuli: caja, cobros, CRM; optometristas: agenda y revisiones; Shuyana: metas, alertas, supervisión; menú con Pacientes, Agenda, Caja, CRM, Laboratorio y "Administración" | — |
+| P6 | **Fidelización y referidos** | Código/QR por paciente, "¿quién te refirió?", beneficios, ranking | Reglas de beneficios (Shuyana) |
+| P7 | **Lentes de contacto** | Plantillas por marca/duración y recordatorio de reposición en el CRM | — |
+| P8 | **Proveedores y compras** | Órdenes de compra, cuentas por pagar, costo real por producto | — |
+| P9 | **Respaldo externo** | Copia diaria fuera de Supabase | — |
