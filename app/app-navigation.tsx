@@ -33,6 +33,7 @@ const primaryItems: NavItem[] = [
   { href: "/pacientes", label: "Pacientes", detail: "Historias y revisiones", icon: Users, group: "Operación" },
   { href: "/ventas", label: "Ventas", detail: "Cobros y pedidos", icon: Banknote, group: "Operación" },
   { href: "/resumen-dia", label: "Resumen del día", detail: "Cierre operativo", icon: Landmark, group: "Finanzas" },
+  { href: "/caja", label: "Cuadre de caja", detail: "Apertura, gastos y cierre diario", icon: Coins, group: "Finanzas" },
   { href: "/agenda", label: "Agenda", detail: "Citas del equipo", icon: CalendarDays, group: "Operación" },
 ];
 
@@ -42,7 +43,6 @@ const menuItems: NavItem[] = [
   { href: "/inventario", label: "Inventario", detail: "Monturas, lunas y stock", icon: Package, group: "Operación" },
   { href: "/crm", label: "CRM", detail: "A quién contactar hoy", icon: HeartHandshake, group: "Operación" },
   { href: "/tareas", label: "Tareas", detail: "Seguimiento del equipo", icon: ClipboardList, group: "Operación" },
-  { href: "/caja", label: "Caja", detail: "Cuadre diario", icon: Coins, group: "Finanzas" },
   { href: "/cuentas-cobrar", label: "Cuentas por cobrar", detail: "Saldos y convenios de pago", icon: Wallet, group: "Finanzas" },
   { href: "/facturacion", label: "Facturación", detail: "Borradores vinculados a ventas", icon: FileText, group: "Finanzas" },
   { href: "/convenios", label: "Convenios", detail: "Empresas aliadas", icon: Building2, group: "Finanzas" },
