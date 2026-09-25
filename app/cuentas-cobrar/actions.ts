@@ -11,6 +11,14 @@ export async function actualizarFrecuenciaCobro(pacienteId: string, frecuencia: 
   revalidatePath("/cuentas-cobrar");
 }
 
+export async function clasificarDeuda(pacienteId: string, categoria: string) {
+  const supabase = await createSupabaseServerClient();
+  if (!pacienteId) throw new Error("Falta identificar al paciente.");
+  const { error } = await supabase.rpc("clasificar_deuda_paciente", { p_paciente: pacienteId, p_categoria: categoria || null });
+  if (error) throw new Error(error.message || "No se pudo cambiar la clasificación.");
+  revalidatePath("/cuentas-cobrar");
+}
+
 export async function activarCobroInsistente(pacienteId: string, activo: boolean) {
   const supabase = await createSupabaseServerClient();
   if (!pacienteId) throw new Error("Falta identificar al paciente.");

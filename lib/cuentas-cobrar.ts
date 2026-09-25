@@ -4,7 +4,7 @@ import { getOperationalContext } from "@/lib/operational-context";
 export type DeudaVenta = { id: string; total: number; pagado: number; saldo: number; creado_en: string; fecha_entrega_estimada: string | null; recibo_token: string; folio: number | null };
 export type ConvenioDeuda = { empresa: string; cuotas: number; monto_cuota: number; fecha_primera_cuota: string | null };
 export type CategoriaDeuda = "urgentes" | "recientes" | "mensuales" | "convenio";
-export type DeudaPaciente = { paciente_id: string; nombres: string; apellidos: string; telefono: string | null; frecuencia_cobro: string | null; cobro_insistente: boolean; empresa_nombre: string; saldo_total: number; ventas: DeudaVenta[]; convenio: ConvenioDeuda | null; dias_mas_antigua: number; categoria: CategoriaDeuda };
+export type DeudaPaciente = { paciente_id: string; nombres: string; apellidos: string; telefono: string | null; frecuencia_cobro: string | null; cobro_insistente: boolean; empresa_nombre: string; saldo_total: number; ventas: DeudaVenta[]; convenio: ConvenioDeuda | null; dias_mas_antigua: number; categoria: CategoriaDeuda; categoria_auto: CategoriaDeuda; categoria_manual: CategoriaDeuda | null };
 
 export { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
 import { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
@@ -41,7 +41,7 @@ export async function getCuentasCobrarData(): Promise<CuentasCobrarData> {
     const pacienteIds = Array.from(new Set((ventas ?? []).map((v) => v.paciente_id as string)));
     if (!pacienteIds.length) return { status: "ready", profile: { id: profile.id, empresa_id: profile.empresa_id, rol: role }, deudas: [], empresasConvenio, makeConfigured };
 
-    const { data: pacientes, error: pacientesError } = await supabase.from("pacientes_clinicos").select("id,nombres,apellidos,telefono,frecuencia_cobro,cobro_insistente").in("id", pacienteIds);
+    const { data: pacientes, error: pacientesError } = await supabase.from("pacientes_clinicos").select("id,nombres,apellidos,telefono,frecuencia_cobro,cobro_insistente,categoria_cobro").in("id", pacienteIds);
     if (pacientesError) return { status: "error", message: "No se pudieron cargar los pacientes con saldo pendiente.", ...empty };
     const pacienteById = new Map((pacientes ?? []).map((p) => [p.id, p]));
     const ventaIds = (ventas ?? []).map((v) => v.id);
@@ -61,7 +61,7 @@ export async function getCuentasCobrarData(): Promise<CuentasCobrarData> {
       const existente = grupos.get(key);
       const ventaResumen: DeudaVenta = { id: venta.id, total: Number(venta.total), pagado: Number(venta.pagado), saldo: Number(venta.saldo), creado_en: venta.creado_en, fecha_entrega_estimada: venta.fecha_entrega_estimada, recibo_token: venta.recibo_token, folio: venta.folio };
       if (existente) { existente.saldo_total += Number(venta.saldo); existente.ventas.push(ventaResumen); }
-      else grupos.set(key, { paciente_id: paciente.id, nombres: paciente.nombres, apellidos: paciente.apellidos, telefono: paciente.telefono, frecuencia_cobro: paciente.frecuencia_cobro, cobro_insistente: paciente.cobro_insistente ?? false, empresa_nombre: nombreEmpresa ?? "Empresa", saldo_total: Number(venta.saldo), ventas: [ventaResumen], convenio: null, dias_mas_antigua: 0, categoria: "recientes" });
+      else grupos.set(key, { paciente_id: paciente.id, nombres: paciente.nombres, apellidos: paciente.apellidos, telefono: paciente.telefono, frecuencia_cobro: paciente.frecuencia_cobro, cobro_insistente: paciente.cobro_insistente ?? false, empresa_nombre: nombreEmpresa ?? "Empresa", saldo_total: Number(venta.saldo), ventas: [ventaResumen], convenio: null, dias_mas_antigua: 0, categoria: "recientes", categoria_auto: "recientes", categoria_manual: (paciente.categoria_cobro as CategoriaDeuda | null) ?? null });
       const grupo = grupos.get(key)!;
       const acuerdo = acuerdoByVenta.get(venta.id);
       if (acuerdo && !grupo.convenio) grupo.convenio = acuerdo;
@@ -71,8 +71,8 @@ export async function getCuentasCobrarData(): Promise<CuentasCobrarData> {
     const deudas = Array.from(grupos.values()).map((d) => {
       const masAntigua = Math.min(...d.ventas.map((v) => new Date(v.creado_en).getTime()));
       const dias = Math.max(0, Math.floor((ahora - masAntigua) / 86_400_000));
-      const categoria: CategoriaDeuda = d.convenio ? "convenio" : d.frecuencia_cobro === "mensual" ? "mensuales" : dias > DIAS_URGENTE ? "urgentes" : "recientes";
-      return { ...d, dias_mas_antigua: dias, categoria };
+      const categoria_auto: CategoriaDeuda = d.convenio ? "convenio" : d.frecuencia_cobro === "mensual" ? "mensuales" : dias > DIAS_URGENTE ? "urgentes" : "recientes";
+      return { ...d, dias_mas_antigua: dias, categoria_auto, categoria: d.categoria_manual ?? categoria_auto };
     });
     return { status: "ready", profile: { id: profile.id, empresa_id: empresaActiva, rol: role }, empresaNombre: context?.activeCompany.nombre, deudas, empresasConvenio, makeConfigured };
   } catch {

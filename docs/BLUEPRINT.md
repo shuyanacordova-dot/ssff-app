@@ -219,6 +219,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-25 | Cuadre de caja: botón claro "Anotar valores y cerrar caja", abre en la sucursal elegida, montos aceptan coma o punto, apertura ya no se repite dentro del cierre. | (este commit) |
 | 2026-09-25 | Menú de arriba: "Resumen del día" reemplaza a "Laboratorio" (Laboratorio sigue en el menú completo). | (este commit) |
 | 2026-09-25 | Cuentas por cobrar → Más opciones → "Añadir pago": abre la carpeta del paciente en Ventas con el abono listo en esa venta (enlace `/pacientes?paciente=ID&venta=ID`). Montos del abono aceptan coma o punto. | (este commit) |
+| 2026-09-25 | Cuentas por cobrar: pestaña "Todas", clasificación manual por tarjeta (Automática / Urgentes / Recientes / Mensuales / Convenios, guardada en `pacientes_clinicos.categoria_cobro`), "Ventas recientes" = hasta 3 meses (90 días). Migración `20260925180000_clasificar_deuda_manual.sql`. | (este commit) |
 
 ---
 

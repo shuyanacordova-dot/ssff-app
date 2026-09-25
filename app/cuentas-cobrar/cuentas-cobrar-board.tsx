@@ -10,19 +10,21 @@ import { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
 import { construirMensajeContacto, plantillasContacto, type PlantillaContactoId } from "@/lib/mensajes";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import { crearAcuerdoPago, crearEmpresaConvenio, type AcuerdoPago } from "@/app/ventas/convenio-actions";
-import { activarCobroInsistente, actualizarFrecuenciaCobro } from "./actions";
+import { activarCobroInsistente, actualizarFrecuenciaCobro, clasificarDeuda } from "./actions";
 import Letterhead from "../print-letterhead";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
 const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
 const frecuenciaLabel: Record<string, string> = { semanal: "Semanal", quincenal: "Quincenal", mensual: "Mensual" };
 const categorias: { id: CategoriaDeuda; label: string; ayuda: string }[] = [
-  { id: "urgentes", label: "Urgentes", ayuda: `Deudas con más de ${DIAS_URGENTE} días, de la más antigua a la más reciente.` },
-  { id: "recientes", label: "Ventas recientes", ayuda: `Saldos de los últimos ${DIAS_URGENTE} días, de la venta más nueva a la más antigua.` },
+  { id: "urgentes", label: "Urgentes", ayuda: `Deudas de más de 3 meses (${DIAS_URGENTE} días), de la más antigua a la más reciente.` },
+  { id: "recientes", label: "Ventas recientes", ayuda: `Saldos de ventas de hasta 3 meses (${DIAS_URGENTE} días), de la venta más nueva a la más antigua.` },
   { id: "mensuales", label: "Cobros mensuales", ayuda: "Pacientes con frecuencia de cobro mensual." },
   { id: "convenio", label: "Convenios", ayuda: "Deudas con acuerdo de pago con una empresa (descuento a rol)." },
 ];
-const ordenar = (categoria: CategoriaDeuda, deudas: DeudaPaciente[]) => [...deudas].sort((a, b) =>
+type Pestana = CategoriaDeuda | "todas";
+const categoriaLabel = (id: CategoriaDeuda) => categorias.find((c) => c.id === id)?.label ?? id;
+const ordenar = (categoria: Pestana, deudas: DeudaPaciente[]) => [...deudas].sort((a, b) =>
   categoria === "recientes" ? a.dias_mas_antigua - b.dias_mas_antigua
   : categoria === "convenio" ? (a.convenio?.empresa ?? "").localeCompare(b.convenio?.empresa ?? "") || a.apellidos.localeCompare(b.apellidos)
   : b.dias_mas_antigua - a.dias_mas_antigua);
@@ -31,16 +33,20 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
   const [notice, setNotice] = useState(props.message ?? "");
   const [pending, startTransition] = useTransition();
   const [convenioDeuda, setConvenioDeuda] = useState<DeudaPaciente | null>(null);
-  const [tab, setTab] = useState<CategoriaDeuda>("urgentes");
+  const [tab, setTab] = useState<Pestana>("urgentes");
 
   if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN COMERCIAL</p><h1>Cuentas por cobrar</h1><p className="subtitle">{props.message ?? "No se pudo abrir cuentas por cobrar."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/cuentas-cobrar">Iniciar sesión</Link>}</header></div></main>;
 
   const totalDeuda = props.deudas.reduce((sum, d) => sum + d.saldo_total, 0);
-  const visibles = ordenar(tab, props.deudas.filter((d) => d.categoria === tab));
+  const visibles = ordenar(tab, tab === "todas" ? props.deudas : props.deudas.filter((d) => d.categoria === tab));
 
   const cambiarFrecuencia = (pacienteId: string, frecuencia: string) => startTransition(async () => {
     try { await actualizarFrecuenciaCobro(pacienteId, frecuencia); setNotice("Frecuencia de cobro actualizada."); }
     catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo actualizar la frecuencia."); }
+  });
+  const cambiarClasificacion = (pacienteId: string, categoria: string) => startTransition(async () => {
+    try { await clasificarDeuda(pacienteId, categoria); setNotice(categoria ? `Deuda movida a "${categoriaLabel(categoria as CategoriaDeuda)}".` : "La deuda vuelve a clasificarse automáticamente."); }
+    catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo cambiar la clasificación."); }
   });
   const cambiarCobroInsistente = (pacienteId: string, activo: boolean) => startTransition(async () => {
     try { await activarCobroInsistente(pacienteId, activo); setNotice(activo ? "Cobro insistente marcado. La automatización con Make sigue pendiente; todavía no se enviaron mensajes." : "Cobro insistente desactivado."); }
@@ -54,15 +60,15 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
     <div className="make-status"><AlertTriangle size={18} /><span><strong>Automatización diaria con Make:</strong> {props.makeConfigured ? "el enlace técnico está configurado, pero el envío de datos permanece pausado hasta tu autorización final." : "pendiente de conectar. Los mensajes manuales por WhatsApp ya se pueden usar y revisar."}</span></div>
 
     <section className="glass agenda-board">
-      <div className="tabs" role="tablist" style={{ flexWrap: "wrap", marginBottom: 10 }}>{categorias.map((c) => { const lista = props.deudas.filter((d) => d.categoria === c.id); return <button key={c.id} role="tab" type="button" className={tab === c.id ? "active" : ""} onClick={() => setTab(c.id)}>{c.label} ({lista.length} · {money(lista.reduce((sum, d) => sum + d.saldo_total, 0))})</button>; })}</div>
-      <p className="field-hint">{categorias.find((c) => c.id === tab)?.ayuda}</p>
-      {visibles.length ? <div className="task-list">{visibles.map((deuda) => <DeudaCard key={deuda.paciente_id} deuda={deuda} pending={pending} onFrecuencia={(f) => cambiarFrecuencia(deuda.paciente_id, f)} onCobroInsistente={(activo) => cambiarCobroInsistente(deuda.paciente_id, activo)} onConvenio={() => setConvenioDeuda(deuda)} />)}</div> : <section className="empty-state"><Wallet size={27} /><h3>No hay saldos en esta pestaña</h3><p>Cuando una venta quede con saldo aparecerá en la pestaña que le corresponda.</p></section>}
+      <div className="tabs" role="tablist" style={{ flexWrap: "wrap", marginBottom: 10 }}><button role="tab" type="button" className={tab === "todas" ? "active" : ""} onClick={() => setTab("todas")}>Todas ({props.deudas.length} · {money(totalDeuda)})</button>{categorias.map((c) => { const lista = props.deudas.filter((d) => d.categoria === c.id); return <button key={c.id} role="tab" type="button" className={tab === c.id ? "active" : ""} onClick={() => setTab(c.id)}>{c.label} ({lista.length} · {money(lista.reduce((sum, d) => sum + d.saldo_total, 0))})</button>; })}</div>
+      <p className="field-hint">{tab === "todas" ? "Todas las deudas, de la más antigua a la más reciente. Usa \"Clasificación\" en cada tarjeta para moverla a otra pestaña." : categorias.find((c) => c.id === tab)?.ayuda}</p>
+      {visibles.length ? <div className="task-list">{visibles.map((deuda) => <DeudaCard key={deuda.paciente_id} deuda={deuda} pending={pending} mostrarCategoria={tab === "todas"} onClasificar={(c) => cambiarClasificacion(deuda.paciente_id, c)} onFrecuencia={(f) => cambiarFrecuencia(deuda.paciente_id, f)} onCobroInsistente={(activo) => cambiarCobroInsistente(deuda.paciente_id, activo)} onConvenio={() => setConvenioDeuda(deuda)} />)}</div> : <section className="empty-state"><Wallet size={27} /><h3>No hay saldos en esta pestaña</h3><p>Cuando una venta quede con saldo aparecerá en la pestaña que le corresponda.</p></section>}
     </section>
     {convenioDeuda && <ConvenioModal deuda={convenioDeuda} empresasConvenio={props.empresasConvenio} onClose={() => setConvenioDeuda(null)} onNotice={setNotice} />}
   </div></main>;
 }
 
-function DeudaCard({ deuda, pending, onFrecuencia, onCobroInsistente, onConvenio }: { deuda: DeudaPaciente; pending: boolean; onFrecuencia: (frecuencia: string) => void; onCobroInsistente: (activo: boolean) => void; onConvenio: () => void }) {
+function DeudaCard({ deuda, pending, mostrarCategoria, onClasificar, onFrecuencia, onCobroInsistente, onConvenio }: { deuda: DeudaPaciente; pending: boolean; mostrarCategoria: boolean; onClasificar: (categoria: string) => void; onFrecuencia: (frecuencia: string) => void; onCobroInsistente: (activo: boolean) => void; onConvenio: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [origin, setOrigin] = useState("");
   const [plantilla, setPlantilla] = useState<PlantillaContactoId>(deuda.frecuencia_cobro === "mensual" ? "cobro_mensual" : "cobro_insistente");
@@ -84,10 +90,11 @@ function DeudaCard({ deuda, pending, onFrecuencia, onCobroInsistente, onConvenio
   useEffect(() => { if (!menuOpen) return; const onClick = (event: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(event.target as Node)) closeMenu(); }; document.addEventListener("mousedown", onClick); return () => document.removeEventListener("mousedown", onClick); }, [menuOpen]);
 
   return <article className="task-card"><div className="task-status" /><div className="task-main">
-    <div className="task-meta"><span className={deuda.dias_mas_antigua > DIAS_URGENTE ? "urgente" : ""}>{deuda.dias_mas_antigua === 0 ? "Hoy" : `${deuda.dias_mas_antigua} días`}</span>{deuda.convenio && <span>Convenio {deuda.convenio.empresa} · {deuda.convenio.cuotas} cuotas de {money(deuda.convenio.monto_cuota)}</span>}<span>{deuda.telefono || "Sin WhatsApp registrado"}</span>{deuda.cobro_insistente && <span className="urgente"><AlertTriangle size={11} /> Cobro insistente</span>}</div>
+    <div className="task-meta"><span className={deuda.dias_mas_antigua > DIAS_URGENTE ? "urgente" : ""}>{deuda.dias_mas_antigua === 0 ? "Hoy" : `${deuda.dias_mas_antigua} días`}</span>{mostrarCategoria && <span>{categoriaLabel(deuda.categoria)}{deuda.categoria_manual ? " (manual)" : ""}</span>}{deuda.convenio && <span>Convenio {deuda.convenio.empresa} · {deuda.convenio.cuotas} cuotas de {money(deuda.convenio.monto_cuota)}</span>}<span>{deuda.telefono || "Sin WhatsApp registrado"}</span>{deuda.cobro_insistente && <span className="urgente"><AlertTriangle size={11} /> Cobro insistente</span>}</div>
     <h2>{nombre}</h2>
     <p>Deuda: <strong>{money(deuda.saldo_total)}</strong> · {deuda.ventas.length} venta(s) pendiente(s): {deuda.ventas.map((v) => `${formatDate(v.creado_en)} (${money(v.saldo)})`).join(", ")}</p>
     <div className="collection-controls">
+      <label>Clasificación<select key={deuda.categoria_manual ?? "auto"} defaultValue={deuda.categoria_manual ?? ""} disabled={pending} onChange={(event) => onClasificar(event.target.value)}><option value="">Automática ({categoriaLabel(deuda.categoria_auto)})</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
       <label>Frecuencia de cobro<select defaultValue={deuda.frecuencia_cobro ?? ""} disabled={pending} onChange={(event) => onFrecuencia(event.target.value)}><option value="">Sin definir</option>{Object.entries(frecuenciaLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
     </div>
     {verMensaje && <div className="modal-backdrop" onClick={() => setVerMensaje(false)}><section className="new-patient-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
