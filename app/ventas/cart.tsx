@@ -130,9 +130,12 @@ export default function Cart({ products, stock, branches, patients, empresasConv
 
 function ProductSearchModal({ title, products, branch, stockFor, onSelect, onClose }: { title: string; products: SaleProduct[]; branch: string; stockFor: (productoId: string, sucursalId: string) => number; onSelect: (id: string) => void; onClose: () => void }) {
   const [query, setQuery] = useState("");
-  const visible = products.filter((p) => p.nombre.toLowerCase().includes(query.toLowerCase()));
+  const normalizar = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const palabras = normalizar(query).split(/\s+/).filter(Boolean);
+  // Busca por nombre, código de barras, código, marca, modelo o color (varias palabras a la vez).
+  const visible = products.filter((p) => { const texto = normalizar([p.nombre, p.codigo_barra, p.codigo, p.marca, p.modelo, p.color].filter(Boolean).join(" ")); return palabras.every((w) => texto.includes(w)); });
   return <div className="modal-backdrop"><section className="new-patient-modal product-search-modal" role="dialog" aria-modal="true" aria-labelledby="product-search-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button><p className="section-label">{title}</p><h2 id="product-search-title">Buscar producto</h2>
-    <label className="patient-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre del producto" autoFocus /></label>
+    <label className="patient-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre, código de barras, marca o color" autoFocus /></label>
     <div className="product-search-list">{visible.map((p) => <button key={p.id} type="button" className="product-search-row" onClick={() => { onSelect(p.id); onClose(); }} title={p.nombre}><strong>{p.nombre}</strong><span className="product-category-pill">{productCategoryLabel[p.categoria] ?? "Producto"}</span><span className="product-result-price">{money(Number(p.precio_venta))}</span><span className="product-result-stock">{p.controla_inventario && branch ? `${stockFor(p.id, branch)} disponibles` : "Disponible"}</span></button>)}
     {visible.length === 0 && <p className="empty-patients">No se encontraron productos.</p>}</div>
   </section></div>;

@@ -1,3 +1,4 @@
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 import { createSupabaseAdminClient, hasSupabaseAdminConfiguration } from "@/lib/supabase/admin";
 import type { EmpresaConvenio, Garantia, Sale, SaleBranch, SaleCompany, SaleLabOrder, SaleProduct, SaleStock } from "@/lib/ventas";
@@ -76,7 +77,7 @@ export async function getClinicalData(): Promise<ClinicalData> {
       supabase.from("historia_fotos").select("id,paciente_id,consulta_id,tipo,descripcion,storage_path,creado_en").in("paciente_id", ids).order("creado_en", { ascending: false }).limit(150),
       supabase.from("ventas").select("id,empresa_id,sucursal_id,paciente_id,cliente_nombre,estado,subtotal,descuento,total,pagado,saldo,motivo_anulacion,recibo_token,fecha_entrega_estimada,creado_en,folio,apartado,apartado_hasta,venta_items(id,producto_id,descripcion,cantidad,precio_unitario,descuento,total_linea),pagos_venta(id,metodo,monto,referencia,banco,creado_en)").in("paciente_id", ids).order("creado_en", { ascending: false }).limit(150),
       supabase.from("empresas").select("id,nombre,direccion,telefono,email,logo_url").eq("activo", true).order("nombre"),
-      supabase.from("productos_catalogo").select("id,empresa_id,nombre,categoria,precio_venta,controla_inventario").eq("activo", true).order("nombre").limit(200),
+      fetchAll<SaleProduct>((from, to) => supabase.from("productos_catalogo").select("id,empresa_id,nombre,categoria,precio_venta,controla_inventario,codigo,codigo_barra,marca,modelo,color").eq("activo", true).order("nombre").order("id").range(from, to)),
       loadBranchIdentities(supabase),
       hasSupabaseAdminConfiguration()
         ? createSupabaseAdminClient().from("usuarios").select("id,nombre,activo,roles(nombre)").eq("activo", true).order("nombre")
@@ -99,7 +100,7 @@ export async function getClinicalData(): Promise<ClinicalData> {
     const urlByPath = new Map((signed.data ?? []).map((item) => [item.path, item.signedUrl]));
 
     const productIds = (productsResult.data ?? []).map((product) => product.id);
-    const stockResult = productIds.length ? await supabase.from("inventario_stock").select("producto_id,sucursal_id,cantidad").in("producto_id", productIds) : { data: [], error: null };
+    const stockResult = productIds.length ? await fetchAll<SaleStock>((from, to) => supabase.from("inventario_stock").select("producto_id,sucursal_id,cantidad").order("id").range(from, to)) : { data: [], error: null };
 
     const saleIds = (salesResult.data ?? []).map((sale) => sale.id);
     const [labOrdersResult, garantiasResult] = saleIds.length ? await Promise.all([

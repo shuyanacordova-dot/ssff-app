@@ -1,3 +1,4 @@
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 import { getOperationalContext } from "@/lib/operational-context";
 
@@ -27,14 +28,14 @@ export async function getInventarioData(): Promise<InventarioData> {
     const [companiesResult, branchesResult, productosResult, operationalContext] = await Promise.all([
       supabase.from("empresas").select("id,nombre").eq("activo", true).order("nombre"),
       supabase.from("sucursales").select("id,empresa_id,nombre").eq("activo", true).order("nombre"),
-      supabase.from("productos_catalogo").select("id,empresa_id,nombre,categoria,clasificacion,codigo,codigo_barra,precio_venta,costo_referencial,proveedor,controla_inventario,activo,diseno,material,indice,tecnologia,linea,rango_esf_pos,rango_esf_neg,rango_cil_pos,rango_cil_neg,rango_add_pos,rango_add_neg,marca,modelo,color,consignacion,precio_venta_2,precio_venta_3,medida_puente,fecha_compra").eq("activo", true).order("nombre").limit(2000),
+      fetchAll<Producto>((from, to) => supabase.from("productos_catalogo").select("id,empresa_id,nombre,categoria,clasificacion,codigo,codigo_barra,precio_venta,costo_referencial,proveedor,controla_inventario,activo,diseno,material,indice,tecnologia,linea,rango_esf_pos,rango_esf_neg,rango_cil_pos,rango_cil_neg,rango_add_pos,rango_add_neg,marca,modelo,color,consignacion,precio_venta_2,precio_venta_3,medida_puente,fecha_compra").eq("activo", true).order("nombre").order("id").range(from, to)),
       getOperationalContext(),
     ]);
     if (companiesResult.error || branchesResult.error || productosResult.error) return { status: "error", message: "No se pudo cargar inventario. Revisa la conexión y los permisos.", ...empty };
 
     const sucursalIds = (branchesResult.data ?? []).map((branch) => branch.id);
     const [stockResult, movimientosResult] = sucursalIds.length ? await Promise.all([
-      supabase.from("inventario_stock").select("id,producto_id,sucursal_id,cantidad,stock_minimo").in("sucursal_id", sucursalIds).limit(5000),
+      fetchAll<StockRow>((from, to) => supabase.from("inventario_stock").select("id,producto_id,sucursal_id,cantidad,stock_minimo").in("sucursal_id", sucursalIds).order("id").range(from, to)),
       supabase.from("movimientos_inventario").select("id,producto_id,sucursal_id,tipo,cantidad,motivo,venta_id,creado_en").in("sucursal_id", sucursalIds).order("creado_en", { ascending: false }).limit(150),
     ]) : [{ data: [], error: null }, { data: [], error: null }];
     if (stockResult.error || movimientosResult.error) return { status: "error", message: "No se pudo cargar el stock. Revisa la conexión y los permisos.", ...empty };

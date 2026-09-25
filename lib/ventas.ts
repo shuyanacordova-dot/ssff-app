@@ -1,3 +1,4 @@
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 import { createSupabaseAdminClient, hasSupabaseAdminConfiguration } from "@/lib/supabase/admin";
 import { getOperationalContext } from "@/lib/operational-context";
@@ -5,7 +6,7 @@ import { loadBranchIdentities, type BranchIdentity, type CompanyIdentity } from 
 
 export type SaleStatus = "borrador" | "completada" | "anulada";
 export type PaymentMethod = "efectivo" | "transferencia" | "tarjeta" | "credito" | "otro" | "saldo_favor";
-export type SaleProduct = { id: string; empresa_id: string; nombre: string; categoria: string; precio_venta: number; controla_inventario: boolean };
+export type SaleProduct = { id: string; empresa_id: string; nombre: string; categoria: string; precio_venta: number; controla_inventario: boolean; codigo?: string | null; codigo_barra?: string | null; marca?: string | null; modelo?: string | null; color?: string | null };
 export type SaleCompany = CompanyIdentity;
 export type SaleBranch = BranchIdentity;
 export type SaleStock = { producto_id: string; sucursal_id: string; cantidad: number };
@@ -35,7 +36,7 @@ export async function getVentasData(): Promise<VentasData> {
     if (profileError || !profile?.activo || !role || !salesRoles.has(role)) return { status: "forbidden", message: "Tu perfil no tiene permiso para ventas.", ...empty };
 
     const [productsResult, salesResult, companiesResult, branchesResult, empresasConvenioResult, operationalContext] = await Promise.all([
-      supabase.from("productos_catalogo").select("id,empresa_id,nombre,categoria,precio_venta,controla_inventario").eq("activo", true).order("nombre").limit(200),
+      fetchAll<SaleProduct>((from, to) => supabase.from("productos_catalogo").select("id,empresa_id,nombre,categoria,precio_venta,controla_inventario,codigo,codigo_barra,marca,modelo,color").eq("activo", true).order("nombre").order("id").range(from, to)),
       supabase.from("ventas").select("id,empresa_id,sucursal_id,paciente_id,cliente_nombre,estado,subtotal,descuento,total,pagado,saldo,motivo_anulacion,recibo_token,fecha_entrega_estimada,creado_en,folio,apartado,apartado_hasta,venta_items(id,producto_id,descripcion,cantidad,precio_unitario,descuento,total_linea),pagos_venta(id,metodo,monto,referencia,banco,creado_en)").order("creado_en", { ascending: false }).limit(30),
       supabase.from("empresas").select("id,nombre,direccion,telefono,email,logo_url").eq("activo", true).order("nombre"),
       loadBranchIdentities(supabase),
@@ -60,7 +61,7 @@ export async function getVentasData(): Promise<VentasData> {
     (salePatientsResult.data ?? []).forEach((patient) => patientMap.set(patient.id, patient));
 
     const productIds = (productsResult.data ?? []).map((product) => product.id);
-    const stockResult = productIds.length ? await supabase.from("inventario_stock").select("producto_id,sucursal_id,cantidad").in("producto_id", productIds) : { data: [], error: null };
+    const stockResult = productIds.length ? await fetchAll<SaleStock>((from, to) => supabase.from("inventario_stock").select("producto_id,sucursal_id,cantidad").order("id").range(from, to)) : { data: [], error: null };
     if (stockResult.error) return { status: "error", message: "No se pudo cargar el stock de ventas.", ...empty };
 
     const saleIds = (salesResult.data ?? []).map((sale) => sale.id);
