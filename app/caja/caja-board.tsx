@@ -8,6 +8,8 @@ import type { CajaData, CajaBranch, CierreCaja } from "@/lib/caja";
 import { crearCierreCaja, crearGasto, registrarAperturaCaja, previsualizarCierre, type ResultadoCierre, type VistaCierre } from "./actions";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
+// Acepta coma o punto como decimal (teclados en español) y deja solo números.
+const montoInput = (value: string) => value.replace(/,/g, ".").replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
 const today = fechaGuayaquil;
 const fechaCuadre = (fecha: string) => fecha ? new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", weekday: "long", day: "numeric", month: "short", year: "numeric" }).format(new Date(`${fecha}T12:00:00-05:00`)) : "fecha por seleccionar";
 const origenCaja = (vista: VistaCierre) => vista.origen_caja_anterior && vista.fecha_caja_anterior ? `${vista.origen_caja_anterior === "apertura" ? "Apertura" : "Cierre"} del ${formatDate(vista.fecha_caja_anterior)}` : "Sin registro previo";
@@ -20,6 +22,7 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean }) {
   const [empresaId, setEmpresaId] = useState(props.profile?.empresa_id ?? props.companies[0]?.id ?? "");
   const [showGasto, setShowGasto] = useState(!!props.autoGasto);
   const [showCierre, setShowCierre] = useState(false);
+  const [cierreSucursalId, setCierreSucursalId] = useState("");
   const [pending, startTransition] = useTransition();
   const role = props.profile?.rol;
   const canSaldos = role === "superadmin" || role === "admin_sucursal" || role === "caja";
@@ -42,18 +45,18 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean }) {
     <section className="agenda-summary"><article><Receipt size={21} /><strong>{gastos.length}</strong><span>gastos registrados</span></article><article><Banknote size={21} /><strong>{cierres.filter((c) => c.cuadre_correcto).length}/{cierres.length}</strong><span>cuadres correctos</span></article></section>
     <div className="notice"><AlertCircle size={18} /><span>{notice || "Un cuadre solo puede registrarse una vez por sucursal y fecha; verifica los datos antes de guardar."}</span></div>
 
-    <ResumenCajaHoy empresaId={empresaId} branches={branches} cierres={cierres} defaultSucursalId={props.profile?.sucursal_id ?? ""} onNuevoCuadre={() => setShowCierre(true)} />
+    <ResumenCajaHoy empresaId={empresaId} branches={branches} cierres={cierres} defaultSucursalId={props.profile?.sucursal_id ?? ""} onNuevoCuadre={(sucursalId) => { setCierreSucursalId(sucursalId); setShowCierre(true); }} />
 
     <section className="glass agenda-board" style={{ marginBottom: 18 }}><div className="agenda-toolbar"><div><p className="section-label">EGRESOS</p><h2>Gastos recientes</h2></div><button className="new-task" type="button" onClick={() => setShowGasto(true)}><Plus size={18} /> Nuevo gasto</button></div>{gastos.length ? <div className="task-list">{gastos.slice(0, 15).map((gasto) => <article className="task-card" key={gasto.id}><div className="task-status"><span className="status-dot" /></div><div className="task-main"><div className="task-meta"><span>{clasificacionLabel[gasto.clasificacion]}</span><span>{gasto.origen === "banco" ? bancoLabel[cuentaById.get(gasto.cuenta_bancaria_id ?? "")?.banco ?? ""] || "Banco" : "Efectivo"}</span><span>{formatDate(gasto.fecha)}</span></div><h2>{gasto.concepto}</h2>{gasto.observaciones && <p>{gasto.observaciones}</p>}</div><div className="task-actions"><strong>{money(gasto.monto)}</strong></div></article>)}</div> : <section className="empty-state"><Receipt size={27} /><h3>Aún no hay gastos</h3><p>Registra el primer egreso de esta empresa.</p></section>}</section>
 
-    <section className="glass agenda-board"><div className="agenda-toolbar"><div><p className="section-label">CIERRE DIARIO</p><h2>Cuadre de caja</h2></div><button className="new-task" type="button" onClick={() => setShowCierre(true)}><Plus size={18} /> Nuevo cuadre</button></div>{cierres.length ? <div className="task-list">{cierres.map((cierre) => <CierreCard key={cierre.id} cierre={cierre} sucursalNombre={props.branches.find((b) => b.id === cierre.sucursal_id)?.nombre ?? "Sucursal"} />)}</div> : <section className="empty-state"><Banknote size={27} /><h3>Sin cuadres registrados</h3><p>El primer cierre diario aparecerá aquí.</p></section>}</section>
+    <section className="glass agenda-board"><div className="agenda-toolbar"><div><p className="section-label">CIERRE DIARIO</p><h2>Cuadre de caja</h2></div><button className="new-task" type="button" onClick={() => { setCierreSucursalId(""); setShowCierre(true); }}><Plus size={18} /> Nuevo cuadre</button></div>{cierres.length ? <div className="task-list">{cierres.map((cierre) => <CierreCard key={cierre.id} cierre={cierre} sucursalNombre={props.branches.find((b) => b.id === cierre.sucursal_id)?.nombre ?? "Sucursal"} />)}</div> : <section className="empty-state"><Banknote size={27} /><h3>Sin cuadres registrados</h3><p>El primer cierre diario aparecerá aquí.</p></section>}</section>
 
     {showGasto && <GastoModal empresaId={empresaId} branches={branches} cuentas={cuentas} canSaldos={canSaldos} pending={pending} onClose={() => setShowGasto(false)} onSubmit={(form) => runAction(() => crearGasto(form), "Gasto registrado.")} />}
-    {showCierre && <CierreModal key={empresaId} empresaId={empresaId} branches={branches} onClose={(message) => { setShowCierre(false); if (message) setNotice(message); }} />}
+    {showCierre && <CierreModal key={`${empresaId}:${cierreSucursalId}`} empresaId={empresaId} branches={branches} initialSucursalId={cierreSucursalId || props.profile?.sucursal_id || ""} onClose={(message) => { setShowCierre(false); if (message) setNotice(message); }} />}
   </div></main>;
 }
 
-function ResumenCajaHoy({ empresaId, branches, cierres, defaultSucursalId, onNuevoCuadre }: { empresaId: string; branches: CajaBranch[]; cierres: CierreCaja[]; defaultSucursalId: string; onNuevoCuadre: () => void }) {
+function ResumenCajaHoy({ empresaId, branches, cierres, defaultSucursalId, onNuevoCuadre }: { empresaId: string; branches: CajaBranch[]; cierres: CierreCaja[]; defaultSucursalId: string; onNuevoCuadre: (sucursalId: string) => void }) {
   const [sucursalId, setSucursalId] = useState(() => (branches.some((b) => b.id === defaultSucursalId) ? defaultSucursalId : branches[0]?.id ?? ""));
   useEffect(() => { if (!branches.some((b) => b.id === sucursalId)) setSucursalId(branches[0]?.id ?? ""); }, [branches, sucursalId]);
   const [vista, setVista] = useState<VistaCierre | null>(null);
@@ -85,7 +88,10 @@ function ResumenCajaHoy({ empresaId, branches, cierres, defaultSucursalId, onNue
         <div><span className="section-label">Tarjetas</span><strong>{money(cierreDeHoy ? cierreDeHoy.declarado_tarjeta : vista.cobro_tarjeta)}</strong></div>
         <div><span className="section-label">Transferencias (todos los bancos)</span><strong>{money(cierreDeHoy ? (cierreDeHoy.declarado_transferencia_pichincha + cierreDeHoy.declarado_transferencia_guayaquil + cierreDeHoy.declarado_transferencia_internacional) : transferencias)}</strong></div>
       </div>
-      {!cierreDeHoy && <button className="outline-action" type="button" style={{ marginTop: 10 }} onClick={onNuevoCuadre}>Cerrar caja de hoy</button>}
+      {!cierreDeHoy && <>
+        <p className="field-hint" style={{ marginTop: 10 }}>Estos valores se calculan solos con las ventas y abonos del día. Para anotar lo que contaste (efectivo, tarjetas y transferencias por banco), pulsa el botón.</p>
+        <button className="new-consultation" type="button" style={{ marginTop: 8 }} onClick={() => onNuevoCuadre(sucursalId)}>Anotar valores y cerrar caja</button>
+      </>}
     </>}
   </section>;
 }
@@ -115,8 +121,8 @@ function GastoModal({ empresaId, branches, cuentas, canSaldos, pending, onClose,
   </div><div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" disabled={pending} type="submit">{pending ? "Guardando…" : "Registrar gasto"}</button></div></form></section></div>;
 }
 
-function CierreModal({ empresaId, branches, onClose }: { empresaId: string; branches: CajaData["branches"]; onClose: (message?: string) => void }) {
-  const [sucursalId, setSucursalId] = useState(branches[0]?.id ?? "");
+function CierreModal({ empresaId, branches, initialSucursalId, onClose }: { empresaId: string; branches: CajaData["branches"]; initialSucursalId: string; onClose: (message?: string) => void }) {
+  const [sucursalId, setSucursalId] = useState(branches.some((b) => b.id === initialSucursalId) ? initialSucursalId : branches[0]?.id ?? "");
   const [fecha, setFecha] = useState(today());
   const [declaradoEfectivo, setDeclaradoEfectivo] = useState("");
   const [declaradoTarjeta, setDeclaradoTarjeta] = useState("");
@@ -194,8 +200,6 @@ function CierreModal({ empresaId, branches, onClose }: { empresaId: string; bran
     {vista && <>
       {vista.ya_existe && <p className="notice">Ya existe un cuadre guardado para esta sucursal y fecha.</p>}
 
-      <AperturaCaja key={`${sucursalId}-${fecha}-${vista.origen_caja_anterior}-${vista.fecha_caja_anterior}`} empresaId={empresaId} sucursalId={sucursalId} fecha={fecha} vista={vista} onSaved={() => setRevision((value) => value + 1)} />
-
       <p className="section-label">RESUMEN DEL DÍA</p>
       <div className="consultation-stats"><span><strong>Abonos del día</strong>{money(abonosTotal)}</span><span><strong>Egresos del día</strong>{money(vista.egresos_efectivo)}</span></div>
 
@@ -208,24 +212,24 @@ function CierreModal({ empresaId, branches, onClose }: { empresaId: string; bran
 
   <p className="section-label" style={{ marginTop: 14 }}>VALORES RECIBIDOS SEGÚN EL CIERRE</p>
   <div className="new-patient-form">
-    <label>Efectivo recibido<input name="declarado_efectivo" type="number" min="0" step="0.01" required placeholder={vista ? `Sistema: ${money(vista.cobro_efectivo)}` : "0.00"} value={declaradoEfectivo} onChange={(event) => setDeclaradoEfectivo(event.target.value)} /></label>
-    <label>Tarjetas<input name="declarado_tarjeta" type="number" min="0" step="0.01" required placeholder={vista ? `Sistema: ${money(vista.cobro_tarjeta)}` : "0.00"} value={declaradoTarjeta} onChange={(event) => setDeclaradoTarjeta(event.target.value)} /></label>
-    <label>Transferencia · Banco Pichincha<input name="declarado_transferencia_pichincha" type="number" min="0" step="0.01" required placeholder={vista ? `Sistema: ${money(vista.cobro_transferencia_pichincha)}` : "0.00"} value={declaradoPichincha} onChange={(event) => setDeclaradoPichincha(event.target.value)} /></label>
-    <label>Transferencia · Banco Guayaquil<input name="declarado_transferencia_guayaquil" type="number" min="0" step="0.01" required placeholder={vista ? `Sistema: ${money(vista.cobro_transferencia_guayaquil)}` : "0.00"} value={declaradoGuayaquil} onChange={(event) => setDeclaradoGuayaquil(event.target.value)} /></label>
-    <label>Transferencia · Banco Internacional<input name="declarado_transferencia_internacional" type="number" min="0" step="0.01" required placeholder={vista ? `Sistema: ${money(vista.cobro_transferencia_internacional)}` : "0.00"} value={declaradoInternacional} onChange={(event) => setDeclaradoInternacional(event.target.value)} /></label>
+    <label>Efectivo recibido<input name="declarado_efectivo" type="text" inputMode="decimal" autoComplete="off" required placeholder={vista ? `Sistema: ${money(vista.cobro_efectivo)}` : "0.00"} value={declaradoEfectivo} onChange={(event) => setDeclaradoEfectivo(montoInput(event.target.value))} /></label>
+    <label>Tarjetas<input name="declarado_tarjeta" type="text" inputMode="decimal" autoComplete="off" required placeholder={vista ? `Sistema: ${money(vista.cobro_tarjeta)}` : "0.00"} value={declaradoTarjeta} onChange={(event) => setDeclaradoTarjeta(montoInput(event.target.value))} /></label>
+    <label>Transferencia · Banco Pichincha<input name="declarado_transferencia_pichincha" type="text" inputMode="decimal" autoComplete="off" required placeholder={vista ? `Sistema: ${money(vista.cobro_transferencia_pichincha)}` : "0.00"} value={declaradoPichincha} onChange={(event) => setDeclaradoPichincha(montoInput(event.target.value))} /></label>
+    <label>Transferencia · Banco Guayaquil<input name="declarado_transferencia_guayaquil" type="text" inputMode="decimal" autoComplete="off" required placeholder={vista ? `Sistema: ${money(vista.cobro_transferencia_guayaquil)}` : "0.00"} value={declaradoGuayaquil} onChange={(event) => setDeclaradoGuayaquil(montoInput(event.target.value))} /></label>
+    <label>Transferencia · Banco Internacional<input name="declarado_transferencia_internacional" type="text" inputMode="decimal" autoComplete="off" required placeholder={vista ? `Sistema: ${money(vista.cobro_transferencia_internacional)}` : "0.00"} value={declaradoInternacional} onChange={(event) => setDeclaradoInternacional(montoInput(event.target.value))} /></label>
   </div>
   {metodosCompletos && <p className="notice" style={{ marginTop: 8 }}><span className={`check-badge ${metodosCoinciden ? "ok" : "fail"}`}>{metodosCoinciden ? "Los métodos de pago coinciden" : "Hay diferencias en los métodos de pago"}</span></p>}
 
   <p className="section-label" style={{ marginTop: 14 }}>DEPÓSITO EN CADA BANCO (SI APLICA)</p>
   <div className="new-patient-form">
-    <label>Banco Pichincha<input name="deposito_pichincha" type="number" min="0" step="0.01" placeholder="0.00" value={depositoPichincha} onChange={(event) => setDepositoPichincha(event.target.value)} /></label>
-    <label>Banco Guayaquil<input name="deposito_guayaquil" type="number" min="0" step="0.01" placeholder="0.00" value={depositoGuayaquil} onChange={(event) => setDepositoGuayaquil(event.target.value)} /></label>
-    <label>Banco Internacional<input name="deposito_internacional" type="number" min="0" step="0.01" placeholder="0.00" value={depositoInternacional} onChange={(event) => setDepositoInternacional(event.target.value)} /></label>
+    <label>Banco Pichincha<input name="deposito_pichincha" type="text" inputMode="decimal" autoComplete="off" placeholder="0.00" value={depositoPichincha} onChange={(event) => setDepositoPichincha(montoInput(event.target.value))} /></label>
+    <label>Banco Guayaquil<input name="deposito_guayaquil" type="text" inputMode="decimal" autoComplete="off" placeholder="0.00" value={depositoGuayaquil} onChange={(event) => setDepositoGuayaquil(montoInput(event.target.value))} /></label>
+    <label>Banco Internacional<input name="deposito_internacional" type="text" inputMode="decimal" autoComplete="off" placeholder="0.00" value={depositoInternacional} onChange={(event) => setDepositoInternacional(montoInput(event.target.value))} /></label>
   </div>
 
   <p className="section-label" style={{ marginTop: 14 }}>EFECTIVO CONTADO EN CAJA</p>
   <div className="new-patient-form">
-    <label>¿Cuánto dinero hay en efectivo?<input name="caja_fisica" type="number" min="0" step="0.01" required value={cajaFisica} onChange={(event) => setCajaFisica(event.target.value)} /></label>
+    <label>¿Cuánto dinero hay en efectivo?<input name="caja_fisica" type="text" inputMode="decimal" autoComplete="off" required value={cajaFisica} onChange={(event) => setCajaFisica(montoInput(event.target.value))} /></label>
     {cajaEsperadaPreview !== null && <label>Caja esperada<input value={money(cajaEsperadaPreview)} disabled /></label>}
   </div>
   {cierreCompleto && <p className="notice" style={{ marginTop: 8 }}><span className={`check-badge ${cierreCuadrado ? "ok" : "fail"}`}>{cierreCuadrado ? "Caja cuadrada" : `Caja no cuadrada${diferenciaPreview !== null && Math.abs(diferenciaPreview) >= 0.01 ? ` · Diferencia en efectivo: ${money(diferenciaPreview)}` : ""}`}</span></p>}
@@ -256,7 +260,7 @@ function AperturaCaja({ empresaId, sucursalId, fecha, vista, onSaved }: { empres
       }}>
         <h3>Apertura de caja — ¿Con cuánto efectivo abrió hoy la caja?</h3><p>Fecha de apertura: <strong>{formatDate(fecha)}</strong></p>
         <input type="hidden" name="empresa_id" value={empresaId} /><input type="hidden" name="sucursal_id" value={sucursalId} /><input type="hidden" name="fecha" value={fecha} />
-        <div className="new-patient-form"><label>Monto de apertura<input name="monto" type="number" min="0" step="0.01" required defaultValue={tieneApertura ? vista.caja_anterior : ""} /></label><label>Nota (opcional)<input name="observaciones" /></label></div>
+        <div className="new-patient-form"><label>Monto de apertura<input name="monto" type="text" inputMode="decimal" autoComplete="off" required defaultValue={tieneApertura ? vista.caja_anterior : ""} /></label><label>Nota (opcional)<input name="observaciones" /></label></div>
         {error && <p className="notice" role="alert">{error}</p>}
         <button className="new-consultation" type="submit" disabled={pending}>{pending ? "Guardando…" : "Registrar apertura"}</button>
       </form>}

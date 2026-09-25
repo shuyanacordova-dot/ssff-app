@@ -4,15 +4,17 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const text = (form: FormData, name: string) => typeof form.get(name) === "string" ? String(form.get(name)).trim() : "";
+// Montos: acepta coma o punto como decimal ("25,50" o "25.50").
+const monto = (form: FormData, name: string, vacio = "") => Number((text(form, name) || vacio).replace(",", "."));
 
 export async function crearGasto(form: FormData) {
   const supabase = await createSupabaseServerClient();
   const empresaId = text(form, "empresa_id"); const sucursalId = text(form, "sucursal_id") || null; const fecha = text(form, "fecha") || null;
-  const clasificacion = text(form, "clasificacion"); const concepto = text(form, "concepto"); const monto = Number(text(form, "monto"));
+  const clasificacion = text(form, "clasificacion"); const concepto = text(form, "concepto"); const valor = monto(form, "monto");
   const origen = text(form, "origen"); const cuentaBancariaId = text(form, "cuenta_bancaria_id") || null; const observaciones = text(form, "observaciones");
   if (!empresaId || !clasificacion || !concepto) throw new Error("Completa clasificación y concepto.");
-  if (!Number.isFinite(monto) || monto <= 0) throw new Error("Indica un monto válido.");
-  const { error } = await supabase.rpc("registrar_gasto", { p_empresa: empresaId, p_sucursal: sucursalId, p_fecha: fecha, p_clasificacion: clasificacion, p_concepto: concepto, p_monto: monto, p_origen: origen, p_cuenta_bancaria_id: cuentaBancariaId, p_observaciones: observaciones || null });
+  if (!Number.isFinite(valor) || valor <= 0) throw new Error("Indica un monto válido.");
+  const { error } = await supabase.rpc("registrar_gasto", { p_empresa: empresaId, p_sucursal: sucursalId, p_fecha: fecha, p_clasificacion: clasificacion, p_concepto: concepto, p_monto: valor, p_origen: origen, p_cuenta_bancaria_id: cuentaBancariaId, p_observaciones: observaciones || null });
   if (error) throw new Error(error.message || "No se pudo registrar el gasto.");
   revalidatePath("/caja");
 }
@@ -20,10 +22,10 @@ export async function crearGasto(form: FormData) {
 export async function crearMovimientoBancario(form: FormData) {
   const supabase = await createSupabaseServerClient();
   const cuentaId = text(form, "cuenta_id"); const sucursalId = text(form, "sucursal_id") || null; const fecha = text(form, "fecha") || null;
-  const tipo = text(form, "tipo"); const monto = Number(text(form, "monto")); const observaciones = text(form, "observaciones");
+  const tipo = text(form, "tipo"); const valor = monto(form, "monto"); const observaciones = text(form, "observaciones");
   if (!cuentaId || !tipo) throw new Error("Elige la cuenta y el tipo de movimiento.");
-  if (!Number.isFinite(monto) || monto === 0) throw new Error("Indica un monto válido.");
-  const { error } = await supabase.rpc("registrar_movimiento_bancario", { p_cuenta_id: cuentaId, p_sucursal: sucursalId, p_fecha: fecha, p_tipo: tipo, p_monto: monto, p_observaciones: observaciones || null });
+  if (!Number.isFinite(valor) || valor === 0) throw new Error("Indica un monto válido.");
+  const { error } = await supabase.rpc("registrar_movimiento_bancario", { p_cuenta_id: cuentaId, p_sucursal: sucursalId, p_fecha: fecha, p_tipo: tipo, p_monto: valor, p_observaciones: observaciones || null });
   if (error) throw new Error(error.message || "No se pudo registrar el movimiento.");
   revalidatePath("/caja");
 }
@@ -42,15 +44,15 @@ export async function previsualizarCierre(empresaId: string, sucursalId: string,
 export async function crearCierreCaja(form: FormData) {
   const supabase = await createSupabaseServerClient();
   const empresaId = text(form, "empresa_id"); const sucursalId = text(form, "sucursal_id"); const fecha = text(form, "fecha") || null;
-  const cajaFisica = Number(text(form, "caja_fisica"));
-  const declaradoEfectivo = Number(text(form, "declarado_efectivo"));
-  const declaradoTarjeta = Number(text(form, "declarado_tarjeta"));
-  const declaradoPichincha = Number(text(form, "declarado_transferencia_pichincha"));
-  const declaradoGuayaquil = Number(text(form, "declarado_transferencia_guayaquil"));
-  const declaradoInternacional = Number(text(form, "declarado_transferencia_internacional"));
-  const depositoPichincha = Number(text(form, "deposito_pichincha") || "0");
-  const depositoGuayaquil = Number(text(form, "deposito_guayaquil") || "0");
-  const depositoInternacional = Number(text(form, "deposito_internacional") || "0");
+  const cajaFisica = monto(form, "caja_fisica");
+  const declaradoEfectivo = monto(form, "declarado_efectivo");
+  const declaradoTarjeta = monto(form, "declarado_tarjeta");
+  const declaradoPichincha = monto(form, "declarado_transferencia_pichincha");
+  const declaradoGuayaquil = monto(form, "declarado_transferencia_guayaquil");
+  const declaradoInternacional = monto(form, "declarado_transferencia_internacional");
+  const depositoPichincha = monto(form, "deposito_pichincha", "0");
+  const depositoGuayaquil = monto(form, "deposito_guayaquil", "0");
+  const depositoInternacional = monto(form, "deposito_internacional", "0");
   const observaciones = text(form, "observaciones");
   if (!empresaId || !sucursalId) throw new Error("Elige empresa y sucursal.");
   if (!Number.isFinite(cajaFisica) || cajaFisica < 0) throw new Error("Indica el efectivo contado en caja.");
@@ -67,11 +69,11 @@ export async function registrarAperturaCaja(form: FormData) {
   const sucursalId = text(form, "sucursal_id");
   const fecha = text(form, "fecha");
   const montoRaw = text(form, "monto");
-  const monto = Number(montoRaw);
+  const valor = Number(montoRaw.replace(",", "."));
   if (!empresaId || !sucursalId || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) throw new Error("Elige empresa, sucursal y fecha.");
-  if (!montoRaw || !Number.isFinite(monto) || monto < 0) throw new Error("Indica un monto de apertura válido (puede ser cero).");
+  if (!montoRaw || !Number.isFinite(valor) || valor < 0) throw new Error("Indica un monto de apertura válido (puede ser cero).");
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.rpc("registrar_apertura_caja", { p_empresa: empresaId, p_sucursal: sucursalId, p_fecha: fecha, p_monto: monto, p_observaciones: text(form, "observaciones") || null });
+  const { error } = await supabase.rpc("registrar_apertura_caja", { p_empresa: empresaId, p_sucursal: sucursalId, p_fecha: fecha, p_monto: valor, p_observaciones: text(form, "observaciones") || null });
   if (error) throw new Error(error.message || "No se pudo registrar la apertura.");
   revalidatePath("/caja");
 }

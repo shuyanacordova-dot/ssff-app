@@ -157,6 +157,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | L21 | 2026-09-25 | Codex alcanzó el límite de uso de la cuenta (hasta 28-sep) a mitad de 3 tareas. Claude revisó y terminó el trabajo parcial (faltaba mostrar la apertura de caja y toda la pantalla del CRM). | Revisar siempre el estado real de los archivos cuando una tarea falla; no asumir que quedó completa. |
 | L22 | 2026-09-25 | Un componente de pantalla importó un valor (no solo tipos) desde un archivo de servidor y rompió la compilación de producción; además el comando siguió y publicó el intento. | Constantes compartidas en archivos sin código de servidor (`*-config.ts` / `*-labels.ts`). Publicar solo si `next build` termina con código 0. |
 | L23 | 2026-09-25 | La importación de Optox guardó la hora de los abonos en formato 12 h y sin zona horaria; los de la tarde se corrieron al día anterior. Además, al anular duplicados, algunos abonos quedaron en la copia anulada y la venta que quedó viva no tenía pagos. | Al importar: fecha + hora de 24 h en `America/Guayaquil`, y cuadrar día por día contra el Resumen del día de Optox. Al anular duplicados: mover o recrear los abonos en la venta que queda. |
+| L24 | 2026-09-25 | Primer día real de caja: Yuli veía la caja de partida ($131) pero no podía anotar efectivo, tarjetas y transferencias. El recuadro "Resumen de caja" solo muestra valores (el botón para anotar era discreto), el formulario de apertura estaba repetido dentro del formulario del cierre y los montos usaban campo numérico, que en celulares con coma decimal no deja escribir. | Pantallas de dinero: campo de texto con teclado decimal que acepta coma o punto; nunca un formulario dentro de otro; la acción principal debe verse como botón principal. |
 
 ---
 
@@ -215,6 +216,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-25 | Personas del convenio (clientes potenciales) y plantillas Excel (banco de lunas, personas de convenio). | (este commit) |
 | 2026-09-25 | Carga de faltantes de Optox 22–24 sep (ventas, abonos, salidas) cuadrada contra las capturas; hallazgo de la hora de abonos importados (L23). | (este commit) |
 | 2026-09-25 | Corrección de la hora de 172 abonos importados (aparecían el día anterior), con respaldo. | (este commit) |
+| 2026-09-25 | Cuadre de caja: botón claro "Anotar valores y cerrar caja", abre en la sucursal elegida, montos aceptan coma o punto, apertura ya no se repite dentro del cierre. | (este commit) |
 
 ---
 
