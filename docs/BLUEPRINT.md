@@ -214,6 +214,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-25 | Sucursal destacada en Laboratorio; 29 controles agendados desde historias; banco de lunas con alerta en la orden de laboratorio. | (este commit) |
 | 2026-09-25 | Personas del convenio (clientes potenciales) y plantillas Excel (banco de lunas, personas de convenio). | (este commit) |
 | 2026-09-25 | Carga de faltantes de Optox 22–24 sep (ventas, abonos, salidas) cuadrada contra las capturas; hallazgo de la hora de abonos importados (L23). | (este commit) |
+| 2026-09-25 | Corrección de la hora de 172 abonos importados (aparecían el día anterior), con respaldo. | (este commit) |
 
 ---
 
@@ -226,7 +227,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 5. **Resumen del día**: solo muestra abonos de ventas creadas ese día; debe mostrar todos los abonos recibidos ese día.
 6. **Elegir fecha**: permitir registrar revisión, venta, orden, cita y cuadre con fecha anterior (con registro de quién lo hizo), y evitar duplicados por fecha.
 
-7. **Hora de los abonos importados (causa encontrada 2026-09-25)**: la importación guardó la hora de cada abono en formato 12 h y con el mes en los minutos (ej. 2:12 pm → `02:09` UTC). 191 abonos de jul–sep 2026 ($11,754.95) con hora 1–4 pm aparecen el **día anterior** en Resumen del día e informes (ej. Shuvision 22-sep muestra $34 en vez de $13). Corrección propuesta: poner esos 191 abonos a las 12:00 de su fecha. **Espera autorización escrita de Shuyana** (cambio masivo).
+7. ✅ **Hora de los abonos importados corregida** (2026-09-25, autorizado por Shuyana: "SI CORRIGE"; migración `20260925160000_corregir_hora_abonos_importados.sql`): la importación había guardado la hora en formato 12 h y los abonos de 1–4 pm aparecían el día anterior. 172 abonos de ventas vigentes ($10,309.95) quedaron a las 12:00 de su fecha; respaldo de la hora anterior en `correccion_hora_abonos`. Los 19 abonos de ventas anuladas (duplicados) no se tocaron. Verificado: Shuvision 22-sep $13 y 23-sep $632, igual que Optox.
 8. **Make – Focus separado**: plan Free (2 escenarios activos, 1.000 operaciones/mes). Todos los escenarios (Cumpleaños, Cobros, Control anual, Convenios) envían desde un solo número y leen de Notion. Para separar Focus: registrar el número de Focus en Meta (WhatsApp Cloud API), crear su conexión en Make y filtrar por empresa. Probablemente requiere subir de plan en Make.
 9. **WhatsApp Business de las 3 ópticas dentro de LumOS** (propuesta): conectar cada número a la API oficial de WhatsApp (Meta Cloud API, con "coexistencia" para seguir usando la app en el celular), bandeja de mensajes en LumOS ligada a la carpeta del paciente (pestaña Comunicaciones), asistente con IA que sugiere o envía respuestas a preguntas frecuentes (horarios, estado de la orden, saldo) y siempre pide confirmación en lo sensible. Make queda solo para campañas.
 
