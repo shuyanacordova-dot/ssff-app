@@ -75,8 +75,15 @@ export async function actualizarPacienteClinico(data: FormData) {
 
 const astigmatismo = (k1: string, k2: string) => { const a = Number(k1); const b = Number(k2); return Number.isFinite(a) && Number.isFinite(b) && k1 !== "" && k2 !== "" ? Math.abs(a - b).toFixed(2) : ""; };
 const monthsFor = { "3m": 3, "6m": 6, "1a": 12 } as const;
+const rxFieldLabel = (field: string) => {
+  const [seccion, ojo, campo] = field.split("_");
+  const secciones: Record<string, string> = { lens: "Lensometría", auto: "Autorrefractómetro", ref: "Refracción final" };
+  const campos: Record<string, string> = { esfera: "Esfera", cilindro: "Cilindro", add: "Adición" };
+  return `${campos[campo] ?? campo} ${ojo === "od" ? "OD" : "OI"} (${secciones[seccion] ?? seccion})`;
+};
 const signedRxFields = ["lens_od_esfera", "lens_od_cilindro", "lens_od_add", "lens_oi_esfera", "lens_oi_cilindro", "lens_oi_add", "auto_od_esfera", "auto_od_cilindro", "auto_od_add", "auto_oi_esfera", "auto_oi_cilindro", "auto_oi_add", "ref_od_esfera", "ref_od_cilindro", "ref_od_add", "ref_oi_esfera", "ref_oi_cilindro", "ref_oi_add"];
-const signedRxPattern = /^[+-](?:\d+(?:[.,]\d*)?|[.,]\d+)$/;
+// Valores con signo (+/-); el cero ("0.00", plano) se acepta sin signo.
+const signedRxPattern = /^(?:[+-]?(?:0+(?:[.,]0*)?|[.,]0+)|[+-](?:\d+(?:[.,]\d*)?|[.,]\d+))$/;
 
 function parseComplementaryExams(raw: string) {
   try {
@@ -86,14 +93,14 @@ function parseComplementaryExams(raw: string) {
   } catch { return []; }
 }
 
-export async function crearConsulta(data: FormData) {
+async function crearConsultaInterna(data: FormData) {
   const { supabase, profile } = await currentClinicalProfile();
   const pacienteId = text(data, "paciente_id");
   const optometristaId = text(data, "optometrista_id");
   if (!pacienteId) throw new Error("Falta identificar al paciente.");
   if (!optometristaId) throw new Error("Selecciona quién realizó la revisión.");
   const invalidRxField = signedRxFields.find((field) => { const value = text(data, field); return value && !signedRxPattern.test(value); });
-  if (invalidRxField) throw new Error("No se guardó: cada Esfera, Cilindro o Adición debe comenzar con + o -.");
+  if (invalidRxField) throw new Error(`No se guardó: revisa el valor de ${rxFieldLabel(invalidRxField)} (debe ser un número, con + o - si no es cero).`);
   const { data: directory } = await supabase.rpc("directorio_tareas");
   const optometrist = ((directory ?? []) as { id: string; rol: string }[]).find((member) => member.id === optometristaId);
   if (!optometrist || (optometrist.rol !== "optometra" && !isAdditionalOptometrist(optometrist.id))) throw new Error("La persona seleccionada no es un optometrista activo.");
@@ -123,7 +130,7 @@ export async function crearConsulta(data: FormData) {
     impresion_diagnostica: impresionDiagnostica || null, receta, plan_manejo: text(data, "plan_manejo") || null, observaciones: text(data, "observaciones") || null,
     created_by: profile.id,
   }).select("id").single();
-  if (error || !consulta) throw new Error("No se pudo guardar la consulta.");
+  if (error || !consulta) throw new Error(`No se pudo guardar la consulta${error?.message ? `: ${error.message}` : "."}`);
 
   const siguienteControl = text(data, "siguiente_control") as keyof typeof monthsFor | "";
   if (siguienteControl && monthsFor[siguienteControl]) {
@@ -136,14 +143,14 @@ export async function crearConsulta(data: FormData) {
   revalidatePath("/pacientes"); revalidatePath("/agenda");
 }
 
-export async function actualizarConsulta(data: FormData) {
+async function actualizarConsultaInterna(data: FormData) {
   const { supabase, profile } = await currentClinicalProfile();
   const consultaId = text(data, "consulta_id");
   const optometristaId = text(data, "optometrista_id");
   if (!consultaId) throw new Error("Falta identificar la consulta.");
   if (!optometristaId) throw new Error("Selecciona quién realizó la revisión.");
   const invalidRxField = signedRxFields.find((field) => { const value = text(data, field); return value && !signedRxPattern.test(value); });
-  if (invalidRxField) throw new Error("No se guardó: cada Esfera, Cilindro o Adición debe comenzar con + o -.");
+  if (invalidRxField) throw new Error(`No se guardó: revisa el valor de ${rxFieldLabel(invalidRxField)} (debe ser un número, con + o - si no es cero).`);
   const { data: directory } = await supabase.rpc("directorio_tareas");
   const optometrist = ((directory ?? []) as { id: string; rol: string }[]).find((member) => member.id === optometristaId);
   if (!optometrist || (optometrist.rol !== "optometra" && !isAdditionalOptometrist(optometrist.id))) throw new Error("La persona seleccionada no es un optometrista activo.");
@@ -254,4 +261,15 @@ export async function subirArchivoClinico(data: FormData) {
   const { error } = await supabase.from("historia_fotos").insert({ paciente_id: pacienteId, consulta_id: consultaId || null, storage_path: path, tipo, descripcion: descripcion || null, empresa_id: profile.empresa_id, sucursal_id: profile.sucursal_id, subido_por: profile.id });
   if (error) { await supabase.storage.from("historias").remove([path]); throw new Error("No se pudo registrar el archivo."); }
   revalidatePath("/pacientes");
+}
+
+// Las acciones devuelven el error en vez de lanzarlo: en producción Next.js oculta el texto de los errores lanzados.
+export async function crearConsulta(data: FormData): Promise<{ ok: true } | { ok: false; error: string }> {
+  try { await crearConsultaInterna(data); return { ok: true }; }
+  catch (err) { return { ok: false, error: err instanceof Error ? err.message : "No se pudo guardar la consulta." }; }
+}
+
+export async function actualizarConsulta(data: FormData): Promise<{ ok: true } | { ok: false; error: string }> {
+  try { await actualizarConsultaInterna(data); return { ok: true }; }
+  catch (err) { return { ok: false, error: err instanceof Error ? err.message : "No se pudo actualizar la consulta." }; }
 }

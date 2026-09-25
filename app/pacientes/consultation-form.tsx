@@ -93,6 +93,7 @@ function EyeRxCard({ eye, prefix, showDnp, showAv = true, defaults, onRxChange }
 
 export default function ConsultationModal({ pacienteId, optometrists, defaultOptometristId, initial, onClose, onSaved }: { pacienteId: string; optometrists: ClinicalOptometrist[]; defaultOptometristId?: string; initial?: Consultation; onClose: () => void; onSaved: (message: string) => void }) {
   const [pending, start] = useTransition();
+  const [saveError, setSaveError] = useState("");
   const [k, setK] = useState({ odK1: initial?.queratometria?.od_k1 ?? "", odK2: initial?.queratometria?.od_k2 ?? "", oiK1: initial?.queratometria?.oi_k1 ?? "", oiK2: initial?.queratometria?.oi_k2 ?? "" });
   const [receta, setReceta] = useState({ lagrimas: initial?.receta?.lagrimas_artificiales ?? false, vitaminas: initial?.receta?.vitaminas ?? false, terapia: initial?.receta?.terapia_visual ?? false });
   const initialRxDiagnostico: RxDiagnosticValues = { od_esfera: initial?.refraccion?.od_esfera ?? "", od_cilindro: initial?.refraccion?.od_cilindro ?? "", od_add: initial?.refraccion?.od_add ?? "", oi_esfera: initial?.refraccion?.oi_esfera ?? "", oi_cilindro: initial?.refraccion?.oi_cilindro ?? "", oi_add: initial?.refraccion?.oi_add ?? "" };
@@ -105,11 +106,14 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
   const submit = (form: HTMLFormElement) => {
     start(async () => {
       const data = new FormData(form); data.set("paciente_id", pacienteId);
+      setSaveError("");
       try {
-        if (initial) { data.set("consulta_id", initial.id); await actualizarConsulta(data); onSaved("Consulta actualizada en la historia clínica."); }
-        else { await crearConsulta(data); onSaved("Consulta registrada en la historia clínica."); }
+        if (initial) data.set("consulta_id", initial.id);
+        const result = initial ? await actualizarConsulta(data) : await crearConsulta(data);
+        if (!result.ok) { setSaveError(result.error); return; }
+        onSaved(initial ? "Consulta actualizada en la historia clínica." : "Consulta registrada en la historia clínica.");
         onClose();
-      } catch (err) { onSaved(err instanceof Error ? err.message : "No se pudo guardar la consulta."); }
+      } catch { setSaveError("No se pudo guardar la consulta. Revisa tu conexión e inténtalo de nuevo."); }
     });
   };
   const ante = initial?.antecedentes ?? {};
@@ -201,6 +205,7 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
     <div className="new-patient-form"><label>Próximo control<select name="siguiente_control" defaultValue=""><option value="">Sin agendar</option><option value="3m">En 3 meses</option><option value="6m">En 6 meses</option><option value="1a">En 1 año</option></select></label></div>
     <p className="field-hint">Si eliges un plazo, se crea automáticamente una cita programada en la agenda.</p></>}
 
+    {saveError && <p className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 700 }}>{saveError}</p>}
     <div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" disabled={pending || !optometrists.length} type="submit">{pending ? "Guardando…" : initial ? "Guardar cambios" : "Guardar consulta"}</button></div>
   </form></section></div>;
 }
