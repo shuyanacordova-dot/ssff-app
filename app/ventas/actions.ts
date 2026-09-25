@@ -46,7 +46,7 @@ export async function registrarVenta(form: FormData) {
 
 export async function registrarAbono(form: FormData) {
   const supabase = await createSupabaseServerClient();
-  const ventaId = text(form, "venta_id"); const metodo = text(form, "metodo"); const monto = Number(text(form, "monto")); const referencia = text(form, "referencia"); const banco = text(form, "banco");
+  const ventaId = text(form, "venta_id"); const metodo = text(form, "metodo"); const monto = Number(text(form, "monto").replace(",", ".")); const referencia = text(form, "referencia"); const banco = text(form, "banco");
   if (!ventaId) throw new Error("Falta identificar la venta.");
   if (metodo === "transferencia" && !bancos.some((b) => b.value === banco)) throw new Error("Selecciona el banco de la transferencia.");
   if (!Number.isFinite(monto) || monto <= 0) throw new Error("Indica un monto válido para el abono.");

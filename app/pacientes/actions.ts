@@ -194,6 +194,17 @@ export async function buscarPacientesClinicos(query: string): Promise<PatientRec
   return enrichPatientRecords(supabase, data ?? []);
 }
 
+export async function obtenerPacienteClinico(pacienteId: string): Promise<PatientRecord | null> {
+  const { supabase } = await currentClinicalProfile(folderRoles);
+  if (!pacienteId) return null;
+  const { data, error } = await supabase.from("pacientes_clinicos")
+    .select("id,nombres,apellidos,cedula,telefono,email,direccion,sexo,ocupacion,responsable_id,fecha_nacimiento,frecuencia_cobro,empresa_origen_id,actualizado_en")
+    .eq("id", pacienteId).limit(1);
+  if (error) throw new Error("No se pudo abrir la carpeta del paciente.");
+  const [record] = await enrichPatientRecords(supabase, data ?? []);
+  return record ?? null;
+}
+
 export async function obtenerHistorialPaciente(pacienteId: string): Promise<{ consultations: Consultation[]; photos: ClinicalPhoto[]; sales: PatientSale[]; labOrders: SaleLabOrder[]; garantias: Garantia[] }> {
   const { supabase } = await currentClinicalProfile(folderRoles);
   if (!pacienteId) throw new Error("Falta identificar al paciente.");

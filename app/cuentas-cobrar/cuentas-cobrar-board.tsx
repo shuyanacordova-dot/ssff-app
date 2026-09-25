@@ -102,6 +102,7 @@ function DeudaCard({ deuda, pending, onFrecuencia, onCobroInsistente, onConvenio
     <div className="menu-wrap" ref={menuRef}>
       <button className="outline-action" type="button" onClick={() => setMenuOpen((v) => !v)}><MoreVertical size={14} /> Más opciones</button>
       {menuOpen && <div className="menu-dropdown">
+        {deuda.ventas.map((venta) => <Link key={venta.id} href={`/pacientes?paciente=${deuda.paciente_id}&venta=${venta.id}`} onClick={closeMenu}><Wallet size={14} /> Añadir pago{deuda.ventas.length > 1 ? ` · ${formatDate(venta.creado_en)} (${money(venta.saldo)})` : ""}</Link>)}
         <button type="button" onClick={() => { onConvenio(); closeMenu(); }}><FileText size={14} /> Convenio de pago</button>
         <button type="button" className={deuda.cobro_insistente ? "danger" : ""} onClick={() => { onCobroInsistente(!deuda.cobro_insistente); closeMenu(); }}><AlertTriangle size={14} /> {deuda.cobro_insistente ? "Quitar cobro insistente" : "Activar cobro insistente"}</button>
       </div>}

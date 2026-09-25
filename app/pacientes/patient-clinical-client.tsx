@@ -4,8 +4,8 @@ import { formatRecordDate } from "@/lib/record-date";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft, Building2, CalendarDays, ChevronRight, ClipboardPlus, FlaskConical, Pencil, Image as ImageIcon, History, MessageCircle, Plus, ReceiptText, Search, ShieldCheck, Stethoscope, X } from "lucide-react";
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { actualizarPacienteClinico, buscarPacientesClinicos, crearPacienteClinico, obtenerHistorialPaciente } from "./actions";
+import { useEffect, useMemo, useState, useTransition, useRef } from "react";
+import { actualizarPacienteClinico, buscarPacientesClinicos, crearPacienteClinico, obtenerHistorialPaciente, obtenerPacienteClinico } from "./actions";
 import ConsultationModal from "./consultation-form";
 import ConsultationDetailModal from "./consultation-detail";
 import FilesPanel from "./files-panel";
@@ -40,7 +40,7 @@ const calcularEdad = (fechaISO: string): number | null => {
   return edad >= 0 ? edad : null;
 };
 
-export default function PatientClinicalClient(props: ClinicalData & { autoCreate?: boolean; initialSearch?: string }) {
+export default function PatientClinicalClient(props: ClinicalData & { autoCreate?: boolean; initialSearch?: string; initialPacienteId?: string; initialVentaId?: string }) {
   const router = useRouter();
   const demoMode = props.status !== "ready";
   const patients = demoMode ? demoPatients : props.patients;
@@ -159,6 +159,22 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
     }
   };
 
+  // Enlace desde Cuentas por cobrar: /pacientes?paciente=ID&venta=ID abre Ventas con el abono listo.
+  const abrirEnlaceInicial = useRef(false);
+  useEffect(() => {
+    const id = props.initialPacienteId;
+    if (demoMode || !id || abrirEnlaceInicial.current) return;
+    abrirEnlaceInicial.current = true;
+    const abrir = () => { selectPatient(id); setSection("sales"); };
+    if (allPatients.has(id)) { abrir(); return; }
+    obtenerPacienteClinico(id).then((patient) => {
+      if (!patient) { setNotice("No se encontró la carpeta de este paciente."); return; }
+      setExtraPatients((prev) => [...prev.filter((item) => item.id !== patient.id), patient]);
+      abrir();
+    }).catch(() => setNotice("No se pudo abrir la carpeta del paciente."));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.initialPacienteId, demoMode]);
+
   const closeCreating = () => { setEditingPatient(null); setPatientFormError(""); setIsCreating(false); setEdadNuevoPaciente(null); setTieneResponsable(false); setResponsableId(""); setBuscarResponsable(""); setResponsableResults([]); };
   const refreshSelected = () => {
     if (demoMode || !selected) return;
@@ -226,7 +242,7 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
       {patientBranches.length > 1 && <section className="branch-filter-panel patient-history-filter" aria-label="Filtrar historial por sucursal"><div><Building2 size={18} /><span>Historial de</span></div><div className="branch-filter-buttons"><button type="button" className={historyBranchId === "all" ? "active" : ""} onClick={() => setHistoryBranchId("all")}>Todas</button>{patientBranches.map((branch) => <button type="button" key={branch.id} className={historyBranchId === branch.id ? "active" : ""} onClick={() => setHistoryBranchId(branch.id)}>{branch.nombre}</button>)}</div></section>}
       <nav className="clinical-tabs"><button type="button" className={section === "consultations" ? "active" : ""} onClick={() => setSection("consultations")}><Stethoscope size={16} /> Revisiones ({visibleConsultations.length})</button><button type="button" className={section === "sales" ? "active" : ""} onClick={() => setSection("sales")}><ReceiptText size={16} /> Ventas ({visibleSales.length})</button><button type="button" className={section === "files" ? "active" : ""} onClick={() => setSection("files")}><ImageIcon size={16} /> Fotos y documentos</button><button type="button" className={section === "laboratory" ? "active" : ""} onClick={() => setSection("laboratory")}><FlaskConical size={16} /> Laboratorio ({labOrders.length})</button><button type="button" className={section === "comms" ? "active" : ""} onClick={() => setSection("comms")}><MessageCircle size={16} /> Comunicaciones</button></nav>
     {section === "consultations" && <section className="clinical-content history-list">{visibleConsultations.length ? visibleConsultations.map((consultation) => <article className="glass consultation-card" key={consultation.id} onClick={() => setViewingConsultation(consultation)} style={{ cursor: "pointer" }}><div className="consultation-date"><CalendarDays size={17} /><strong>{formatDate(consultation.fecha_consulta)}</strong><span>{props.branches.find((branch) => branch.id === consultation.sucursal_atencion_id)?.nombre ?? "Consulta clínica"}</span></div><div><p className="section-label">{consultation.motivo_consulta ?? "Sin motivo registrado"}</p><h3>{consultation.impresion_diagnostica ?? "Sin diagnóstico registrado"}</h3><p>{consultation.plan_manejo ?? "Sin receta registrada"}</p><div className="consultation-stats">{consultation.optometrista_nombre && <span><strong>Examinó</strong>{consultation.optometrista_nombre}</span>}<span><strong>AV lejos c/rx antigua OD/OI</strong>{consultation.lensometria?.od_av_lejos || "—"} / {consultation.lensometria?.oi_av_lejos || "—"}</span><span><strong>Rx final OD</strong>{[consultation.refraccion?.od_esfera, consultation.refraccion?.od_cilindro, consultation.refraccion?.od_eje].filter(Boolean).join(" ") || "—"}</span><span><strong>Astigmatismo corneal OD/OI</strong>{consultation.queratometria?.od_astigmatismo || "—"} / {consultation.queratometria?.oi_astigmatismo || "—"}</span></div></div></article>) : <section className="glass empty-state"><Stethoscope size={27} /><h3>Sin consultas en esta sucursal</h3><p>Selecciona otra sucursal o registra la primera consulta.</p></section>}</section>}
-    {section === "sales" && <section className="clinical-content history-list">{!demoMode && <div className="tab-actions"><button className="new-consultation" type="button" onClick={() => setIsSelling(true)}><ReceiptText size={17} /> Nueva venta</button></div>}{visibleSales.length ? <div className="task-list">{visibleSales.map((sale) => <SaleCard key={sale.id} sale={sale} companyName={companyName(sale.empresa_id)} branchName={props.branches.find((branch) => branch.id === sale.sucursal_id)?.nombre} patient={selected} lensItems={lensItemsFor(sale)} hasLabOrderItems={labOrderItemsFor(sale).length > 0} labOrders={labOrders.filter((order) => order.venta_id === sale.id)} canAnular={canAnular} pending={pending} onAbono={abonar} onRequestAnular={setAnulling} onCreateLabOrder={() => setLabOrderContext({ sale })} onViewOrder={(orderId) => setLabOrderContext({ sale, orderId })} onRecibo={() => setReciboSale(sale)} onDetalle={() => setViewingSale(sale)} onGarantia={() => setGarantiaModal({ defaultVentaId: sale.id })} />)}</div> : <section className="glass empty-state"><ReceiptText size={27} /><h3>Sin compras en esta sucursal</h3><p>Selecciona otra sucursal para consultar sus compras anteriores.</p></section>}</section>}
+    {section === "sales" && <section className="clinical-content history-list">{!demoMode && <div className="tab-actions"><button className="new-consultation" type="button" onClick={() => setIsSelling(true)}><ReceiptText size={17} /> Nueva venta</button></div>}{visibleSales.length ? <div className="task-list">{visibleSales.map((sale) => <SaleCard key={sale.id} sale={sale} companyName={companyName(sale.empresa_id)} branchName={props.branches.find((branch) => branch.id === sale.sucursal_id)?.nombre} patient={selected} lensItems={lensItemsFor(sale)} hasLabOrderItems={labOrderItemsFor(sale).length > 0} labOrders={labOrders.filter((order) => order.venta_id === sale.id)} canAnular={canAnular} pending={pending} onAbono={abonar} onRequestAnular={setAnulling} onCreateLabOrder={() => setLabOrderContext({ sale })} onViewOrder={(orderId) => setLabOrderContext({ sale, orderId })} onRecibo={() => setReciboSale(sale)} onDetalle={() => setViewingSale(sale)} onGarantia={() => setGarantiaModal({ defaultVentaId: sale.id })} autoAbono={sale.id === props.initialVentaId && sale.saldo > 0} />)}</div> : <section className="glass empty-state"><ReceiptText size={27} /><h3>Sin compras en esta sucursal</h3><p>Selecciona otra sucursal para consultar sus compras anteriores.</p></section>}</section>}
     {section === "comms" && selected && <ComunicacionesPanel key={selected.id} pacienteId={selected.id} empresaId={props.profile?.empresa_id ?? ""} sucursalId={props.profile?.sucursal_id ?? null} telefono={selected.telefono ?? null} />}
     {section === "laboratory" && <section className="clinical-content history-list">
       {!demoMode && <div className="tab-actions"><button className="new-consultation" type="button" disabled={loadingHistorial} onClick={() => {
