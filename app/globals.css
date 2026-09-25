@@ -299,3 +299,8 @@ body { font-family: var(--font-body), Arial, sans-serif; background: radial-grad
   .print-context .receipt-document p { font-size: 10pt !important; }
   .print-context .print-field-value { white-space: pre-wrap; }
 }
+
+.lab-branch-badge { display: block; width: fit-content; margin-bottom: 8px; padding: 6px 14px; border-radius: 999px; font-size: 17px; font-weight: 900; letter-spacing: .02em; text-transform: uppercase; color: #fff; }
+.lab-branch-badge.tone-matriz { background: #1f7a70; }
+.lab-branch-badge.tone-sacha { background: #6b4fa0; }
+.lab-branch-badge.tone-focus { background: #c46a1c; }

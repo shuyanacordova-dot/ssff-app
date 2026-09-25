@@ -82,14 +82,17 @@ export default function LabMonitorBoard(props: LabMonitorData) {
   </div></main>;
 }
 
+const branchTone = (nombre: string) => { const n = nombre.toLowerCase(); return n.includes("focus") ? "tone-focus" : n.includes("sacha") ? "tone-sacha" : "tone-matriz"; };
+
 function OrderCard({ order, pending, onOpen, onStatus }: { order: LabMonitorOrder; pending: boolean; onOpen: () => void; onStatus: (next: EstadoOrdenLaboratorio) => void }) {
   const whatsapp = enlaceWhatsapp(order.paciente_telefono, `Hola ${order.paciente_nombre.trim().split(/\s+/)[0] || ""}. Tu pedido de ${order.empresa_nombre} - ${order.sucursal_nombre} está listo para retirar. Te esperamos.`);
   const next = nextStatus(order.estado);
   return <article className={`lab-order-card ${overdue(order) ? "is-overdue" : ""}`}>
     <button className="lab-card-main" type="button" onClick={onOpen}>
+      <span className={`lab-branch-badge ${branchTone(order.sucursal_nombre)}`}>{order.sucursal_nombre}</span>
       <div className="lab-card-top"><span className={`lab-status status-${order.estado}`}>{estadoOrdenLabels[order.estado]}</span>{order.es_garantia && <span className="lab-warranty">Garantía</span>}</div>
       <h3>{order.paciente_nombre}</h3>
-      <p>{order.empresa_nombre} · <strong>{order.sucursal_nombre}</strong></p>
+      <p>{order.empresa_nombre}</p>
       <div className="lab-card-meta"><span><FlaskConical size={13} /> {laboratorioLabels[order.laboratorio] ?? order.laboratorio}</span><span>{tipoLenteLabels[order.tipo_lente] ?? order.tipo_lente}</span><span>{shortId(order)}</span></div>
       <div className="lab-dates"><span>Creada {date(order.creado_en)}</span>{order.fecha_entrega_estimada && <span className={overdue(order) ? "overdue-text" : ""}><CalendarClock size={13} /> Entrega {date(order.fecha_entrega_estimada)}</span>}</div>
     </button>

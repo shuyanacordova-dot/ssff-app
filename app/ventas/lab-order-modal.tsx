@@ -1,6 +1,7 @@
 "use client";
 import { Pencil, Printer, X } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
+import LunasStockAlert from "./lunas-stock-alert";
 import type { Sale, SaleCompany, SaleItem, SaleProduct } from "@/lib/ventas";
 import { calcularUso, emptyMedidas, emptyRx, estadoOrdenLabels, laboratorioLabels, rxFromRefraccion, tipoLenteLabels, tipoLenteSugerido, rxCerca, rxIntermedia, dnpCerca, transponer, normalizarRx, compensacionVertice, aplicarCompensacionVertice, editarRxLaboratorio, deshacerCompensacionVertice, diametroMinimoLuna, resumenDiametroMinimo, validarAlturaMontaje, avisoAnisometropia } from "@/lib/laboratorio";
 import type { EstadoOrdenLaboratorio, LaboratorioProveedor, OrdenLaboratorioMedidas, OrdenLaboratorioRx, RefraccionOption, RxEye, TipoLente, UsoCalculado } from "@/lib/laboratorio";
@@ -196,6 +197,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
         <p className="section-label" style={{ marginTop: 14 }}>Rx calculada para el laboratorio</p>
         <p className="field-hint">Puedes ajustar la receta calculada. Cambiar el uso o el examen vuelve a calcularla.{uso === "intermedio" ? " Intermedio: se aplica la mitad de la adición, redondeada a 0,25 D." : ""}</p>
         <div className={rxStyles.cards} style={{ marginTop: 10 }} key={`${consultaId}-${uso}`}><RxEyeCard eye="OD" value={rx.od} cerca={uso === "cerca"} onChange={(value) => setRx(editarRxLaboratorio(rx, "od", value))} /><RxEyeCard eye="OI" value={rx.oi} cerca={uso === "cerca"} onChange={(value) => setRx(editarRxLaboratorio(rx, "oi", value))} /></div>
+        <LunasStockAlert empresaId={sale.empresa_id} rx={rx} orderId={orderId || null} patientName={patientName} />
 
         {anisometropiaAviso && <div className="glass notice" role="status">{anisometropiaAviso}</div>}
         <section className="glass" style={{ padding: 14, marginTop: 14 }} aria-label="Distancia al vértice">

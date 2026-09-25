@@ -58,11 +58,11 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | Ventas y cobros | ✅ | Pantalla general: solo venta rápida. Lentes solo desde la carpeta del paciente. El formulario pide **solo sucursal** (la empresa sale de la sucursal). Métodos de pago: Efectivo, Transferencia, Tarjeta de crédito, Otro ("Crédito" solo en historial). Duplicados de importación jul–sep 2026 limpiados |
 | Laboratorio | ✅ | Pestaña en carpeta; uso lejos/cerca/intermedio con cálculo automático; DNP de cerca; **compensación por distancia al vértice** (≥ ±4.00), **diámetro mínimo de luna** + tamaño estándar, **altura de montaje obligatoria** en progresivos/bifocales (por ojo), **aviso de anisometropía** (≥ 2.00 D). Todo en la orden impresa |
 | Impresiones (receta, revisión, orden, recibo) | 🟡 | Hoja A4 aislada. Arreglado bloqueo de 5 minutos tras la primera impresión; en iPhone/iPad imprime en una ventana nueva. Falta prueba en el navegador real |
-| Inventario | ✅ | Stock por sucursal, transferencias, alertas, pestañas por categoría. **Búsqueda** por marca, modelo, código, código de barras y color + filtro de marca |
+| Inventario | ✅ | Stock por sucursal, transferencias, alertas, búsqueda por marca/modelo/código. **Banco de lunas** (`/inventario/lunas`): lunas de bodega y de garantía por sucursal; la orden de laboratorio avisa "Tienes esta luna en bodega / de garantía" y permite usarla (descuenta y deja registro) |
 | Caja, resumen del día | ✅ | Arranque real 25-sep-2026 (Yuli hace el cuadre de Shuvision). Días en hora de Ecuador (antes UTC). **Apertura de caja** (efectivo inicial) antes del primer cuadre. Abonos por transferencia piden banco. Resumen del día incluye abonos de ventas antiguas. Cuadre único por sucursal y fecha |
 | Cuentas de bancos / cuadre global | 🟡 | Enlace existe pero apunta a la misma caja diaria |
 | Cuentas por cobrar | ✅ | Pestañas por prioridad: **Urgentes** (> 30 días, más antigua primero), **Ventas recientes** (≤ 30 días), **Cobros mensuales** (frecuencia mensual), **Convenios** (acuerdo de pago con empresa). Cada paciente en una sola pestaña. Mensaje de WhatsApp guardado tras "Ver mensaje". Muestra solo la empresa activa (Shuvision o Focus) |
-| Agenda | ✅ | Vista día y mes. Vendedores pueden ver y agendar citas (2026-09-24). Falta Google Calendar |
+| Agenda | ✅ | Vista día y mes. Vendedores agendan. 29 controles futuros agendados desde las historias (estado "Programada" = por confirmar); 250 revisiones con fecha de control para el CRM. Falta Google Calendar |
 | Convenios | ✅ | Empresas con descuento a rol |
 | Informes y metas | ✅ | Las metas usan **"A cuenta del mes"** = lo pagado de las ventas creadas en el mes (igual que la columna "A cuenta" de Optox). Queda también `ingresos_total` (abonos por fecha de pago) disponible |
 | Facturación SRI | 🟡 | Borradores internos. Tabla `emisores_sri` por **sucursal** (Shuvision 1804006391001 ✔; Sacha 2100060470001 y Focus 1722305412001 **por confirmar**, se entregaron con 10 dígitos). Falta todo el envío al SRI (proyecto P1) |
@@ -210,6 +210,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-25 | Caja lista para el arranque (hora Ecuador, apertura, banco en abonos), cálculos ópticos avanzados, CRM v1, 2.897 pacientes vinculados a su empresa. | (este commit) |
 | 2026-09-25 | Cuentas por cobrar ordenadas por prioridad en 4 pestañas y mensaje guardado. | (este commit) |
 | 2026-09-25 | Pestaña Comunicaciones en la carpeta; tabla de emisores SRI por sucursal; proyectos largos y plan de salida de Optox en el Blueprint. | (este commit) |
+| 2026-09-25 | Sucursal destacada en Laboratorio; 29 controles agendados desde historias; banco de lunas con alerta en la orden de laboratorio. | (este commit) |
 
 ---
 
@@ -264,7 +265,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 ### Antes de apagar Optox (bloqueantes)
 | # | Qué | Por qué bloquea | Estado |
 |---|---|---|---|
-| B1 | **Facturación electrónica** | Si hoy las facturas salen desde Optox, al apagarlo no se puede facturar legalmente. Puente mientras LumOS factura: el facturador gratuito del SRI en línea. | ❌ (P1) |
+| B1 | Facturación electrónica | **No bloquea**: Shuyana siempre factura con el facturador gratuito del SRI, no con Optox. P1 queda como mejora. | ✅ no bloquea |
 | B2 | Exportar de Optox todo lo que falte: ventas y abonos desde 22/23/24-sep, historias clínicas desde 23-sep, inventario actual, catálogo y precios | Después no habrá acceso | 🟡 esperando capturas/Excel |
 | B3 | Una semana de marcha blanca: cada cuadre de LumOS comparado con el conteo real | Confirmar que los números cuadran | ⏳ desde 25-sep |
 | B4 | Inventario inicial contado por sucursal | El stock debe partir de un conteo real | ❌ |
