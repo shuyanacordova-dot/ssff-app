@@ -6,7 +6,8 @@ export type ConvenioDeuda = { empresa: string; cuotas: number; monto_cuota: numb
 export type CategoriaDeuda = "urgentes" | "recientes" | "mensuales" | "convenio";
 export type DeudaPaciente = { paciente_id: string; nombres: string; apellidos: string; telefono: string | null; frecuencia_cobro: string | null; cobro_insistente: boolean; empresa_nombre: string; saldo_total: number; ventas: DeudaVenta[]; convenio: ConvenioDeuda | null; dias_mas_antigua: number; categoria: CategoriaDeuda };
 
-export const DIAS_URGENTE = 30;
+export { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
+import { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
 export type EmpresaConvenio = { id: string; nombre: string };
 export type CuentasCobrarProfile = { id: string; empresa_id: string; rol: string };
 export type CuentasCobrarData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: CuentasCobrarProfile; empresaNombre?: string; deudas: DeudaPaciente[]; empresasConvenio: EmpresaConvenio[]; makeConfigured: boolean };
