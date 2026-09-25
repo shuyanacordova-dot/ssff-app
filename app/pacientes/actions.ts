@@ -128,6 +128,8 @@ export async function crearConsulta(data: FormData) {
   const siguienteControl = text(data, "siguiente_control") as keyof typeof monthsFor | "";
   if (siguienteControl && monthsFor[siguienteControl]) {
     const inicio = new Date(); inicio.setMonth(inicio.getMonth() + monthsFor[siguienteControl]); inicio.setHours(10, 0, 0, 0);
+    const proximoControl = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Guayaquil", year: "numeric", month: "2-digit", day: "2-digit" }).format(inicio);
+    await supabase.from("consultas_optometricas").update({ proximo_control: proximoControl }).eq("id", consulta.id);
     const { error: agendaError } = await supabase.from("citas_agenda").insert({ paciente_id: pacienteId, empresa_atencion_id: profile.empresa_id, sucursal_atencion_id: profile.sucursal_id, responsable_id: profile.id, inicio: inicio.toISOString(), duracion_minutos: 30, tipo: "control", motivo: "Próximo control programado desde consulta", estado: "programada", created_by: profile.id });
     if (agendaError) throw new Error(`La consulta se guardó, pero no se pudo agendar el próximo control: ${agendaError.message}`);
   }

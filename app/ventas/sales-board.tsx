@@ -1,4 +1,5 @@
 "use client";
+import { bancos } from "@/lib/bancos";
 import { paymentMethods, paymentMethodLabels } from "@/lib/payment-methods";
 
 import Link from "next/link";
@@ -92,11 +93,13 @@ export default function SalesBoard(props: VentasData) {
 
 export function SaleCard({ sale, companyName, branchName, patient, lensItems, hasLabOrderItems, labOrders, canAnular, pending, onAbono, onRequestAnular, onCreateLabOrder, onViewOrder, onRecibo, onDetalle, onGarantia }: { sale: Sale; companyName: string; branchName?: string; patient?: { id: string; nombres: string; apellidos: string; telefono?: string | null }; lensItems: SaleItem[]; hasLabOrderItems: boolean; labOrders: SaleLabOrder[]; canAnular: boolean; pending: boolean; onAbono: (sale: Sale, data: FormData) => void; onRequestAnular: (sale: Sale) => void; onCreateLabOrder: () => void; onViewOrder: (orderId: string) => void; onRecibo: () => void; onDetalle: () => void; onGarantia: () => void }) {
   const [showAbono, setShowAbono] = useState(false); const [metodo, setMetodo] = useState("efectivo"); const [monto, setMonto] = useState("");
+  const [banco, setBanco] = useState("");
+  const [referencia, setReferencia] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const closeMenu = () => setMenuOpen(false);
   useEffect(() => { if (!menuOpen) return; const onClick = (event: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(event.target as Node)) closeMenu(); }; document.addEventListener("mousedown", onClick); return () => document.removeEventListener("mousedown", onClick); }, [menuOpen]);
-  const submitAbono = () => { const data = new FormData(); data.set("metodo", metodo); data.set("monto", monto); onAbono(sale, data); setShowAbono(false); setMonto(""); };
+  const submitAbono = () => { if (metodo === "transferencia" && !banco) return; const data = new FormData(); data.set("metodo", metodo); data.set("monto", monto); data.set("banco", metodo === "transferencia" ? banco : ""); data.set("referencia", metodo === "transferencia" ? referencia : ""); onAbono(sale, data); setShowAbono(false); setMonto(""); setBanco(""); setReferencia(""); };
   const displayName = patient ? salePatientName(patient) : (sale.cliente_nombre || "Cliente ocasional");
   const items = sale.venta_items ?? [];
   const resumenItems = items.slice(0, 2).map((item) => `${item.descripcion} ×${item.cantidad}`).join(", ");
@@ -110,7 +113,7 @@ export function SaleCard({ sale, companyName, branchName, patient, lensItems, ha
       {patient && hasLabOrderItems && <button type="button" onClick={onCreateLabOrder}><FlaskConical size={14} /> Orden de laboratorio</button>}
       {sale.saldo > 0 && <button type="button" onClick={() => setShowAbono((value) => !value)}><Wallet size={14} /> Registrar abono</button>}
     </div>}
-    {showAbono && <div className="new-patient-form" style={{ marginTop: 10 }} onClick={(event) => event.stopPropagation()}><label>Método<select value={metodo} onChange={(event) => setMetodo(event.target.value)}>{paymentMethods.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select></label><label>Monto<input type="number" min={0} step={0.01} max={sale.saldo} value={monto} onChange={(event) => setMonto(event.target.value)} /></label><button type="button" className="new-consultation" disabled={pending || !Number(monto) || Number(monto) > sale.saldo} onClick={submitAbono}>Confirmar abono</button></div>}
+    {showAbono && <div className="new-patient-form" style={{ marginTop: 10 }} onClick={(event) => event.stopPropagation()}><label>Método<select value={metodo} onChange={(event) => setMetodo(event.target.value)}>{paymentMethods.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select></label><label>Monto<input type="number" min={0} step={0.01} max={sale.saldo} value={monto} onChange={(event) => setMonto(event.target.value)} /></label>{metodo === "transferencia" && <><label>Banco<select required value={banco} onChange={(event) => setBanco(event.target.value)}><option value="">Selecciona el banco</option>{bancos.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}</select></label><label>Referencia (opcional)<input value={referencia} onChange={(event) => setReferencia(event.target.value)} /></label></>}<button type="button" className="new-consultation" disabled={pending || !Number.isFinite(Number(monto)) || Number(monto) <= 0 || Number(monto) > sale.saldo || (metodo === "transferencia" && !banco)} onClick={submitAbono}>Confirmar abono</button></div>}
   </div><div className="task-actions" onClick={(event) => event.stopPropagation()}><span className={`state-pill ${statePillClass[sale.estado]}`}>{stateLabel[sale.estado]}</span>
     {sale.estado === "completada" && <div className="menu-wrap" ref={menuRef}>
       <button className="outline-action" type="button" onClick={() => setMenuOpen((v) => !v)}><MoreVertical size={14} /> Más opciones</button>

@@ -1,4 +1,5 @@
 "use client";
+import { fechaGuayaquil, formatRecordDate } from "@/lib/record-date";
 import { printDocumentById } from "@/lib/print-document";
 import Link from "next/link";
 import { Fragment } from "react";
@@ -7,7 +8,7 @@ import { Printer } from "lucide-react";
 import type { ResumenDiaData } from "@/lib/resumen-dia";
 
 const money = (n: number) => `$${n.toFixed(2)}`;
-const formatHora = (value: string) => new Intl.DateTimeFormat("es-EC", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(value));
+const formatHora = (value: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(value));
 const metodoLabel: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta", credito: "Crédito", otro: "Otro" };
 const clasificacionLabel: Record<string, string> = { salarios: "Salarios", pago_proveedor: "Pago a proveedor", gastos_mensuales: "Gastos mensuales", gastos_operacion: "Gastos de operación", ajuste: "Ajuste" };
 
@@ -47,7 +48,7 @@ export default function ResumenDiaBoard(props: ResumenDiaData & { fecha: string 
       <section className="glass agenda-board" style={{ marginBottom: 18 }}>
         <p className="section-label">RESUMEN DE ABONOS</p><h2>Abonos del día</h2>
         {props.abonos.length ? <table className="resumen-table"><thead><tr><th>Monto</th><th>Forma de pago</th><th>Paciente</th><th>Recibió</th><th>Saldo actual</th></tr></thead><tbody>
-          {props.abonos.map((a) => <tr key={a.id}><td>{money(a.monto)}</td><td>{metodoLabel[a.metodo] || a.metodo}</td><td>{a.paciente_nombre || a.cliente_nombre || "Cliente sin nombre"}</td><td>{a.autor_nombre || "—"}</td><td>{money(a.venta_saldo)}</td></tr>)}
+          {props.abonos.map((a) => <tr key={a.id}><td>{money(a.monto)}</td><td>{metodoLabel[a.metodo] || a.metodo}</td><td>{a.paciente_nombre || a.cliente_nombre || "Cliente sin nombre"}{a.venta_fecha && fechaGuayaquil(new Date(a.venta_fecha)) < props.fecha && <small style={{ display: "block" }}>Venta del {formatRecordDate(a.venta_fecha)}</small>}</td><td>{a.autor_nombre || "—"}</td><td>{money(a.venta_saldo)}</td></tr>)}
           <tr className="total-row"><td>{money(totalAbonos)}</td><td colSpan={4} /></tr>
         </tbody></table> : <p className="field-hint">No hay abonos registrados este día.</p>}
       </section>

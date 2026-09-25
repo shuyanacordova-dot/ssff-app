@@ -2,7 +2,7 @@
 import { Pencil, Printer, X } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import type { Sale, SaleCompany, SaleItem, SaleProduct } from "@/lib/ventas";
-import { calcularUso, emptyMedidas, emptyRx, estadoOrdenLabels, laboratorioLabels, rxFromRefraccion, tipoLenteLabels, tipoLenteSugerido, rxCerca, rxIntermedia, dnpCerca, transponer, normalizarRx } from "@/lib/laboratorio";
+import { calcularUso, emptyMedidas, emptyRx, estadoOrdenLabels, laboratorioLabels, rxFromRefraccion, tipoLenteLabels, tipoLenteSugerido, rxCerca, rxIntermedia, dnpCerca, transponer, normalizarRx, compensacionVertice, aplicarCompensacionVertice, editarRxLaboratorio, deshacerCompensacionVertice, diametroMinimoLuna, resumenDiametroMinimo, validarAlturaMontaje, avisoAnisometropia } from "@/lib/laboratorio";
 import type { EstadoOrdenLaboratorio, LaboratorioProveedor, OrdenLaboratorioMedidas, OrdenLaboratorioRx, RefraccionOption, RxEye, TipoLente, UsoCalculado } from "@/lib/laboratorio";
 import { actualizarOrdenLaboratorio, cambiarEstadoOrdenLaboratorio, crearOrdenLaboratorio, getOrdenLaboratorio, getRefraccionesPaciente } from "./lab-actions";
 import LabOrderPrint from "../lab-order-print";
@@ -59,6 +59,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
   const [tipoLente, setTipoLente] = useState<TipoLente>("monofocal_lejos");
   const [notas, setNotas] = useState("");
   const [error, setError] = useState("");
+  const [anterior, setAnterior] = useState<Parameters<typeof validarAlturaMontaje>[3]>();
 
   useEffect(() => {
     let active = true;
@@ -72,7 +73,8 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
     getOrdenLaboratorio(existingOrderId).then((orden) => {
       if (!active || !orden) return;
       setEstado(orden.estado); setItemId(orden.venta_item_id ?? lensItems[0]?.id ?? ""); setLaboratorio(orden.laboratorio); setOrderCreatedAt(orden.creado_en);
-      setConsultaId(orden.consulta_id ?? ""); setRx(orden.rx); setMedidas(orden.medidas); setTipoLente(orden.tipo_lente); setNotas((orden.notas ?? "").replace(/^Intermedio\s*[:·—-]?\s*/i, ""));
+      setAnterior(orden);
+      setConsultaId(orden.consulta_id ?? ""); setRx(orden.rx); setMedidas({ ...emptyMedidas(), ...orden.medidas }); setTipoLente(orden.tipo_lente); setNotas((orden.notas ?? "").replace(/^Intermedio\s*[:·—-]?\s*/i, ""));
       setUso(/^Intermedio\b/i.test(orden.notas ?? "") ? "intermedio" : orden.uso_calculado);
       setUsoElegido(true);
       if (orden.rx.examen_lejos) { setExamenManual(orden.rx.examen_lejos); setDnpLejos(orden.rx.dnp_lejos ?? ""); }
@@ -111,8 +113,19 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
   const frameItems = productoById ? sale.venta_items.filter((item) => item.producto_id && productoById.get(item.producto_id)?.categoria === "montura") : [];
   const lensSaleItems = productoById ? sale.venta_items.filter((item) => item.producto_id && productoById.get(item.producto_id)?.categoria === "lente") : lensItems;
 
+  const verticeRefraccion = parseRxNumber(medidas.vertice_refraccion ?? "12");
+  const verticeMontaje = parseRxNumber(medidas.vertice_montaje ?? "12");
+  const cambiarVertice = (key: "vertice_refraccion" | "vertice_montaje", value: string) => {
+    setRx(deshacerCompensacionVertice(rx));
+    setMedidas({ ...medidas, [key]: value });
+  };
+  const diametroResumen = resumenDiametroMinimo(medidas, rx);
+  const anisometropiaAviso = avisoAnisometropia(rx);
+
   const submit = () => {
     setError("");
+    const alturaError = validarAlturaMontaje(tipoLente, medidas, rx, anterior);
+    if (alturaError) { setError(alturaError); return; }
     if (!orderId && !itemId) { setError("Elige el producto de esta venta."); return; }
     start(async () => {
       const data = new FormData();
@@ -182,16 +195,54 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
         {(uso === "cerca" || uso === "intermedio") && examen && (["od", "oi"] as const).some((eye) => rx[eye].procesar && !(parseRxNumber(examen[eye].add) ?? 0)) && <p className="notice" role="status">Falta la adición para calcular la visión de cerca</p>}
         <p className="section-label" style={{ marginTop: 14 }}>Rx calculada para el laboratorio</p>
         <p className="field-hint">Puedes ajustar la receta calculada. Cambiar el uso o el examen vuelve a calcularla.{uso === "intermedio" ? " Intermedio: se aplica la mitad de la adición, redondeada a 0,25 D." : ""}</p>
-        <div className={rxStyles.cards} style={{ marginTop: 10 }} key={`${consultaId}-${uso}`}><RxEyeCard eye="OD" value={rx.od} cerca={uso === "cerca"} onChange={(value) => setRx({ ...rx, od: value })} /><RxEyeCard eye="OI" value={rx.oi} cerca={uso === "cerca"} onChange={(value) => setRx({ ...rx, oi: value })} /></div>
+        <div className={rxStyles.cards} style={{ marginTop: 10 }} key={`${consultaId}-${uso}`}><RxEyeCard eye="OD" value={rx.od} cerca={uso === "cerca"} onChange={(value) => setRx(editarRxLaboratorio(rx, "od", value))} /><RxEyeCard eye="OI" value={rx.oi} cerca={uso === "cerca"} onChange={(value) => setRx(editarRxLaboratorio(rx, "oi", value))} /></div>
+
+        {anisometropiaAviso && <div className="glass notice" role="status">{anisometropiaAviso}</div>}
+        <section className="glass" style={{ padding: 14, marginTop: 14 }} aria-label="Distancia al vértice">
+          <p className="section-label">Distancia al vértice</p>
+          <div className="new-patient-form">
+            <label>Distancia de refracción (mm)<input inputMode="decimal" value={medidas.vertice_refraccion ?? "12"} onChange={(event) => cambiarVertice("vertice_refraccion", event.target.value)} /></label>
+            <label>Distancia de montaje de la montura (mm)<input inputMode="decimal" value={medidas.vertice_montaje ?? "12"} onChange={(event) => cambiarVertice("vertice_montaje", event.target.value)} /></label>
+          </div>
+          <p className="field-hint">Cambiar las distancias restaura la potencia anterior a la compensación. Potencias redondeadas a 0,25 D; montaje 0 mm = plano corneal.</p>
+          {(["od", "oi"] as const).map((eye) => {
+            const original = rx.compensacion_vertice?.[eye]?.original ?? rx[eye];
+            const result = compensacionVertice(original, verticeRefraccion ?? NaN, verticeMontaje ?? NaN);
+            const revisar = compensacionVertice(original, 12, 12)?.revisar;
+            if (!rx[eye].procesar || !revisar) return null;
+            return <div key={eye} className="notice" role="status">
+              <strong>{eye.toUpperCase()} · Revisar distancia al vértice</strong>
+              {!result && <p>Ingresa distancias válidas para calcular la compensación.</p>}
+              {result && verticeRefraccion !== verticeMontaje && <>
+                <p>Potencia compensada (Esf · Esf + Cil): {result.montaje.map((p) => p.toFixed(2)).join(" D · ")} D</p>
+                <p className="field-hint">Plano corneal: {result.cornea.map((p) => p.toFixed(2)).join(" D · ")} D</p>
+                <button type="button" className="outline-action" disabled={!!rx.compensacion_vertice?.[eye]} onClick={() => setRx(aplicarCompensacionVertice(rx, eye, verticeRefraccion!, verticeMontaje!))}>Usar compensada</button>
+              </>}
+              {rx.compensacion_vertice?.[eye] && <p>Potencia compensada por distancia al vértice</p>}
+            </div>;
+          })}
+        </section>
 
         <p className="section-label" style={{ marginTop: 14 }}>PARÁMETROS DEL ARMAZÓN (MM)</p>
         <div className="new-patient-form">
           <label>Vertical<input value={medidas.vertical} onChange={(event) => setMedidas({ ...medidas, vertical: event.target.value })} /></label>
           <label>Horizontal mayor<input value={medidas.horizontal_mayor} onChange={(event) => setMedidas({ ...medidas, horizontal_mayor: event.target.value })} /></label>
           <label>Puente<input value={medidas.puente} onChange={(event) => setMedidas({ ...medidas, puente: event.target.value })} /></label>
-          <label>Altura<input value={medidas.altura} onChange={(event) => setMedidas({ ...medidas, altura: event.target.value })} /></label>
+          <label>Altura común<input value={medidas.altura} onChange={(event) => setMedidas({ ...medidas, altura: event.target.value })} /></label>
+          <label>Altura OD<input inputMode="decimal" value={medidas.altura_od ?? ""} onChange={(event) => setMedidas({ ...medidas, altura_od: event.target.value })} placeholder="Usa altura común si está vacía" /></label>
+          <label>Altura OI<input inputMode="decimal" value={medidas.altura_oi ?? ""} onChange={(event) => setMedidas({ ...medidas, altura_oi: event.target.value })} placeholder="Usa altura común si está vacía" /></label>
+          <label>Diagonal efectiva (ED)<input inputMode="decimal" value={medidas.diagonal_efectiva ?? ""} onChange={(event) => setMedidas({ ...medidas, diagonal_efectiva: event.target.value })} placeholder="Diagonal mayor, opcional" /></label>
           <label>{uso === "cerca" ? "DNP de cerca (sugerida, binocular)" : "DNP binocular"}<input inputMode="decimal" value={medidas.dnp} onChange={(event) => setMedidas({ ...medidas, dnp: event.target.value })} /></label>
         </div>
+
+        {(tipoLente === "progresivo" || tipoLente === "bifocal") && <p className="field-hint">Altura de montaje obligatoria: ingresa la altura común o una altura para cada ojo a procesar.</p>}
+        {diametroResumen && <div className="glass" style={{ padding: 14, marginTop: 10 }} role="status">
+          <p>{diametroResumen}</p>
+          {(["od", "oi"] as const).map((eye) => {
+            const result = diametroMinimoLuna(medidas, rx[eye]);
+            return result && <p className="field-hint" key={eye}>{eye.toUpperCase()} · Diámetro estándar sugerido: {result.estandar === null ? "supera 80 mm; consultar laboratorio" : `${result.estandar} mm`}</p>;
+          })}
+        </div>}
 
         <div className="new-patient-form" style={{ marginTop: 10 }}><label className="task-description">Observaciones<textarea value={notas} onChange={(event) => setNotas(event.target.value)} placeholder="Indicaciones para el laboratorio" /></label></div>
 

@@ -6,3 +6,7 @@ export function formatRecordDate(value: string): string {
     timeZone: "America/Guayaquil", day: "2-digit", month: "short", year: "numeric",
   }).format(date);
 }
+
+export function fechaGuayaquil(date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Guayaquil", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+}

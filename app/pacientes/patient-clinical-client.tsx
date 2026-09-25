@@ -39,12 +39,12 @@ const calcularEdad = (fechaISO: string): number | null => {
   return edad >= 0 ? edad : null;
 };
 
-export default function PatientClinicalClient(props: ClinicalData & { autoCreate?: boolean }) {
+export default function PatientClinicalClient(props: ClinicalData & { autoCreate?: boolean; initialSearch?: string }) {
   const router = useRouter();
   const demoMode = props.status !== "ready";
   const patients = demoMode ? demoPatients : props.patients;
   const initialIds = useMemo(() => new Set(patients.map((patient) => patient.id)), [patients]);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(props.initialSearch ?? "");
   const [searchResults, setSearchResults] = useState<PatientRecord[]>([]);
   const [searchBranchId, setSearchBranchId] = useState(props.profile?.sucursal_id ?? "all");
   const [historyBranchId, setHistoryBranchId] = useState("all");

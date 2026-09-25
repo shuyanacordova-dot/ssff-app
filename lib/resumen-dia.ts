@@ -1,7 +1,7 @@
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 
 export type VentaResumen = { id: string; creado_en: string; subtotal: number; descuento: number; total: number; paciente_nombre: string | null; cliente_nombre: string | null; autor_nombre: string | null };
-export type AbonoResumen = { id: string; monto: number; metodo: string; creado_en: string; venta_id: string; venta_saldo: number; paciente_nombre: string | null; cliente_nombre: string | null; autor_nombre: string | null };
+export type AbonoResumen = { id: string; monto: number; metodo: string; creado_en: string; venta_id: string; venta_saldo: number; venta_fecha?: string; paciente_nombre: string | null; cliente_nombre: string | null; autor_nombre: string | null };
 export type SalidaResumen = { id: string; clasificacion: string; concepto: string; monto: number; observaciones: string | null; autor_nombre: string | null };
 export type ResumenCompany = { id: string; nombre: string };
 export type ResumenDiaData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: { id: string; empresa_id: string; rol: string }; companies: ResumenCompany[]; ventas: VentaResumen[]; abonos: AbonoResumen[]; salidas: SalidaResumen[] };
@@ -42,11 +42,14 @@ export async function getResumenDiaData(fecha: string, empresaIdParam?: string):
     ]);
     if (ventasResult.error || gastosResult.error) return { status: "error", message: "No se pudo cargar el resumen del día.", ...empty };
 
-    const ventaIds = (ventasResult.data ?? []).filter((v) => v.estado !== "anulada").map((v) => v.id);
-    const pagosResult = ventaIds.length ? await supabase.from("pagos_venta").select("id,venta_id,metodo,monto,creado_en,recibido_por").in("venta_id", ventaIds).gte("creado_en", inicio).lt("creado_en", fin).order("creado_en", { ascending: true }) : { data: [], error: null };
+    const pagosResult = await supabase.from("pagos_venta")
+      .select("id,venta_id,metodo,monto,creado_en,recibido_por,ventas!inner(id,creado_en,saldo,cliente_nombre,paciente_id)")
+      .eq("ventas.empresa_id", empresa).neq("ventas.estado", "anulada")
+      .gte("creado_en", inicio).lt("creado_en", fin).order("creado_en", { ascending: true });
     if (pagosResult.error) return { status: "error", message: "No se pudieron cargar los abonos del día.", ...empty };
 
-    const pacienteIds = Array.from(new Set((ventasResult.data ?? []).map((v) => v.paciente_id).filter(Boolean))) as string[];
+    const ventasPagadas = (pagosResult.data ?? []).flatMap((p) => p.ventas);
+    const pacienteIds = Array.from(new Set([...(ventasResult.data ?? []), ...ventasPagadas].map((v) => v.paciente_id).filter(Boolean))) as string[];
     const userIds = Array.from(new Set([
       ...(ventasResult.data ?? []).map((v) => v.created_by),
       ...(pagosResult.data ?? []).map((p) => p.recibido_por),
@@ -59,7 +62,7 @@ export async function getResumenDiaData(fecha: string, empresaIdParam?: string):
     ]);
     const pacienteNombre = new Map((pacientesResult.data ?? []).map((p) => [p.id, `${p.nombres} ${p.apellidos}`]));
     const usuarioNombre = new Map((usuariosResult.data ?? []).map((u) => [u.id, u.nombre]));
-    const ventaById = new Map((ventasResult.data ?? []).map((v) => [v.id, v]));
+    const ventaById = new Map(ventasPagadas.map((v) => [v.id, v]));
 
     const ventas: VentaResumen[] = (ventasResult.data ?? []).filter((v) => v.estado !== "anulada").map((v) => ({
       id: v.id, creado_en: v.creado_en, subtotal: Number(v.subtotal), descuento: Number(v.descuento), total: Number(v.total),
@@ -72,6 +75,7 @@ export async function getResumenDiaData(fecha: string, empresaIdParam?: string):
       return {
         id: p.id, monto: Number(p.monto), metodo: p.metodo, creado_en: p.creado_en, venta_id: p.venta_id,
         venta_saldo: venta ? Number(venta.saldo) : 0,
+        venta_fecha: venta?.creado_en,
         paciente_nombre: venta?.paciente_id ? pacienteNombre.get(venta.paciente_id) ?? null : null,
         cliente_nombre: venta?.cliente_nombre ?? null,
         autor_nombre: p.recibido_por ? usuarioNombre.get(p.recibido_por) ?? null : null,

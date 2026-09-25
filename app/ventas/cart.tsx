@@ -1,4 +1,5 @@
 "use client";
+import { bancos } from "@/lib/bancos";
 import { paymentMethods as methods } from "@/lib/payment-methods";
 import { useMemo, useState, useTransition } from "react";
 import { Search, X } from "lucide-react";
@@ -10,7 +11,7 @@ import type { EmpresaConvenio, PaymentMethod, SaleBranch, SaleCompany, SalePatie
 type CartItem = { producto_id: string; cantidad: number; descuento: number };
 type CartPayment = { metodo: PaymentMethod; monto: string; referencia: string; banco: string };
 type Modo = "" | "rapida" | "lentes";
-const bancos = [{ value: "pichincha", label: "Banco Pichincha" }, { value: "guayaquil", label: "Banco Guayaquil" }, { value: "internacional", label: "Banco Internacional" }, { value: "otro", label: "Otro banco" }];
+
 const money = (n: number) => `$${n.toFixed(2)}`;
 const primeraCuotaFecha = () => { const d = new Date(); d.setMonth(d.getMonth() + 1); d.setDate(1); return d; };
 const formatFecha = (d: Date) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "long", year: "numeric" }).format(d);

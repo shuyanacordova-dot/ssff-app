@@ -56,18 +56,18 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | Historia clínica / revisiones | ✅ | Crear, ver, editar, imprimir. En celular: botones −/+ (pasos de 0,25), chip de signo para esfera, cilindro siempre negativo, botón "Transponer", eje 0–180 |
 | Carpeta del paciente | 🟡 | Cuatro pestañas: Revisiones, Ventas, Fotos y documentos, Laboratorio con contador y órdenes. Pendientes Citas, Estado de cuenta, Comunicaciones. |
 | Ventas y cobros | ✅ | Pantalla general: solo venta rápida. Lentes solo desde la carpeta del paciente. El formulario pide **solo sucursal** (la empresa sale de la sucursal). Métodos de pago: Efectivo, Transferencia, Tarjeta de crédito, Otro ("Crédito" solo en historial). Duplicados de importación jul–sep 2026 limpiados |
-| Laboratorio | ✅ | Pestaña propia en la carpeta; la carpeta se recarga al crear/editar (antes no se veía la orden nueva, pero sí se guardaba). "Uso del lente": lejos / cerca / intermedio / lejos y cerca; cerca = esfera + adición, intermedio = esfera + 50 % de la adición; DNP de cerca sugerida (−3 mm binocular). Guarda la Rx original del examen |
+| Laboratorio | ✅ | Pestaña en carpeta; uso lejos/cerca/intermedio con cálculo automático; DNP de cerca; **compensación por distancia al vértice** (≥ ±4.00), **diámetro mínimo de luna** + tamaño estándar, **altura de montaje obligatoria** en progresivos/bifocales (por ojo), **aviso de anisometropía** (≥ 2.00 D). Todo en la orden impresa |
 | Impresiones (receta, revisión, orden, recibo) | 🟡 | Hoja A4 aislada. Arreglado bloqueo de 5 minutos tras la primera impresión; en iPhone/iPad imprime en una ventana nueva. Falta prueba en el navegador real |
 | Inventario | ✅ | Stock por sucursal, transferencias, alertas, pestañas por categoría. **Búsqueda** por marca, modelo, código, código de barras y color + filtro de marca |
-| Caja, resumen del día | ✅ | Cuadre diario convive con la herramienta vieja de Notion (no tocar esa) |
+| Caja, resumen del día | ✅ | Arranque real 25-sep-2026 (Yuli hace el cuadre de Shuvision). Días en hora de Ecuador (antes UTC). **Apertura de caja** (efectivo inicial) antes del primer cuadre. Abonos por transferencia piden banco. Resumen del día incluye abonos de ventas antiguas. Cuadre único por sucursal y fecha |
 | Cuentas de bancos / cuadre global | 🟡 | Enlace existe pero apunta a la misma caja diaria |
 | Cuentas por cobrar | ✅ | Incluye mensaje de cobro con días de atraso. Vendedores y caja ya ven los nombres de los pacientes (2026-09-24) |
 | Agenda | ✅ | Vista día y mes. Vendedores pueden ver y agendar citas (2026-09-24). Falta Google Calendar |
 | Convenios | ✅ | Empresas con descuento a rol |
 | Informes y metas | ✅ | Las metas usan **"A cuenta del mes"** = lo pagado de las ventas creadas en el mes (igual que la columna "A cuenta" de Optox). Queda también `ingresos_total` (abonos por fecha de pago) disponible |
-| Facturación SRI | 🟡 | Solo **borradores** internos (`app/facturacion`). No firma ni envía al SRI. **Fase C** |
+| Facturación SRI | 🟡 | Solo **borradores** internos (`app/facturacion`). No firma ni envía al SRI. **Fase C**: 3 RUC con su firma .p12 (se suben por pantalla segura, nunca por chat); la clave del portal SRI no se necesita |
 | Asistente Shu (IA) | 🟡 | Ayuda administrativa básica (`app/asistente`). **Fase D** |
-| CRM / seguimiento de pacientes | ❌ | **Fase B** |
+| CRM / seguimiento de pacientes | 🟡 | `/crm` "A quién contactar hoy": controles, examen sin compra, lentes listos, postventa, cumpleaños, inactivos. WhatsApp con mensaje listo (envío manual) y registro de contacto. Pacientes contactados se ocultan 14 días. Falta: pestaña "Comunicaciones" en la carpeta, lealtad/referidos, lentes de contacto |
 | Tarjeta de lealtad y referidos | ❌ | **Fase B** |
 | Auditoría general de cambios | 🟡 | `pacientes_cambios` activa para ediciones de pacientes. Falta pantalla para verla y auditoría de otros módulos. |
 | Seguridad de funciones de base de datos | ✅ | 2026-09-24: se quitó el acceso sin sesión a 7 funciones. Solo `obtener_recibo_publico` es pública (a propósito). |
@@ -153,6 +153,8 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | L17 | 2026-09-24 | Con autorización explícita en el chat, la anulación masiva sí se pudo aplicar. Se usó el Excel completo de Optox como referencia y se revisó a mano cada caso dudoso (nombres escritos distinto, ventas con orden/garantía enlazada). | Cruzar siempre contra el sistema de origen, mostrar el resultado esperado por mes antes de aplicar, y nunca anular una copia con registros enlazados. |
 | L18 | 2026-09-24 | "La orden no se guarda": sí se guardaba; la carpeta de un paciente abierto por búsqueda guardaba sus datos en memoria y no se recargaba. | Después de cada cambio, volver a leer los datos de la pantalla. Antes de decir "no se guardó", revisar la base de datos. |
 | L19 | 2026-09-24 | Imprimir se bloqueaba 5 minutos: se esperaba un aviso "impresión terminada" que Safari no envía. | Nunca bloquear una acción del usuario esperando un evento del navegador; liberar enseguida. |
+| L20 | 2026-09-25 | La caja calculaba el día en UTC (lo de después de las 19:00 caía al día siguiente) y el CRM salía vacío porque solo 10 de 3.021 pacientes importados estaban vinculados a su empresa. | Revisar en cada función `::date` sobre timestamptz (usar `at time zone \'America/Guayaquil\'`). Al importar, crear también los vínculos paciente–empresa. |
+| L21 | 2026-09-25 | Codex alcanzó el límite de uso de la cuenta (hasta 28-sep) a mitad de 3 tareas. Claude revisó y terminó el trabajo parcial (faltaba mostrar la apertura de caja y toda la pantalla del CRM). | Revisar siempre el estado real de los archivos cuando una tarea falla; no asumir que quedó completa. |
 
 ---
 
@@ -204,6 +206,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-24 | Ícono para Dock/inicio, metas por dinero cobrado, venta rápida sin lentes, sucursales renombradas, vendedor con pacientes/agenda/cuentas por cobrar. Migración `20260924220247_vendedor_pacientes_agenda_metas_cobradas.sql` aplicada. | (este commit) |
 | 2026-09-24 | Solo sucursal en ventas, métodos de pago, metas "A cuenta", fechas visibles, resumen del día sin anuladas, tabla de referencia Optox. | (este commit) |
 | 2026-09-24 | Depuración de 332 duplicados (jul–sep), carpeta se recarga tras cambios, impresión sin bloqueo, búsqueda en inventario, Rx con botones −/+ en celular, uso del lente con cálculo de cerca/intermedio. | (este commit) |
+| 2026-09-25 | Caja lista para el arranque (hora Ecuador, apertura, banco en abonos), cálculos ópticos avanzados, CRM v1, 2.897 pacientes vinculados a su empresa. | (este commit) |
 
 ---
 

@@ -1,14 +1,16 @@
 "use client";
-import { formatRecordDate } from "@/lib/record-date";
+import { fechaGuayaquil, formatRecordDate } from "@/lib/record-date";
 
 import Link from "next/link";
 import { AlertCircle, Banknote, CheckCircle2, Plus, Receipt, XCircle, X } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { CajaData, CajaBranch, CierreCaja } from "@/lib/caja";
-import { crearCierreCaja, crearGasto, previsualizarCierre, type ResultadoCierre, type VistaCierre } from "./actions";
+import { crearCierreCaja, crearGasto, registrarAperturaCaja, previsualizarCierre, type ResultadoCierre, type VistaCierre } from "./actions";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
-const today = () => new Date().toISOString().slice(0, 10);
+const today = fechaGuayaquil;
+const fechaCuadre = (fecha: string) => fecha ? new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", weekday: "long", day: "numeric", month: "short", year: "numeric" }).format(new Date(`${fecha}T12:00:00-05:00`)) : "fecha por seleccionar";
+const origenCaja = (vista: VistaCierre) => vista.origen_caja_anterior && vista.fecha_caja_anterior ? `${vista.origen_caja_anterior === "apertura" ? "Apertura" : "Cierre"} del ${formatDate(vista.fecha_caja_anterior)}` : "Sin registro previo";
 const formatDate = formatRecordDate;
 const bancoLabel: Record<string, string> = { pichincha: "Banco Pichincha", guayaquil: "Banco Guayaquil", internacional: "Banco Internacional" };
 const clasificacionLabel: Record<string, string> = { salarios: "Salarios", pago_proveedor: "Pago a proveedor", gastos_mensuales: "Gastos mensuales", gastos_operacion: "Gastos de operación", ajuste: "Ajuste" };
@@ -47,7 +49,7 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean }) {
     <section className="glass agenda-board"><div className="agenda-toolbar"><div><p className="section-label">CIERRE DIARIO</p><h2>Cuadre de caja</h2></div><button className="new-task" type="button" onClick={() => setShowCierre(true)}><Plus size={18} /> Nuevo cuadre</button></div>{cierres.length ? <div className="task-list">{cierres.map((cierre) => <CierreCard key={cierre.id} cierre={cierre} sucursalNombre={props.branches.find((b) => b.id === cierre.sucursal_id)?.nombre ?? "Sucursal"} />)}</div> : <section className="empty-state"><Banknote size={27} /><h3>Sin cuadres registrados</h3><p>El primer cierre diario aparecerá aquí.</p></section>}</section>
 
     {showGasto && <GastoModal empresaId={empresaId} branches={branches} cuentas={cuentas} canSaldos={canSaldos} pending={pending} onClose={() => setShowGasto(false)} onSubmit={(form) => runAction(() => crearGasto(form), "Gasto registrado.")} />}
-    {showCierre && <CierreModal empresaId={empresaId} branches={branches} onClose={(message) => { setShowCierre(false); if (message) setNotice(message); }} />}
+    {showCierre && <CierreModal key={empresaId} empresaId={empresaId} branches={branches} onClose={(message) => { setShowCierre(false); if (message) setNotice(message); }} />}
   </div></main>;
 }
 
@@ -78,7 +80,7 @@ function ResumenCajaHoy({ empresaId, branches, cierres, defaultSucursalId, onNue
     {!sucursalId ? <p className="field-hint">No hay sucursales para revisar.</p> : loading ? <p className="field-hint">Calculando…</p> : error ? <p className="notice">{error}</p> : vista && <>
       {cierreDeHoy ? <div className={`caja-estado ${cierreDeHoy.cuadre_correcto ? "ok" : "fail"}`}>{cierreDeHoy.cuadre_correcto ? <CheckCircle2 size={19} /> : <XCircle size={19} />}<span>{cierreDeHoy.cuadre_correcto ? "Caja cuadrada" : `Caja no cuadrada · Diferencia ${money(cierreDeHoy.diferencia)}`}</span></div> : <div className="caja-estado pending"><AlertCircle size={19} /><span>Aún no se ha cerrado la caja de hoy — estos son los valores registrados hasta el momento.</span></div>}
       <div className="caja-resumen-grid">
-        <div><span className="section-label">Caja del día anterior</span><strong>{money(vista.caja_anterior)}</strong></div>
+        <div><span className="section-label">Caja de partida</span><strong>{money(vista.caja_anterior)}</strong><small>{origenCaja(vista)}</small></div>
         <div><span className="section-label">Efectivo de hoy</span><strong>{money(cierreDeHoy ? cierreDeHoy.declarado_efectivo : vista.cobro_efectivo)}</strong></div>
         <div><span className="section-label">Tarjetas</span><strong>{money(cierreDeHoy ? cierreDeHoy.declarado_tarjeta : vista.cobro_tarjeta)}</strong></div>
         <div><span className="section-label">Transferencias (todos los bancos)</span><strong>{money(cierreDeHoy ? (cierreDeHoy.declarado_transferencia_pichincha + cierreDeHoy.declarado_transferencia_guayaquil + cierreDeHoy.declarado_transferencia_internacional) : transferencias)}</strong></div>
@@ -114,7 +116,7 @@ function GastoModal({ empresaId, branches, cuentas, canSaldos, pending, onClose,
 }
 
 function CierreModal({ empresaId, branches, onClose }: { empresaId: string; branches: CajaData["branches"]; onClose: (message?: string) => void }) {
-  const [sucursalId, setSucursalId] = useState("");
+  const [sucursalId, setSucursalId] = useState(branches[0]?.id ?? "");
   const [fecha, setFecha] = useState(today());
   const [declaradoEfectivo, setDeclaradoEfectivo] = useState("");
   const [declaradoTarjeta, setDeclaradoTarjeta] = useState("");
@@ -132,14 +134,21 @@ function CierreModal({ empresaId, branches, onClose }: { empresaId: string; bran
   const [resultado, setResultado] = useState<ResultadoCierre | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [guardarError, setGuardarError] = useState("");
+  const [revision, setRevision] = useState(0);
 
   useEffect(() => {
-    if (!sucursalId) { setVista(null); setVistaError(""); return; }
+    let cancelled = false;
+    setVista(null); setVistaError("");
+    if (!sucursalId || !fecha) return;
     startVista(async () => {
-      const result = await previsualizarCierre(empresaId, sucursalId, fecha);
-      if ("error" in result) { setVistaError(result.error); setVista(null); } else { setVistaError(""); setVista(result); }
+      try {
+        const result = await previsualizarCierre(empresaId, sucursalId, fecha);
+        if (cancelled) return;
+        if ("error" in result) setVistaError(result.error); else setVista(result);
+      } catch { if (!cancelled) setVistaError("No se pudo cargar la vista previa."); }
     });
-  }, [sucursalId, fecha, empresaId]);
+    return () => { cancelled = true; };
+  }, [sucursalId, fecha, empresaId, revision]);
 
   const depositosTotal = (Number(depositoPichincha) || 0) + (Number(depositoGuayaquil) || 0) + (Number(depositoInternacional) || 0);
   const cajaEsperadaPreview = vista ? vista.caja_anterior + vista.cobro_efectivo - vista.egresos_efectivo - depositosTotal : null;
@@ -174,9 +183,9 @@ function CierreModal({ empresaId, branches, onClose }: { empresaId: string; bran
     <div className="modal-actions"><button className="new-consultation" type="button" onClick={() => onClose(resultado.cuadre_correcto ? "Caja cuadrada." : "Caja no cuadrada — revisa las diferencias.")}>Listo</button></div>
   </section></div>;
 
-  return <div className="modal-backdrop"><section className="new-patient-modal task-modal" role="dialog" aria-modal="true" aria-labelledby="new-cierre-title"><button className="modal-close" onClick={() => onClose()} aria-label="Cerrar"><X size={19} /></button><p className="section-label">CIERRE DE CAJA</p><h2 id="new-cierre-title">Cierre de caja diario</h2><p>Ingresa lo recibido por cada método de pago y el efectivo contado. El sistema lo comparará con las ventas registradas.</p><form onSubmit={submit}><input type="hidden" name="empresa_id" value={empresaId} /><div className="new-patient-form">
+  return <div className="modal-backdrop"><section className="new-patient-modal task-modal" role="dialog" aria-modal="true" aria-labelledby="new-cierre-title"><button className="modal-close" onClick={() => onClose()} aria-label="Cerrar"><X size={19} /></button><p className="section-label">CIERRE DE CAJA</p><h2 id="new-cierre-title">Cuadre del {fechaCuadre(fecha)}</h2><p>Ingresa lo recibido por cada método de pago y el efectivo contado. El sistema lo comparará con las ventas registradas.</p>{vista && !loadingVista && <AperturaCaja key={`${empresaId}:${sucursalId}:${fecha}:${revision}`} empresaId={empresaId} sucursalId={sucursalId} fecha={fecha} vista={vista} onSaved={() => { setVista(null); setRevision((value) => value + 1); }} />}<form onSubmit={submit}><input type="hidden" name="empresa_id" value={empresaId} /><div className="new-patient-form">
     <label>Sucursal<select name="sucursal_id" required value={sucursalId} onChange={(event) => setSucursalId(event.target.value)}><option value="" disabled>Selecciona la sucursal</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label>
-    <label>Fecha<input name="fecha" type="date" value={fecha} onChange={(event) => setFecha(event.target.value)} /></label>
+    <label>Fecha<input name="fecha" type="date" required value={fecha} onChange={(event) => setFecha(event.target.value)} /></label>
   </div>
 
   {sucursalId && <div className="glass clinical-card" style={{ minHeight: "auto", margin: "14px 0", padding: 16 }}>
@@ -185,11 +194,10 @@ function CierreModal({ empresaId, branches, onClose }: { empresaId: string; bran
     {vista && <>
       {vista.ya_existe && <p className="notice">Ya existe un cuadre guardado para esta sucursal y fecha.</p>}
 
+      <AperturaCaja key={`${sucursalId}-${fecha}-${vista.origen_caja_anterior}-${vista.fecha_caja_anterior}`} empresaId={empresaId} sucursalId={sucursalId} fecha={fecha} vista={vista} onSaved={() => setRevision((value) => value + 1)} />
+
       <p className="section-label">RESUMEN DEL DÍA</p>
       <div className="consultation-stats"><span><strong>Abonos del día</strong>{money(abonosTotal)}</span><span><strong>Egresos del día</strong>{money(vista.egresos_efectivo)}</span></div>
-
-      <p className="section-label" style={{ marginTop: 14 }}>CAJA DEL CIERRE ANTERIOR</p>
-      <div className="consultation-stats"><span><strong>{vista.fecha_caja_anterior ? `Cierre del ${formatDate(vista.fecha_caja_anterior)}` : "Sin cierre anterior"}</strong>{money(vista.caja_anterior)}</span></div>
 
       <p className="section-label" style={{ marginTop: 14 }}>VALORES REGISTRADOS EN EL SISTEMA</p>
       <div className="consultation-stats"><span><strong>Efectivo</strong>{money(vista.cobro_efectivo)}</span><span><strong>Tarjetas</strong>{money(vista.cobro_tarjeta)}</span><span><strong>Pichincha</strong>{money(vista.cobro_transferencia_pichincha)}</span><span><strong>Guayaquil</strong>{money(vista.cobro_transferencia_guayaquil)}</span><span><strong>Internacional</strong>{money(vista.cobro_transferencia_internacional)}</span></div>
@@ -225,4 +233,33 @@ function CierreModal({ empresaId, branches, onClose }: { empresaId: string; bran
   <div className="new-patient-form" style={{ marginTop: 14 }}><label className="task-description">Observaciones<textarea name="observaciones" value={observaciones} onChange={(event) => setObservaciones(event.target.value)} /></label></div>
   {guardarError && <p className="notice">{guardarError}</p>}
   <div className="modal-actions"><button className="outline-action" type="button" onClick={() => onClose()}>Cancelar</button><button className="new-consultation" disabled={guardando || loadingVista || !vista || vista.ya_existe} type="submit">{guardando ? "Guardando…" : vista?.ya_existe ? "Cierre ya registrado" : "Registrar cierre"}</button></div></form></section></div>;
+}
+
+function AperturaCaja({ empresaId, sucursalId, fecha, vista, onSaved }: { empresaId: string; sucursalId: string; fecha: string; vista: VistaCierre; onSaved: () => void }) {
+  const anterior = new Date(`${fecha}T12:00:00Z`);
+  anterior.setUTCDate(anterior.getUTCDate() - 1);
+  const tieneApertura = vista.origen_caja_anterior === "apertura" && vista.fecha_caja_anterior === fecha;
+  const tieneCierreAyer = vista.origen_caja_anterior === "cierre" && vista.fecha_caja_anterior === anterior.toISOString().slice(0, 10);
+  const [abierta, setAbierta] = useState(!tieneApertura && !tieneCierreAyer);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  return <section className="glass clinical-card" style={{ minHeight: "auto", margin: "14px 0", padding: 16 }}>
+    <p className="section-label">Caja de partida</p><h2>{money(vista.caja_anterior)}</h2><p>{origenCaja(vista)}</p>
+    {!vista.ya_existe && <>
+      <button className="text-action" type="button" onClick={() => setAbierta(true)}>Corregir apertura</button>
+      {abierta && <form onSubmit={async (event) => {
+        event.preventDefault(); setPending(true); setError("");
+        const form = new FormData(event.currentTarget);
+        try { await registrarAperturaCaja(form); onSaved(); }
+        catch (err) { setError(err instanceof Error ? err.message : "No se pudo registrar la apertura."); }
+        finally { setPending(false); }
+      }}>
+        <h3>Apertura de caja — ¿Con cuánto efectivo abrió hoy la caja?</h3><p>Fecha de apertura: <strong>{formatDate(fecha)}</strong></p>
+        <input type="hidden" name="empresa_id" value={empresaId} /><input type="hidden" name="sucursal_id" value={sucursalId} /><input type="hidden" name="fecha" value={fecha} />
+        <div className="new-patient-form"><label>Monto de apertura<input name="monto" type="number" min="0" step="0.01" required defaultValue={tieneApertura ? vista.caja_anterior : ""} /></label><label>Nota (opcional)<input name="observaciones" /></label></div>
+        {error && <p className="notice" role="alert">{error}</p>}
+        <button className="new-consultation" type="submit" disabled={pending}>{pending ? "Guardando…" : "Registrar apertura"}</button>
+      </form>}
+    </>}
+  </section>;
 }

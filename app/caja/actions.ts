@@ -28,7 +28,7 @@ export async function crearMovimientoBancario(form: FormData) {
   revalidatePath("/caja");
 }
 
-export type VistaCierre = { ya_existe: boolean; fecha_caja_anterior: string | null; caja_anterior: number; ventas_brutas: number; cobro_efectivo: number; cobro_tarjeta: number; cobro_transferencia_pichincha: number; cobro_transferencia_guayaquil: number; cobro_transferencia_internacional: number; cobro_credito: number; cobro_otro: number; egresos_efectivo: number; egresos_banco: number };
+export type VistaCierre = { ya_existe: boolean; origen_caja_anterior: "apertura" | "cierre" | null; fecha_caja_anterior: string | null; caja_anterior: number; ventas_brutas: number; cobro_efectivo: number; cobro_tarjeta: number; cobro_transferencia_pichincha: number; cobro_transferencia_guayaquil: number; cobro_transferencia_internacional: number; cobro_credito: number; cobro_otro: number; egresos_efectivo: number; egresos_banco: number };
 export type ResultadoCierre = { id: string; cuadre_correcto: boolean; diferencia: number; diferencia_cobros_declarados: number; caja_esperada: number; caja_fisica: number; check_cobros_ventas: boolean; check_metodos_pago: boolean };
 
 export async function previsualizarCierre(empresaId: string, sucursalId: string, fecha: string): Promise<VistaCierre | { error: string }> {
@@ -60,4 +60,18 @@ export async function crearCierreCaja(form: FormData) {
   if (error) throw new Error(error.message.includes("cierres_caja_empresa_id_sucursal_id_fecha_key") ? "Ya existe un cuadre registrado para esa sucursal y fecha." : (error.message || "No se pudo registrar el cuadre."));
   revalidatePath("/caja");
   return data as ResultadoCierre;
+}
+
+export async function registrarAperturaCaja(form: FormData) {
+  const empresaId = text(form, "empresa_id");
+  const sucursalId = text(form, "sucursal_id");
+  const fecha = text(form, "fecha");
+  const montoRaw = text(form, "monto");
+  const monto = Number(montoRaw);
+  if (!empresaId || !sucursalId || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) throw new Error("Elige empresa, sucursal y fecha.");
+  if (!montoRaw || !Number.isFinite(monto) || monto < 0) throw new Error("Indica un monto de apertura válido (puede ser cero).");
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("registrar_apertura_caja", { p_empresa: empresaId, p_sucursal: sucursalId, p_fecha: fecha, p_monto: monto, p_observaciones: text(form, "observaciones") || null });
+  if (error) throw new Error(error.message || "No se pudo registrar la apertura.");
+  revalidatePath("/caja");
 }

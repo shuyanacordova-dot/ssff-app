@@ -1,4 +1,5 @@
 "use server";
+import { bancos } from "@/lib/bancos";
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -47,6 +48,7 @@ export async function registrarAbono(form: FormData) {
   const supabase = await createSupabaseServerClient();
   const ventaId = text(form, "venta_id"); const metodo = text(form, "metodo"); const monto = Number(text(form, "monto")); const referencia = text(form, "referencia"); const banco = text(form, "banco");
   if (!ventaId) throw new Error("Falta identificar la venta.");
+  if (metodo === "transferencia" && !bancos.some((b) => b.value === banco)) throw new Error("Selecciona el banco de la transferencia.");
   if (!Number.isFinite(monto) || monto <= 0) throw new Error("Indica un monto válido para el abono.");
   const { error } = await supabase.rpc("registrar_abono_venta", { p_venta: ventaId, p_metodo: metodo, p_monto: monto, p_referencia: referencia || null, p_banco: banco || null });
   if (error) throw new Error(error.message || "No se pudo registrar el abono.");

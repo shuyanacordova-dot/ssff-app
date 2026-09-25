@@ -1,5 +1,6 @@
 import { formatRecordDate } from "@/lib/record-date";
 import { Binoculars, Eye, Phone, UserRound } from "lucide-react";
+import { alturaMontaje, resumenDiametroMinimo, diametroMinimoLuna, avisoAnisometropia } from "@/lib/laboratorio";
 import type { OrdenLaboratorioMedidas, OrdenLaboratorioRx, RxEye } from "@/lib/laboratorio";
 
 type PrintCompany = {
@@ -62,8 +63,12 @@ const formatDelivery = (dateValue?: string | null) => {
 
 export default function LabOrderPrint(props: LabOrderPrintProps) {
   const code = labOrderCode(props.orderId, props.createdAt, props.saleFolio);
+  const diametro = resumenDiametroMinimo(props.medidas, props.rx);
+  const anisometropia = avisoAnisometropia(props.rx);
+  const compensada = (["od", "oi"] as const).filter((eye) => props.rx[eye].procesar && props.rx.compensacion_vertice?.[eye]);
   const measures = [
     props.medidas.horizontal_mayor && `Horizontal mayor: ${props.medidas.horizontal_mayor}mm`,
+    props.medidas.diagonal_efectiva && `Diagonal efectiva (ED): ${props.medidas.diagonal_efectiva} mm`,
     props.medidas.vertical && `Vertical: ${props.medidas.vertical}mm`,
     props.medidas.puente && `Puente: ${props.medidas.puente}mm`,
     props.medidas.altura && `Altura: ${props.medidas.altura}`,
@@ -92,8 +97,8 @@ export default function LabOrderPrint(props: LabOrderPrintProps) {
     <p className="lab-print-product"><Binoculars size={19} /> <span>{props.productDescription || "Producto no especificado"}</span></p>
 
     <section className="lab-print-rx">
-      <EyeLine label="OD" eye={props.rx.od} altura={props.medidas.altura} />
-      <EyeLine label="OI" eye={props.rx.oi} altura={props.medidas.altura} />
+      <EyeLine label="OD" eye={props.rx.od} altura={alturaMontaje(props.medidas, "od")} />
+      <EyeLine label="OI" eye={props.rx.oi} altura={alturaMontaje(props.medidas, "oi")} />
     </section>
 
     <section className="lab-print-review">
@@ -104,8 +109,18 @@ export default function LabOrderPrint(props: LabOrderPrintProps) {
     <section className="lab-print-notes">
       <h3>Observaciones</h3>
       {measures && <p>{measures}</p>}
+      {diametro && <p>{diametro}</p>}
+      {(["od", "oi"] as const).map((eye) => {
+        const result = diametroMinimoLuna(props.medidas, props.rx[eye]);
+        return result && <p key={eye}>{eye.toUpperCase()} · Diámetro estándar sugerido: {result.estandar === null ? "supera 80 mm; consultar laboratorio" : `${result.estandar} mm`}</p>;
+      })}
+      {compensada.length > 0 && <p>Potencia compensada por distancia al vértice: {compensada.map((eye) => {
+        const data = props.rx.compensacion_vertice![eye]!;
+        return `${eye.toUpperCase()} (${data.refraccion_mm} mm → ${data.montaje_mm} mm)`;
+      }).join(" · ")}</p>}
+      {anisometropia && <p>{anisometropia}</p>}
       {props.notes && <p>{props.notes}</p>}
-      {!measures && !props.notes && <p>Sin observaciones.</p>}
+      {!measures && !props.notes && !diametro && !anisometropia && !compensada.length && <p>Sin observaciones.</p>}
     </section>
 
     <footer className="lab-print-footer">

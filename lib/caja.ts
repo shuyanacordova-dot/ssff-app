@@ -62,12 +62,12 @@ export async function getCajaData(): Promise<CajaData> {
     return {
       status: "ready",
       profile: { id: profile.id, empresa_id: operationalContext?.activeCompany.id ?? profile.empresa_id, sucursal_id: operationalContext?.activeBranch.id ?? profile.sucursal_id, rol: role },
-      companies: companiesResult.data ?? [],
-      branches: branchesResult.data ?? [],
-      cuentas: (cuentasResult.data ?? []) as CuentaBancaria[],
-      movimientos: movimientosResult.data ?? [],
-      gastos: (gastosResult.data ?? []) as Gasto[],
-      cierres: (cierresResult.data ?? []) as CierreCaja[],
+      companies: (companiesResult.data ?? []).filter((c) => role === "superadmin" || c.id === profile.empresa_id),
+      branches: (branchesResult.data ?? []).filter((b) => role === "superadmin" || (b.empresa_id === profile.empresa_id && (role === "admin_sucursal" || b.id === profile.sucursal_id))),
+      cuentas: (cuentasResult.data ?? []).filter((c) => role === "superadmin" || c.empresa_id === profile.empresa_id) as CuentaBancaria[],
+      movimientos: (movimientosResult.data ?? []).filter((m) => role === "superadmin" || (cuentasResult.data ?? []).some((c) => c.id === m.cuenta_id && c.empresa_id === profile.empresa_id)),
+      gastos: (gastosResult.data ?? []).filter((g) => role === "superadmin" || (g.empresa_id === profile.empresa_id && (role === "admin_sucursal" || g.sucursal_id === profile.sucursal_id))) as Gasto[],
+      cierres: (cierresResult.data ?? []).filter((c) => role === "superadmin" || (c.empresa_id === profile.empresa_id && (role === "admin_sucursal" || c.sucursal_id === profile.sucursal_id))) as CierreCaja[],
     };
   } catch { return { status: "error", message: "La conexión de caja no está disponible.", ...empty }; }
 }

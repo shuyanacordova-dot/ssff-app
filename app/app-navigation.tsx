@@ -24,8 +24,7 @@ import {
   Sparkles,
   Users,
   Wallet,
-  X,
-} from "lucide-react";
+  X, HeartHandshake } from "lucide-react";
 
 type NavItem = { href: string; label: string; detail: string; icon: typeof Home; group: "Operación" | "Finanzas" | "Administración" };
 
@@ -40,6 +39,7 @@ const primaryItems: NavItem[] = [
 const menuItems: NavItem[] = [
   ...primaryItems,
   { href: "/inventario", label: "Inventario", detail: "Monturas, lunas y stock", icon: Package, group: "Operación" },
+  { href: "/crm", label: "CRM", detail: "A quién contactar hoy", icon: HeartHandshake, group: "Operación" },
   { href: "/tareas", label: "Tareas", detail: "Seguimiento del equipo", icon: ClipboardList, group: "Operación" },
   { href: "/caja", label: "Caja", detail: "Cuadre diario", icon: Coins, group: "Finanzas" },
   { href: "/cuentas-cobrar", label: "Cuentas por cobrar", detail: "Saldos y convenios de pago", icon: Wallet, group: "Finanzas" },

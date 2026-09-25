@@ -1,0 +1,1 @@
+export const bancos = [{ value: "pichincha", label: "Banco Pichincha" }, { value: "guayaquil", label: "Banco Guayaquil" }, { value: "internacional", label: "Banco Internacional" }, { value: "otro", label: "Otro banco" }];
