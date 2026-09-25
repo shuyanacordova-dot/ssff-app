@@ -8,4 +8,5 @@ export const paymentMethods = [
 export const paymentMethodLabels: Record<string, string> = {
   ...Object.fromEntries(paymentMethods.map(({ value, label }) => [value, label])),
   credito: "Crédito",
+  saldo_favor: "Saldo a favor",
 };

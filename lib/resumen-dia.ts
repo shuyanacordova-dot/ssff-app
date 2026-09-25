@@ -43,10 +43,14 @@ export async function getResumenDiaData(fecha: string, empresaIdParam?: string):
     if (ventasResult.error || gastosResult.error) return { status: "error", message: "No se pudo cargar el resumen del día.", ...empty };
 
     const pagosResult = await supabase.from("pagos_venta")
-      .select("id,venta_id,metodo,monto,creado_en,recibido_por,ventas!inner(id,creado_en,saldo,cliente_nombre,paciente_id)")
-      .eq("ventas.empresa_id", empresa).neq("ventas.estado", "anulada")
+      .select("id,venta_id,metodo,monto,creado_en,recibido_por,ventas!inner(id,creado_en,saldo,cliente_nombre,paciente_id,estado,anulacion_modo)")
+      .eq("ventas.empresa_id", empresa).neq("metodo", "saldo_favor")
       .gte("creado_en", inicio).lt("creado_en", fin).order("creado_en", { ascending: true });
     if (pagosResult.error) return { status: "error", message: "No se pudieron cargar los abonos del día.", ...empty };
+    // El dinero de una venta anulada con devolución o saldo a favor sí entró ese día; las anulaciones antiguas
+    // (duplicados) no cuentan. El saldo a favor usado no es dinero nuevo (se excluye arriba).
+    const ventaDePago = (p: { ventas: unknown }) => (Array.isArray(p.ventas) ? p.ventas[0] : p.ventas) as { estado: string; anulacion_modo: string | null } | undefined;
+    if (pagosResult.data) pagosResult.data = pagosResult.data.filter((p) => { const v = ventaDePago(p); return !!v && (v.estado !== "anulada" || !!v.anulacion_modo); });
 
     const ventasPagadas = (pagosResult.data ?? []).flatMap((p) => p.ventas);
     const pacienteIds = Array.from(new Set([...(ventasResult.data ?? []), ...ventasPagadas].map((v) => v.paciente_id).filter(Boolean))) as string[];

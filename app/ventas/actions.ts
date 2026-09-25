@@ -52,7 +52,17 @@ export async function registrarAbono(form: FormData) {
   if (!Number.isFinite(monto) || monto <= 0) throw new Error("Indica un monto válido para el abono.");
   const { error } = await supabase.rpc("registrar_abono_venta", { p_venta: ventaId, p_metodo: metodo, p_monto: monto, p_referencia: referencia || null, p_banco: banco || null });
   if (error) throw new Error(error.message || "No se pudo registrar el abono.");
-  revalidatePath("/ventas"); revalidatePath("/pacientes");
+  revalidatePath("/ventas"); revalidatePath("/pacientes"); revalidatePath("/caja"); revalidatePath("/cuentas-cobrar"); revalidatePath("/inventario");
+}
+
+export async function obtenerSaldosFavor(pacienteId: string): Promise<Record<string, number>> {
+  const supabase = await createSupabaseServerClient();
+  if (!pacienteId) return {};
+  const { data, error } = await supabase.from("creditos_paciente").select("empresa_id,monto").eq("paciente_id", pacienteId);
+  if (error) return {};
+  const saldos: Record<string, number> = {};
+  for (const row of data ?? []) saldos[row.empresa_id as string] = Math.round(((saldos[row.empresa_id as string] ?? 0) + Number(row.monto)) * 100) / 100;
+  return saldos;
 }
 
 export async function actualizarEntregaVenta(ventaId: string, fecha: string) {
@@ -67,9 +77,11 @@ export async function actualizarEntregaVenta(ventaId: string, fecha: string) {
 export async function anularVenta(form: FormData) {
   const supabase = await createSupabaseServerClient();
   const ventaId = text(form, "venta_id"); const motivo = text(form, "motivo");
+  const modo = text(form, "modo") || "devolver"; const origen = text(form, "devolucion_origen") || "caja"; const banco = text(form, "devolucion_banco");
   if (!ventaId) throw new Error("Falta identificar la venta.");
   if (motivo.length < 5) throw new Error("Escribe el motivo de la anulación (mínimo 5 caracteres).");
-  const { error } = await supabase.rpc("anular_venta", { p_venta: ventaId, p_motivo: motivo });
+  if (modo !== "devolver" && modo !== "credito") throw new Error("Elige si el dinero se devuelve o queda como saldo a favor.");
+  const { error } = await supabase.rpc("anular_venta_con_modo", { p_venta: ventaId, p_motivo: motivo, p_modo: modo, p_devolucion_origen: origen, p_devolucion_banco: banco || null });
   if (error) throw new Error(error.message || "No se pudo anular la venta.");
   revalidatePath("/ventas"); revalidatePath("/pacientes");
 }

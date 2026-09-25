@@ -4,7 +4,7 @@ import { getOperationalContext } from "@/lib/operational-context";
 import { loadBranchIdentities, type BranchIdentity, type CompanyIdentity } from "@/lib/sucursales";
 
 export type SaleStatus = "borrador" | "completada" | "anulada";
-export type PaymentMethod = "efectivo" | "transferencia" | "tarjeta" | "credito" | "otro";
+export type PaymentMethod = "efectivo" | "transferencia" | "tarjeta" | "credito" | "otro" | "saldo_favor";
 export type SaleProduct = { id: string; empresa_id: string; nombre: string; categoria: string; precio_venta: number; controla_inventario: boolean };
 export type SaleCompany = CompanyIdentity;
 export type SaleBranch = BranchIdentity;
