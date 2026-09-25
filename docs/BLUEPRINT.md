@@ -205,8 +205,8 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 
 ## 11. Pendientes abiertos (2026-09-24)
 
-1. **Aplicar depuración de septiembre** (`docs/pendientes/depurar_ventas_duplicadas_septiembre.sql`): anula 118 copias. Resultado verificado: Shuvision queda $7,639 / a cuenta $5,604; Sacha idéntica a Optox; Focus $1,735 / $1,450. Requiere autorización explícita.
-2. **Historial completo**: Shuyana exportará de Optox "Ventas por sucursal" de todos los meses → cargar en `optox_ventas_referencia` y depurar igual.
+1. **Aplicar depuración julio–septiembre 2026** (`docs/pendientes/depurar_ventas_duplicadas_jul_sep_2026.sql`): anula 332 copias (Shuvision 234, Focus 50, Sacha 48). Verificado: julio y agosto idénticos a Optox en las 3 sucursales; septiembre idéntico salvo ventas del 24-sep y 2 pagos de Focus. Requiere autorización explícita en el chat.
+2. **Historial**: Excel completo de Optox recibido (7,627 ventas desde nov-2022). Enero–junio 2026 y años anteriores **no tienen duplicados** (el sistema tiene igual o menos que Optox). Sacha antes de junio 2026 no es válido (indicación de Shuyana); el sistema no tiene ventas de Sacha antes de julio.
 3. Faltan en el sistema: ventas de Optox del 24-sep (Shuvision folio 6802 $200; Focus 6565 $100 y 6566 $70) y un abono de $100 de Adriana Hurtado (Focus 6563).
 4. Inconsistencias: ventas con total $0 pero con pagos (ej. Lady Gómez 13-sep, $180 dos veces); ventas con `pagado` distinto a la suma de sus pagos.
 5. **Resumen del día**: solo muestra abonos de ventas creadas ese día; debe mostrar todos los abonos recibidos ese día.
