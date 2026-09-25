@@ -128,6 +128,7 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
       <label>Uso de dispositivos electrónicos<span className="radio-row"><label><input type="radio" name="ante_dispositivos" value="si" defaultChecked={ante.dispositivos_electronicos ? ante.dispositivos_electronicos === "si" : true} /> Sí</label><label><input type="radio" name="ante_dispositivos" value="no" defaultChecked={ante.dispositivos_electronicos === "no"} /> No</label></span></label>
       <label>¿Cuántas horas al día?<input name="ante_horas_dispositivos" defaultValue={ante.horas_dispositivos ?? ""} placeholder="Ej.: 6" /></label>
       <label>Hipersensibilidad<span className="radio-row"><label><input type="radio" name="ante_hipersensibilidad" value="si" defaultChecked={ante.hipersensibilidad === "si"} /> Sí</label><label><input type="radio" name="ante_hipersensibilidad" value="no" defaultChecked={ante.hipersensibilidad ? ante.hipersensibilidad === "no" : true} /> No</label></span></label>
+      <label>Fotosensibilidad<span className="radio-row"><label><input type="radio" name="ante_fotosensibilidad" value="si" defaultChecked={ante.fotosensibilidad === "si"} /> Sí</label><label><input type="radio" name="ante_fotosensibilidad" value="no" defaultChecked={ante.fotosensibilidad ? ante.fotosensibilidad === "no" : true} /> No</label></span></label>
       <label>Último control<input name="ante_ultimo_control" defaultValue={ante.ultimo_control ?? ""} placeholder="Ej.: Hace 1 año, sin control previo" /></label>
       <label className="task-description">Enfermedades o condiciones<textarea name="ante_enfermedades" defaultValue={ante.enfermedades_condiciones ?? ""} placeholder="Antecedentes oculares o sistémicos relevantes" /></label>
     </div>
@@ -159,6 +160,7 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
     <p className="section-label">BIOMICROSCOPÍA</p>
     <p className="field-hint">Las imágenes de lámpara de hendidura se adjuntan después de guardar, desde la pestaña “Fotos y documentos” vinculándolas a esta consulta.</p>
     <div className="biom-grid"><MultiFindingSelector eye="OD" name="biom_od" initialValue={initial?.biomicroscopia?.od} /><MultiFindingSelector eye="OI" name="biom_oi" initialValue={initial?.biomicroscopia?.oi} /></div>
+    <div className="new-patient-form" style={{ marginTop: 10 }}><label className="task-description" style={{ gridColumn: "1 / -1" }}>Otros detalles<textarea name="biom_otros" defaultValue={initial?.biomicroscopia?.otros_detalles ?? ""} placeholder="Otros hallazgos de la biomicroscopía" /></label></div>
 
     <p className="section-label">EXÁMENES COMPLEMENTARIOS</p>
     <p className="field-hint">Añade tantos exámenes como necesites y registra el resultado de cada uno.</p>

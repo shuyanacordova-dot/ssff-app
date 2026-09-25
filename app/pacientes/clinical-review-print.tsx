@@ -72,13 +72,13 @@ export default function ClinicalReviewPrint({ consultation, patient, company, br
 
     {patientDetails.length > 0 && <section className="clinical-print-demographics">{patientDetails.map(([label, value]) => <p key={label}>{label}: <strong>{value}</strong></p>)}</section>}
 
-    <section className="clinical-print-section"><h3>Enfermedades o condiciones</h3><p>{display(consultation.antecedentes?.enfermedades_condiciones)}</p><h3>Motivo de consulta</h3><p>{display(consultation.motivo_consulta)}</p></section>
+    <section className="clinical-print-section"><h3>Enfermedades o condiciones</h3><p>{display(consultation.antecedentes?.enfermedades_condiciones)}</p>{(consultation.antecedentes?.hipersensibilidad === "si" || consultation.antecedentes?.fotosensibilidad === "si") && <p>{[consultation.antecedentes?.hipersensibilidad === "si" && "Hipersensibilidad: Sí", consultation.antecedentes?.fotosensibilidad === "si" && "Fotosensibilidad: Sí"].filter(Boolean).join(" · ")}</p>}<h3>Motivo de consulta</h3><p>{display(consultation.motivo_consulta)}</p></section>
 
     <section className="clinical-print-section">
       <h3>Exploración y pruebas</h3>
       <ReviewFinding title="Derecho/CÓRNEA" text={shown(consultation.queratometria?.od_k1) || shown(consultation.queratometria?.od_k2) ? `QUERATOMETRÍA: ${display(consultation.queratometria?.od_k1)}/${display(consultation.queratometria?.od_k2)} X ${display(consultation.queratometria?.od_eje)}` : ""} />
       <ReviewFinding title="Izquierdo/CÓRNEA" text={shown(consultation.queratometria?.oi_k1) || shown(consultation.queratometria?.oi_k2) ? `QUERATOMETRÍA: ${display(consultation.queratometria?.oi_k1)}/${display(consultation.queratometria?.oi_k2)} X ${display(consultation.queratometria?.oi_eje)}` : ""} />
-      <ReviewFinding title="Derecho/BIOMICROSCOPÍA" text={consultation.biomicroscopia?.od} /><ReviewFinding title="Izquierdo/BIOMICROSCOPÍA" text={consultation.biomicroscopia?.oi} />
+      <ReviewFinding title="Derecho/BIOMICROSCOPÍA" text={consultation.biomicroscopia?.od} /><ReviewFinding title="Izquierdo/BIOMICROSCOPÍA" text={consultation.biomicroscopia?.oi} /><ReviewFinding title="Otros detalles/BIOMICROSCOPÍA" text={consultation.biomicroscopia?.otros_detalles} />
       <ReviewFinding title="Derecho/AUTORREFRACTOR" text={compactValues(consultation.autorefractor, "od")} /><ReviewFinding title="Izquierdo/AUTORREFRACTOR" text={compactValues(consultation.autorefractor, "oi")} />
       <ReviewFinding title="Visión binocular" text={Object.entries(consultation.examen_binocular ?? {}).filter(([key, val]) => key !== "complementarios" && shown(val)).map(([key, val]) => `${key.replaceAll("_", " ")}: ${val}`).join(" · ")} />
       {complementaryExams.length > 0 && <ReviewFinding title="Exámenes complementarios" text={complementaryExams.map((exam) => `${exam.name || "Examen"}: ${exam.result || "sin resultado"}`).join(" · ")} />}
