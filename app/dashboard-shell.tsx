@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Banknote, CalendarDays, FlaskConical, LockKeyhole, LogOut, Target, UserPlus } from "lucide-react";
+import { Banknote, CalendarDays, Coins, FlaskConical, Landmark, LockKeyhole, LogOut, Receipt, Target, UserPlus } from "lucide-react";
 import type { TaskData } from "@/lib/tasks";
 import type { InformeMensual } from "./informes/actions";
 import TaskBoard from "./tareas/task-board";
@@ -12,7 +12,34 @@ import BranchSelector, { BranchDirectory } from "./branch-selector";
 const money = (value: number) => new Intl.NumberFormat("es-EC", { style: "currency", currency: "USD" }).format(value);
 const pct = (actual: number, meta: number) => meta > 0 ? Math.round((actual / meta) * 100) : 0;
 
-export default function DashboardShell({ taskData, informeMensual, metasMessage }: { taskData: TaskData; informeMensual: InformeMensual | null; metasMessage?: string }) {
+export type ResumenHoy = { sucursal: string; ventas_brutas: number; cobro_efectivo: number; cobro_tarjeta: number; cobro_transferencia_pichincha: number; cobro_transferencia_guayaquil: number; cobro_transferencia_internacional: number; cobro_credito: number; cobro_otro: number; egresos_efectivo: number; caja_anterior: number; ya_existe: boolean };
+
+function ResumenDelDia({ r }: { r: ResumenHoy }) {
+  const transferencias = r.cobro_transferencia_pichincha + r.cobro_transferencia_guayaquil + r.cobro_transferencia_internacional;
+  const cobrado = r.cobro_efectivo + r.cobro_tarjeta + transferencias + r.cobro_credito + r.cobro_otro;
+  const cajaEsperada = r.caja_anterior + r.cobro_efectivo - r.egresos_efectivo;
+  return <section className="glass agenda-board" style={{ marginBottom: 18 }}>
+    <div className="agenda-toolbar"><div><p className="section-label">RESUMEN DEL DÍA · {r.sucursal.toUpperCase()}</p><h2>Hoy en caja</h2></div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <Link className="new-consultation" href="/caja?gasto=1"><Receipt size={16} /> Registrar egreso</Link>
+        <Link className="outline-action" href="/resumen-dia"><Landmark size={15} /> Ver resumen completo</Link>
+        <Link className="outline-action" href="/caja"><Coins size={15} /> Cuadre de caja</Link>
+      </div></div>
+    <div className="consultation-stats" style={{ marginTop: 8 }}>
+      <span><strong>Ventas del día</strong>{money(r.ventas_brutas)}</span>
+      <span><strong>Cobrado hoy</strong>{money(cobrado)}</span>
+      <span><strong>Efectivo</strong>{money(r.cobro_efectivo)}</span>
+      <span><strong>Tarjetas</strong>{money(r.cobro_tarjeta)}</span>
+      <span><strong>Transferencias</strong>{money(transferencias)}</span>
+      <span><strong>Egresos</strong>{money(r.egresos_efectivo)}</span>
+      <span><strong>Caja de partida</strong>{money(r.caja_anterior)}</span>
+      <span><strong>Efectivo esperado</strong>{money(cajaEsperada)}</span>
+    </div>
+    <p className="field-hint" style={{ marginTop: 8 }}>{r.ya_existe ? "La caja de hoy ya está cerrada." : "La caja de hoy todavía no se ha cerrado."}</p>
+  </section>;
+}
+
+export default function DashboardShell({ taskData, informeMensual, metasMessage, resumenHoy }: { taskData: TaskData; informeMensual: InformeMensual | null; metasMessage?: string; resumenHoy?: ResumenHoy | null }) {
   const role = taskData.profile?.rol;
   const canVerInformes = role === "superadmin" || role === "admin_sucursal";
 
@@ -29,9 +56,11 @@ export default function DashboardShell({ taskData, informeMensual, metasMessage 
       <Link href="/ventas"><span className="quick-icon blue"><Banknote size={21} /></span><span><strong>Nueva venta</strong><small>Cobrar o registrar pedido</small></span></Link>
       <Link href="/laboratorio"><span className="quick-icon amber"><FlaskConical size={21} /></span><span><strong>Laboratorio</strong><small>Revisar órdenes pendientes</small></span></Link>
       <Link href="/agenda"><span className="quick-icon lilac"><CalendarDays size={21} /></span><span><strong>Agenda</strong><small>Ver citas de hoy</small></span></Link>
+      <Link href="/caja?gasto=1"><span className="quick-icon amber"><Receipt size={21} /></span><span><strong>Registrar egreso</strong><small>Gasto o pago de caja</small></span></Link>
       {role === "superadmin" && <Link href="/mi-espacio"><span className="quick-icon blue"><LockKeyhole size={21} /></span><span><strong>Mi espacio</strong><small>Deudas privadas por sucursal</small></span></Link>}
     </section>
 
+    {resumenHoy && <ResumenDelDia r={resumenHoy} />}
     <section className="dashboard-main dashboard-main-wide">
       {canVerInformes && <MetasDashboard informe={informeMensual} message={metasMessage} />}
       <TaskBoard {...taskData} embedded />

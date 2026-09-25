@@ -240,6 +240,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-25 | Venta de lentes: mensaje "Precio mínimo de esta venta es de: Armazón $X · Lunas $Y (total)" bajo el total; se pone en rojo si el precio de armazones y lunas queda por debajo. | (este commit) |
 | 2026-09-25 | Caja y Cuentas por cobrar muestran solo la sucursal donde se trabaja (la elegida en el menú); casilla **"Todas las sucursales"** arriba para ver todas (se recuerda por navegador, `app/todas-sucursales-toggle.tsx`). En cuentas por cobrar la Superadministradora ve también las otras empresas al marcarla. | (este commit) |
 | 2026-09-25 | Menú: "Caja" renombrado a **"Cuadre de caja"** y agregado a la barra de arriba (Shuyana no lo encontraba). | (este commit) |
+| 2026-09-25 | Inicio: tarjeta **Resumen del día** de la sucursal activa (ventas, cobrado por método, egresos, caja de partida, efectivo esperado; usa `previsualizar_cierre_caja`) con botones Registrar egreso / Ver resumen completo / Cuadre de caja; acceso rápido "Registrar egreso". Cuadre de caja: la sección de cierre diario va antes de Gastos recientes. | (este commit) |
 
 ---
 

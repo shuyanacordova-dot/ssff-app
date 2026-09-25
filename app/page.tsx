@@ -1,6 +1,9 @@
 import { getTaskData } from "@/lib/tasks";
 import DashboardShell from "./dashboard-shell";
 import { obtenerInformeMensual, type InformeMensual } from "./informes/actions";
+import { getOperationalContext } from "@/lib/operational-context";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { ResumenHoy } from "./dashboard-shell";
 
 export const dynamic = "force-dynamic";
 
@@ -18,5 +21,16 @@ export default async function Home() {
     catch { metasMessage = "No se pudo cargar el avance de metas en este momento."; }
   }
 
-  return <DashboardShell taskData={taskData} informeMensual={informeMensual} metasMessage={metasMessage} />;
+  // Resumen del día de la sucursal donde se trabaja (mismos cálculos que el cuadre de caja).
+  let resumenHoy: ResumenHoy | null = null;
+  try {
+    const context = await getOperationalContext();
+    if (context) {
+      const supabase = await createSupabaseServerClient();
+      const { data } = await supabase.rpc("previsualizar_cierre_caja", { p_empresa: context.activeCompany.id, p_sucursal: context.activeBranch.id, p_fecha: null });
+      if (data) resumenHoy = { ...(data as Omit<ResumenHoy, "sucursal">), sucursal: context.activeBranch.nombre };
+    }
+  } catch { resumenHoy = null; }
+
+  return <DashboardShell taskData={taskData} informeMensual={informeMensual} metasMessage={metasMessage} resumenHoy={resumenHoy} />;
 }
