@@ -213,7 +213,7 @@ export function ReciboModal({ sale, patient, onClose, onSaved }: { sale: Sale; p
   const [error, setError] = useState("");
   const link = `${origin}/recibo/${token}`;
   const nombre = patient ? patient.nombres : (sale.cliente_nombre || "Cliente");
-  const mensaje = mensajeTicketVirtual({ nombre, ticketUrl: link });
+  const mensaje = mensajeTicketVirtual({ nombre, ticketUrl: link, empresaId: sale.empresa_id });
   const wa = enlaceWhatsapp(patient?.telefono, mensaje);
 
   useEffect(() => { setOrigin(window.location.origin); }, []);

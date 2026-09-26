@@ -19,8 +19,18 @@ const ticketLine = (ticketUrl?: string | null) => ticketUrl
   ? `\n\n🌿 Cuidemos el medio ambiente. Consulta tu ticket virtual desde el siguiente enlace: ${ticketUrl}`
   : "";
 
-export function mensajeTicketVirtual({ nombre, ticketUrl }: Pick<ContextoMensaje, "nombre" | "ticketUrl">) {
-  return `Hola ${nombre}.\n\n🌿 Cuidemos el medio ambiente. Consulta tu ticket virtual desde el siguiente enlace: ${ticketUrl ?? ""}`;
+// Nombre comercial de cada empresa para los mensajes al paciente.
+const nombreOptica: Record<string, string> = {
+  "51820b6b-9fc1-495c-b2ea-ab50547e2ce3": "ShuVision Óptica",
+  "be1dc246-219a-40a2-9e92-707e5845d295": "Focus Óptica",
+};
+// "MARIA ISABEL CAMPO VERDE" -> "Maria": el saludo usa solo el primer nombre.
+const primerNombre = (nombre: string) => { const n = nombre.trim().split(/\s+/)[0] ?? ""; return n ? n.charAt(0).toUpperCase() + n.slice(1).toLowerCase() : ""; };
+
+export function mensajeTicketVirtual({ nombre, ticketUrl, empresaId }: Pick<ContextoMensaje, "nombre" | "ticketUrl"> & { empresaId?: string | null }) {
+  const optica = (empresaId && nombreOptica[empresaId]) || "ShuVision Óptica";
+  const saludo = primerNombre(nombre);
+  return `Hola ${saludo || "😊"} 👋, te saludamos de ${optica}. ¡Gracias por confiar en nosotros!\n\n🌿 Cuidemos el medio ambiente: en lugar de un recibo impreso, aquí tienes tu ticket virtual. Ahí puedes ver el detalle de tu compra, tus abonos y tu saldo, siempre actualizado:\n${ticketUrl ?? ""}\n\nCualquier duda, escríbenos por aquí. ¡Que tengas un lindo día!`;
 }
 
 const formatFecha = (iso: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "long", year: "numeric" }).format(new Date(iso));
