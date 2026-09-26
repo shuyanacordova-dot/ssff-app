@@ -1,0 +1,62 @@
+.monthNav { display: flex; align-items: center; gap: 8px; margin: 4px 0 16px; flex-wrap: wrap; }
+.monthNav button { border: 1px solid #d4e0ea; background: #fff; border-radius: 10px; padding: 8px 12px; font-weight: 800; color: #2f4056; cursor: pointer; }
+.monthName { font-size: 20px; font-weight: 800; color: #1f2f44; text-transform: capitalize; min-width: 190px; text-align: center; }
+
+.cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.card { border-radius: 18px; padding: 16px 18px; color: #fff; display: grid; gap: 4px; box-shadow: 0 10px 26px rgba(23, 43, 64, .12); }
+.card span { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; opacity: .9; }
+.card strong { font-size: 26px; letter-spacing: -.02em; }
+.card small { font-size: 12px; opacity: .9; }
+.cardTeal { background: linear-gradient(135deg, #1f7a70, #2a9d8f); }
+.cardGreen { background: linear-gradient(135deg, #247658, #3aa77b); }
+.cardRed { background: linear-gradient(135deg, #a24150, #d05a6a); }
+.cardNavy { background: linear-gradient(135deg, #274c77, #3f6fa5); }
+
+.sectionTitle { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 10px; }
+.sectionTitle h2 { margin: 0; font-size: 20px; }
+
+.timeline { display: grid; gap: 8px; }
+.row { display: grid; grid-template-columns: 62px 6px minmax(0, 1fr) auto; gap: 12px; align-items: center; background: rgba(255,255,255,.85); border: 1px solid #e1e8ef; border-radius: 16px; padding: 10px 12px; }
+.rowPaid { opacity: .6; }
+.day { display: grid; justify-items: center; line-height: 1; color: #274c77; }
+.day strong { font-size: 24px; }
+.day small { font-size: 11px; font-weight: 800; text-transform: uppercase; margin-top: 3px; }
+.bar { width: 6px; height: 44px; border-radius: 4px; }
+.info { min-width: 0; }
+.info h3 { margin: 0; font-size: 15px; color: #1f2f44; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.info p { margin: 2px 0 0; font-size: 12px; color: #66768b; }
+.right { display: flex; align-items: center; gap: 10px; }
+.amount { font-size: 17px; font-weight: 800; color: #1f2f44; white-space: nowrap; }
+
+.pill { font-size: 11px; font-weight: 800; padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
+.pillPagado { background: #dff6ed; color: #247658; }
+.pillVencido { background: #ffe5e8; color: #a24150; }
+.pillHoy { background: #fff1d6; color: #9a6400; }
+.pillProximo { background: #e6eef8; color: #274c77; }
+
+.tipoTag { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 999px; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.debt { background: rgba(255,255,255,.9); border: 1px solid #e1e8ef; border-radius: 18px; padding: 14px 16px; display: grid; gap: 8px; }
+.debt h3 { margin: 0; font-size: 16px; color: #1f2f44; }
+.debt p { margin: 0; font-size: 12px; color: #66768b; }
+.saldo { font-size: 24px; font-weight: 800; color: #1f2f44; letter-spacing: -.02em; }
+.progress { height: 9px; background: #edf2f7; border-radius: 999px; overflow: hidden; }
+.progress div { height: 100%; border-radius: 999px; }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 8px 0 4px; }
+.tile { text-align: left; border: 2px solid transparent; border-radius: 16px; padding: 12px; cursor: pointer; display: grid; gap: 4px; }
+.tile strong { font-size: 14px; }
+.tile small { font-size: 11px; color: #4a5a70; line-height: 1.35; }
+.tileActive { border-color: currentColor; box-shadow: 0 6px 16px rgba(23, 43, 64, .14); }
+
+.empty { text-align: center; padding: 26px 14px; color: #66768b; }
+.summaryLine { font-size: 13px; font-weight: 700; color: #274c77; background: #eef4fb; border-radius: 10px; padding: 8px 10px; }
+
+@media (max-width: 860px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) {
+  .row { grid-template-columns: 48px 5px minmax(0, 1fr); }
+  .right { grid-column: 1 / -1; justify-content: space-between; }
+  .card strong { font-size: 21px; }
+}

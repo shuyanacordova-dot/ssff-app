@@ -242,6 +242,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-25 | Menú: "Caja" renombrado a **"Cuadre de caja"** y agregado a la barra de arriba (Shuyana no lo encontraba). | (este commit) |
 | 2026-09-25 | Inicio: tarjeta **Resumen del día** de la sucursal activa (ventas, cobrado por método, egresos, caja de partida, efectivo esperado; usa `previsualizar_cierre_caja`) con botones Registrar egreso / Ver resumen completo / Cuadre de caja; acceso rápido "Registrar egreso". Cuadre de caja: la sección de cierre diario va antes de Gastos recientes. | (este commit) |
 | 2026-09-25 | Rendimiento: funciones de Vercel en **pdx1** (Oregón), junto a la base de datos Supabase (us-west-2); antes corrían en iad1 (Washington) y cada consulta cruzaba EE. UU. (`vercel.json`). Menú: **Mis deudas** (`/mi-espacio`) visible solo para la Superadministradora (`esSuperadminActual`). | (este commit) |
+| 2026-09-25 | **Mis deudas v2** (`/mi-espacio`, solo Superadministradora): 5 tipos (proveedor, préstamo bancario, tarjeta, préstamo personal, gasto fijo), 3 formas de pago (cuotas fijas con cuotas ya pagadas, abonos libres, pago mensual fijo), vista del mes con tarjetas (por pagar, pagado, vencido, deuda total), pagos del mes y atrasados, deudas con barra de avance y próximo pago, historial, archivar, y opción de registrar el pago también como egreso de caja. Campo `ambito` preparado para que Erick (Focus) y Sacha gestionen lo suyo después. Migración `20260926020000_mis_deudas_v2.sql`; cálculos en `lib/mis-deudas-calc.ts`. | (este commit) |
 
 ---
 

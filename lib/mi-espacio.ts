@@ -1,8 +1,8 @@
 import { getOperationalContext } from "@/lib/operational-context";
 import { hasSupabaseConfiguration } from "@/lib/supabase/server";
 
-export type DebtPayment = { id: string; monto: number; fecha_pago: string; metodo: string; referencia: string | null; notas: string | null };
-export type BusinessDebt = { id: string; empresa_id: string; sucursal_id: string | null; proveedor: string; concepto: string; monto_original: number; saldo: number; fecha_deuda: string; fecha_vencimiento: string | null; frecuencia: "unica" | "mensual"; estado: "pendiente" | "pagada" | "anulada"; notas: string | null; pagos_deuda_negocio: DebtPayment[] };
+import type { BusinessDebt } from "@/lib/mis-deudas-calc";
+export type { BusinessDebt, DebtPayment } from "@/lib/mis-deudas-calc";
 export type PrivateAdminData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "setup_required" | "error"; message?: string; profile?: { id: string; nombre: string }; companies: { id: string; nombre: string }[]; branches: { id: string; empresa_id: string; nombre: string }[]; debts: BusinessDebt[] };
 
 const setupMissing = (error: { code?: string; message?: string } | null) => error?.code === "42P01" || Boolean(error?.message?.includes("deudas_negocio"));
@@ -16,7 +16,7 @@ export async function getPrivateAdminData(): Promise<PrivateAdminData> {
     if (context.profile.rol !== "superadmin") return { status: "forbidden", message: "Este espacio es privado y solo está disponible para la administración general.", ...empty };
     const { createSupabaseServerClient } = await import("@/lib/supabase/server");
     const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase.from("deudas_negocio").select("id,empresa_id,sucursal_id,proveedor,concepto,monto_original,saldo,fecha_deuda,fecha_vencimiento,frecuencia,estado,notas,pagos_deuda_negocio(id,monto,fecha_pago,metodo,referencia,notas)").order("fecha_vencimiento", { ascending: true, nullsFirst: false });
+    const { data, error } = await supabase.from("deudas_negocio").select("id,empresa_id,sucursal_id,proveedor,concepto,monto_original,saldo,fecha_deuda,fecha_vencimiento,estado,notas,tipo,modalidad,cuotas_total,cuotas_previas,monto_cuota,dia_pago,fecha_inicio,ambito,pagos_deuda_negocio(id,monto,fecha_pago,metodo,referencia,notas,periodo)").order("fecha_vencimiento", { ascending: true, nullsFirst: false });
     if (setupMissing(error)) return { status: "setup_required", message: "El módulo está construido localmente. Falta autorizar y aplicar su migración a Supabase para guardar datos.", profile: { id: context.profile.id, nombre: context.profile.nombre }, companies: context.companies, branches: context.branches, debts: [] };
     if (error) return { status: "error", message: "No se pudieron cargar las deudas privadas.", ...empty };
     return { status: "ready", profile: { id: context.profile.id, nombre: context.profile.nombre }, companies: context.companies, branches: context.branches, debts: (data ?? []) as unknown as BusinessDebt[] };
