@@ -164,6 +164,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | L28 | 2026-09-25 | El armazón ZIMI (código 002090) no aparecía para vender ni en inventario: la venta pedía solo 200 productos y Supabase devuelve máximo 1.000 filas por consulta aunque se pida más; con 1.350 productos activos, todo lo que va después en orden alfabético quedaba fuera. | Toda lista que pueda crecer (productos, stock, pacientes, ventas) se carga con `fetchAll` por páginas o se busca en el servidor; nunca `.limit(n)` como si fuera "todo". |
 
 ---
+- **L29 (2026-09-26):** una preferencia guardada en el navegador y compartida entre pantallas ("Todas las sucursales") hizo que el Resumen del día y la Caja mezclaran Shuvision con Sacha después de marcarla en Cuentas por cobrar. Caja y resumen son por sucursal: se ven de una sola sucursal, sin opción de mezclar.
 
 ## 7. Mapa de archivos clave
 
@@ -249,6 +250,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-26 | Mis deudas: **gastos fijos por sucursal** (luz, internet, arriendo): al crearlos se elige la sucursal; en los pagos del mes el botón "Marcar pagado" registra el pago y genera automáticamente el egreso "Gastos mensuales" en la caja de esa sucursal (efectivo por defecto). | (este commit) |
 | 2026-09-26 | **Hacer inventario** (`/inventario/conteo`, botón en Inventario): cualquiera del equipo elige sucursal y qué contar (armazones, gafas, accesorios, lunas); el sistema toma foto del stock y lo agrupa por clasificación. Paso 1: cuántos hay por clasificación (cuadra / sobra / falta). Paso 2: donde no cuadra, detalle producto por producto (vacío = está completo). Se envía para aprobación; aprueban Shuyana (todas), Joao (Sacha) y Erick (Focus), tabla `aprobadores_inventario`. Al aprobar se crean movimientos "ajuste" solo por las diferencias; también se puede rechazar con motivo. Historial de conteos. Migración `20260926050000_hacer_inventario.sql`; probado en transacción (Tiffany no puede aprobar, Joao sí). | (este commit) |
 | 2026-09-26 | Historias clínicas del 24-sep reingresadas desde los PDF de Optox (las únicas de 24–25 sep que no se guardaron por el error de Rx en cero): María Isabel Campo Verde Saritama (Shuvision, Shuyana) y Angela Naguecha Nieto (Focus, Erick). Queratometría, AV, Rx final con Add y DNP, diagnóstico con CIE-10; la "CV lejana" de Optox va en observaciones. Migración `20260926060000_historias_24_sep_desde_pdf.sql`. | (este commit) |
+| 2026-09-26 | **Resumen del día y Cuadre de caja, una sucursal a la vez:** botones Shuvision · Shuvision Sacha · Focus (`app/sucursal-tabs.tsx`), por defecto la sucursal elegida en el menú; se quitó la casilla "Todas las sucursales" y las pestañas por empresa en esas dos pantallas (mezclaban Shuvision con Sacha). El resumen se carga del servidor solo para esa sucursal (`/resumen-dia?sucursal=`). Cuentas por cobrar conserva la casilla. | (este commit) |
 
 ---
 

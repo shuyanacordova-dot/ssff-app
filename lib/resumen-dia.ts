@@ -6,11 +6,12 @@ export type VentaResumen = { id: string; sucursal_id: string | null; creado_en: 
 export type AbonoResumen = { id: string; sucursal_id: string | null; monto: number; metodo: string; creado_en: string; venta_id: string; venta_saldo: number; venta_fecha?: string; paciente_nombre: string | null; cliente_nombre: string | null; autor_nombre: string | null };
 export type SalidaResumen = { id: string; sucursal_id: string | null; clasificacion: string; concepto: string; monto: number; observaciones: string | null; autor_nombre: string | null };
 export type ResumenCompany = { id: string; nombre: string };
-export type ResumenDiaData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: { id: string; empresa_id: string; rol: string }; companies: ResumenCompany[]; sucursalActivaId?: string; sucursalActivaNombre?: string; multiSucursal?: boolean; ventas: VentaResumen[]; abonos: AbonoResumen[]; salidas: SalidaResumen[] };
+export type ResumenBranch = { id: string; nombre: string };
+export type ResumenDiaData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: { id: string; empresa_id: string; rol: string }; companies: ResumenCompany[]; branches: ResumenBranch[]; sucursalId?: string; sucursalNombre?: string; ventas: VentaResumen[]; abonos: AbonoResumen[]; salidas: SalidaResumen[] };
 
 const roles = new Set(["superadmin", "admin_sucursal", "vendedor", "caja"]);
 const roleName = (profile: { roles: { nombre: string } | { nombre: string }[] | null } | null) => Array.isArray(profile?.roles) ? profile.roles[0]?.nombre : profile?.roles?.nombre;
-const empty = { companies: [], ventas: [], abonos: [], salidas: [] };
+const empty = { companies: [], branches: [], ventas: [], abonos: [], salidas: [] };
 
 function rangoGuayaquil(fecha: string) {
   const [y, m, d] = fecha.split("-").map(Number);
@@ -20,7 +21,7 @@ function rangoGuayaquil(fecha: string) {
   return { inicio, fin };
 }
 
-export async function getResumenDiaData(fecha: string, empresaIdParam?: string): Promise<ResumenDiaData> {
+export async function getResumenDiaData(fecha: string, sucursalParam?: string): Promise<ResumenDiaData> {
   if (!hasSupabaseConfiguration()) return { status: "needs_configuration", message: "Falta configurar esta copia local.", ...empty };
   try {
     const supabase = await createSupabaseServerClient();
@@ -33,19 +34,20 @@ export async function getResumenDiaData(fecha: string, empresaIdParam?: string):
 
     const { data: companies, error: companiesError } = await supabase.from("empresas").select("id,nombre").eq("activo", true).order("nombre");
     if (companiesError) return { status: "error", message: "No se pudieron cargar las empresas.", ...empty };
-    const empresa = empresaIdParam || profile.empresa_id || companies?.[0]?.id || "";
-    if (!empresa) return { status: "ready", profile: { id: profile.id, empresa_id: profile.empresa_id, rol: role }, ...empty, companies: companies ?? [] };
-
-    const { inicio, fin } = rangoGuayaquil(fecha);
-    // Cada persona recibe solo las sucursales a las que tiene acceso (Superadministradora: todas las de la empresa).
+    // Cada sucursal tiene su propio resumen (Shuvision y Shuvision Sacha no se mezclan). Por defecto, la elegida en el menú.
     const context = await getOperationalContext();
-    const sucursalIds = (context?.accessibleBranches ?? []).filter((b) => b.empresa_id === empresa).map((b) => b.id);
-    const esSuperadmin = role === "superadmin";
-    if (!sucursalIds.length) return { status: "ready", profile: { id: profile.id, empresa_id: profile.empresa_id, rol: role }, ...empty, companies: companies ?? [] };
+    const accesibles = context?.accessibleBranches ?? [];
+    const branches = accesibles.map((b) => ({ id: b.id, nombre: b.nombre }));
+    const sucursal = accesibles.find((b) => b.id === sucursalParam) ?? accesibles.find((b) => b.id === context?.activeBranch.id) ?? accesibles[0];
+    const base = { status: "ready" as const, profile: { id: profile.id, empresa_id: profile.empresa_id, rol: role }, companies: companies ?? [], branches };
+    if (!sucursal) return { ...base, ventas: [], abonos: [], salidas: [] };
+    const empresa = sucursal.empresa_id;
+    const sucursalIds = [sucursal.id];
+    const { inicio, fin } = rangoGuayaquil(fecha);
 
     const [ventasResult, gastosResult] = await Promise.all([
       supabase.from("ventas").select("id,sucursal_id,creado_en,subtotal,descuento,total,saldo,cliente_nombre,paciente_id,created_by,estado").eq("empresa_id", empresa).in("sucursal_id", sucursalIds).gte("creado_en", inicio).lt("creado_en", fin).order("creado_en", { ascending: true }),
-      (esSuperadmin ? supabase.from("gastos").select("id,sucursal_id,clasificacion,concepto,monto,observaciones,created_by").eq("empresa_id", empresa) : supabase.from("gastos").select("id,sucursal_id,clasificacion,concepto,monto,observaciones,created_by").eq("empresa_id", empresa).in("sucursal_id", sucursalIds)).eq("fecha", fecha).eq("origen", "caja").order("clasificacion"),
+      supabase.from("gastos").select("id,sucursal_id,clasificacion,concepto,monto,observaciones,created_by").eq("empresa_id", empresa).in("sucursal_id", sucursalIds).eq("fecha", fecha).eq("origen", "caja").order("clasificacion"),
     ]);
     if (ventasResult.error || gastosResult.error) return { status: "error", message: "No se pudo cargar el resumen del día.", ...empty };
 
@@ -98,7 +100,6 @@ export async function getResumenDiaData(fecha: string, empresaIdParam?: string):
       autor_nombre: g.created_by ? usuarioNombre.get(g.created_by) ?? null : null,
     }));
 
-    const activa = context?.activeBranch && sucursalIds.includes(context.activeBranch.id) ? context.activeBranch : null;
-    return { status: "ready", profile: { id: profile.id, empresa_id: profile.empresa_id, rol: role }, companies: companies ?? [], sucursalActivaId: activa?.id, sucursalActivaNombre: activa?.nombre, multiSucursal: sucursalIds.length > 1, ventas, abonos, salidas };
+    return { ...base, sucursalId: sucursal.id, sucursalNombre: sucursal.nombre, ventas, abonos, salidas };
   } catch { return { status: "error", message: "El resumen del día no está disponible.", ...empty }; }
 }

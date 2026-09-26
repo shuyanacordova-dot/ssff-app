@@ -3,7 +3,7 @@ import { fechaGuayaquil, formatRecordDate } from "@/lib/record-date";
 import { printDocumentById } from "@/lib/print-document";
 import Link from "next/link";
 import { Fragment } from "react";
-import { TodasSucursalesToggle, useTodasSucursales } from "@/app/todas-sucursales-toggle";
+import { SucursalTabs } from "@/app/sucursal-tabs";
 import { useRouter } from "next/navigation";
 import { Printer } from "lucide-react";
 import type { ResumenDiaData } from "@/lib/resumen-dia";
@@ -15,17 +15,12 @@ const clasificacionLabel: Record<string, string> = { salarios: "Salarios", pago_
 
 export default function ResumenDiaBoard(props: ResumenDiaData & { fecha: string }) {
   const router = useRouter();
-  const [todas, setTodas] = useTodasSucursales();
 
   if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN DEL DÍA</p><h1>Resumen del día</h1><p className="subtitle">{props.message ?? "No se pudo abrir el resumen."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/resumen-dia">Iniciar sesión</Link>}</header></div></main>;
 
-  const empresaId = props.profile?.empresa_id ?? props.companies[0]?.id ?? "";
-  const irA = (fecha: string, empresa: string) => router.push(`/resumen-dia?fecha=${fecha}&empresa=${empresa}`);
-
-  // Sin "Todas las sucursales" se ve solo la sucursal donde se trabaja; los gastos generales (sin sucursal) solo con "Todas".
-  const soloActiva = !todas && !!props.sucursalActivaId;
-  const deSucursal = <T extends { sucursal_id: string | null }>(lista: T[]) => soloActiva ? lista.filter((x) => x.sucursal_id === props.sucursalActivaId) : lista;
-  const ventas = deSucursal(props.ventas); const abonos = deSucursal(props.abonos); const salidas = deSucursal(props.salidas);
+  const sucursalId = props.sucursalId ?? "";
+  const irA = (fecha: string, sucursal: string) => router.push(`/resumen-dia?fecha=${fecha}&sucursal=${sucursal}`);
+  const { ventas, abonos, salidas } = props;
   const totalVentas = ventas.reduce((sum, v) => sum + v.total, 0);
   const totalAbonos = abonos.reduce((sum, a) => sum + a.monto, 0);
   const totalSalidas = salidas.reduce((sum, s) => sum + s.monto, 0);
@@ -34,17 +29,17 @@ export default function ResumenDiaBoard(props: ResumenDiaData & { fecha: string 
 
   return <main className="page agenda-page"><div className="container agenda-shell">
     <header className="agenda-header no-print">
-      <div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN DEL DÍA</p><h1>Resumen del día</h1><p className="subtitle">Ventas, abonos y salidas del día — la base para cerrar la <Link href="/caja" className="text-action" style={{ display: "inline" }}>caja diaria</Link>.</p></div>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>{props.multiSucursal && <TodasSucursalesToggle todas={todas} onChange={setTodas} sucursalNombre={props.sucursalActivaNombre} />}
-        <input type="date" value={props.fecha} onChange={(event) => irA(event.target.value, empresaId)} />
+      <div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN DEL DÍA</p><h1>Resumen del día{props.sucursalNombre ? ` · ${props.sucursalNombre}` : ""}</h1><p className="subtitle">Ventas, abonos y salidas del día — la base para cerrar la <Link href="/caja" className="text-action" style={{ display: "inline" }}>caja diaria</Link>.</p></div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <input type="date" value={props.fecha} onChange={(event) => irA(event.target.value, sucursalId)} />
         <button className="outline-action" type="button" onClick={() => printDocumentById("daily-summary-print")}><Printer size={15} /> Imprimir</button>
       </div>
     </header>
-    <div className="tabs no-print">{props.companies.map((company) => <button key={company.id} className={company.id === empresaId ? "active" : ""} onClick={() => irA(props.fecha, company.id)}>{company.nombre}</button>)}</div>
+    <div className="no-print"><SucursalTabs branches={props.branches} value={sucursalId} onChange={(id) => irA(props.fecha, id)} /></div>
 
     <div id="daily-summary-print" className="print-area">
       <section className="glass agenda-board" style={{ marginTop: 14, marginBottom: 18 }}>
-        <p className="section-label">RESUMEN DE VENTAS</p><h2>Ventas del día</h2>
+        <p className="section-label">RESUMEN DE VENTAS · {(props.sucursalNombre ?? "").toUpperCase()} · {props.fecha}</p><h2>Ventas del día</h2>
         {ventas.length ? <table className="resumen-table"><thead><tr><th>Hora</th><th>Subtotal</th><th>Descuento</th><th>Total</th><th>Paciente</th><th>Autor(a)</th></tr></thead><tbody>
           {ventas.map((v) => <tr key={v.id}><td>{formatHora(v.creado_en)}</td><td>{money(v.subtotal)}</td><td>{money(v.descuento)}</td><td>{money(v.total)}</td><td>{v.paciente_nombre || v.cliente_nombre || "Cliente sin nombre"}</td><td>{v.autor_nombre || "—"}</td></tr>)}
           <tr className="total-row"><td colSpan={3}>Total</td><td>{money(totalVentas)}</td><td colSpan={2} /></tr>
