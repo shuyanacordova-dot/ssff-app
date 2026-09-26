@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Archive, ChevronLeft, ChevronRight, History, LockKeyhole, Plus, Wallet, X } from "lucide-react";
+import { Archive, ChevronLeft, ChevronRight, History, LockKeyhole, Pencil, Plus, Wallet, X } from "lucide-react";
 import type { PrivateAdminData } from "@/lib/mi-espacio";
 import { atrasadas, avance, cuotasPagadas, fechaCorta, hoyEcuador, itemsDelMes, mesDe, modalidades, money, nombreMes, pagosDelMes, proximoPago, sumarMeses, tipos, type BusinessDebt, type ItemMes, type ModalidadDeuda, type TipoDeuda } from "@/lib/mis-deudas-calc";
-import { archivarDeuda, crearDeuda, registrarPagoDeuda } from "./actions";
+import { actualizarDeuda, archivarDeuda, crearDeuda, registrarPagoDeuda } from "./actions";
 import s from "./mis-deudas.module.css";
 
 const estadoTexto = { pagado: "Pagado", vencido: "Vencido", hoy: "Vence hoy", proximo: "Próximo" } as const;
@@ -23,10 +23,12 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
   const [nueva, setNueva] = useState(false);
   const [pagando, setPagando] = useState<Pago | null>(null);
   const [historial, setHistorial] = useState<BusinessDebt | null>(null);
+  const [editando, setEditando] = useState<BusinessDebt | null>(null);
+  const [vista, setVista] = useState<"todo" | "optica" | "personal">("todo");
   const [notice, setNotice] = useState(props.message ?? "");
   const [pending, start] = useTransition();
 
-  const deudas = props.debts;
+  const deudas = useMemo(() => props.debts.filter((d) => vista === "todo" || (vista === "personal" ? d.ambito === "personal" : d.ambito !== "personal")), [props.debts, vista]);
   const activas = useMemo(() => deudas.filter((d) => d.estado === "pendiente"), [deudas]);
   const items = useMemo(() => itemsDelMes(deudas, mes, hoy), [deudas, mes, hoy]);
   const atraso = useMemo(() => atrasadas(deudas, mes, hoy), [deudas, mes, hoy]);
@@ -51,6 +53,7 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
     </header>
     {notice && <div className="notice"><LockKeyhole size={18} /><span>{notice}</span></div>}
 
+    <div className="tabs" style={{ marginBottom: 10 }}>{([["todo", "Todo"], ["optica", "Óptica"], ["personal", "Personal Shu"]] as const).map(([v, label]) => <button key={v} type="button" className={vista === v ? "active" : ""} onClick={() => setVista(v)}>{label}</button>)}</div>
     <div className={s.monthNav}>
       <button type="button" onClick={() => setMes(sumarMeses(mes, -1))} aria-label="Mes anterior"><ChevronLeft size={16} /></button>
       <span className={s.monthName}>{nombreMes(mes)}</span>
@@ -78,13 +81,14 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
         <button type="button" className={filtro === "todas" ? "active" : ""} onClick={() => setFiltro("todas")}>Todas ({activas.length})</button>
         {(Object.keys(tipos) as TipoDeuda[]).map((t) => <button key={t} type="button" className={filtro === t ? "active" : ""} onClick={() => setFiltro(t)}>{tipos[t].plural} ({activas.filter((d) => d.tipo === t).length})</button>)}
       </div>
-      {listaTipo.length ? <div className={s.grid}>{listaTipo.map((d) => <TarjetaDeuda key={d.id} deuda={d} empresa={props.companies.find((c) => c.id === d.empresa_id)?.nombre} pending={pending} onPagar={() => { const p = proximoPago(d, hoy); setPagando({ deuda: d, monto: p?.monto ?? Number(d.saldo), periodo: p ? mesDe(p.fecha) : mesDe(hoy) }); }} onHistorial={() => setHistorial(d)} onArchivar={() => archivar(d)} />)}</div>
+      {listaTipo.length ? <div className={s.grid}>{listaTipo.map((d) => <TarjetaDeuda key={d.id} deuda={d} empresa={d.ambito === "personal" ? "Personal Shu" : props.companies.find((c) => c.id === d.empresa_id)?.nombre} pending={pending} onEditar={() => setEditando(d)} onPagar={() => { const p = proximoPago(d, hoy); setPagando({ deuda: d, monto: p?.monto ?? Number(d.saldo), periodo: p ? mesDe(p.fecha) : mesDe(hoy) }); }} onHistorial={() => setHistorial(d)} onArchivar={() => archivar(d)} />)}</div>
         : <p className={s.empty}>No hay deudas activas en esta categoría.</p>}
     </section>
 
     {nueva && <NuevaDeuda companies={props.companies} onClose={() => setNueva(false)} onSaved={(m) => { setNotice(m); setNueva(false); router.refresh(); }} />}
     {pagando && <PagarDeuda pago={pagando} branches={props.branches} onClose={() => setPagando(null)} onSaved={(m) => { setNotice(m); setPagando(null); router.refresh(); }} />}
     {historial && <Historial deuda={historial} onClose={() => setHistorial(null)} />}
+    {editando && <EditarDeuda deuda={editando} companies={props.companies} onClose={() => setEditando(null)} onSaved={(m) => { setNotice(m); setEditando(null); router.refresh(); }} />}
   </div></main>;
 }
 
@@ -99,12 +103,12 @@ function FilaPago({ item, onPagar }: { item: ItemMes; onPagar: () => void }) {
   return <article className={`${s.row} ${item.estado === "pagado" ? s.rowPaid : ""}`}>
     <div className={s.day}><strong>{dd}</strong><small>{mesCorto || mm}</small></div>
     <div className={s.bar} style={{ background: t.color }} />
-    <div className={s.info}><h3>{item.deuda.proveedor}</h3><p><TipoTag tipo={item.deuda.tipo} /> {item.etiqueta}{item.deuda.concepto && item.deuda.concepto !== item.deuda.proveedor ? ` · ${item.deuda.concepto}` : ""}</p></div>
+    <div className={s.info}><h3>{item.deuda.proveedor}</h3><p><TipoTag tipo={item.deuda.tipo} />{item.deuda.ambito === "personal" && <span className={s.tipoTag} style={{ color: "#5a4a8a", background: "#efeafb", marginLeft: 4 }}>Personal</span>} {item.etiqueta}{!item.deuda.dia_pago && item.deuda.modalidad !== "libre" ? " · día por confirmar" : ""}{item.deuda.concepto && item.deuda.concepto !== item.deuda.proveedor ? ` · ${item.deuda.concepto}` : ""}</p></div>
     <div className={s.right}><span className={s.amount}>{money(item.monto)}</span><span className={`${s.pill} ${estadoClase[item.estado]}`}>{estadoTexto[item.estado]}</span>{item.estado !== "pagado" && <button className="new-consultation" type="button" onClick={onPagar}>Pagar</button>}</div>
   </article>;
 }
 
-function TarjetaDeuda({ deuda, empresa, pending, onPagar, onHistorial, onArchivar }: { deuda: BusinessDebt; empresa?: string; pending: boolean; onPagar: () => void; onHistorial: () => void; onArchivar: () => void }) {
+function TarjetaDeuda({ deuda, empresa, pending, onPagar, onHistorial, onArchivar, onEditar }: { deuda: BusinessDebt; empresa?: string; pending: boolean; onPagar: () => void; onHistorial: () => void; onArchivar: () => void; onEditar: () => void }) {
   const t = tipos[deuda.tipo];
   const prox = proximoPago(deuda);
   const pct = Math.round(avance(deuda) * 100);
@@ -116,10 +120,12 @@ function TarjetaDeuda({ deuda, empresa, pending, onPagar, onHistorial, onArchiva
       : <><span className={s.saldo}>{money(Number(deuda.saldo))}<small style={{ fontSize: 13, fontWeight: 700, color: "#66768b" }}> por pagar</small></span>
         <div className={s.progress}><div style={{ width: `${pct}%`, background: t.color }} /></div>
         <p>{deuda.modalidad === "cuotas" ? `${cuotasPagadas(deuda)} de ${deuda.cuotas_total} cuotas pagadas · cuota ${money(Number(deuda.monto_cuota))}` : `Pagado ${money(deuda.monto_original - Number(deuda.saldo))} de ${money(deuda.monto_original)} (${pct}%)`}</p></>}
-    {prox && <p><strong>Próximo pago:</strong> {fechaCorta(prox.fecha)} · {money(prox.monto)}</p>}
+    {prox && <p><strong>Próximo pago:</strong> {deuda.dia_pago ? fechaCorta(prox.fecha) : `${nombreMes(prox.fecha.slice(0, 7))} (día por confirmar)`} · {money(prox.monto)}</p>}
+    {deuda.notas && <p style={{ color: "#8a5a00" }}>{deuda.notas}</p>}
     <div className={s.actions}>
       <button className="new-consultation" type="button" onClick={onPagar}><Wallet size={14} /> Pagar</button>
       <button className="outline-action" type="button" onClick={onHistorial}><History size={14} /> Pagos</button>
+      <button className="outline-action" type="button" onClick={onEditar}><Pencil size={14} /> Editar</button>
       <button className="outline-action" type="button" disabled={pending} onClick={onArchivar} title="Ya no aplica o se terminó"><Archive size={14} /> Archivar</button>
     </div>
   </article>;
@@ -149,7 +155,7 @@ function NuevaDeuda({ companies, onClose, onSaved }: { companies: PrivateAdminDa
       <div className="new-patient-form" style={{ marginTop: 12 }}>
         <label>{tipo === "gasto_fijo" ? "¿Qué se paga?" : "¿A quién le debes?"}<input name="proveedor" required placeholder={tipo === "gasto_fijo" ? "Ej.: Arriendo local Shushufindi" : tipo === "prestamo_banco" ? "Ej.: Banco Pichincha" : "Ej.: Optec"} /></label>
         <label>Detalle (opcional)<input name="concepto" placeholder={tipo === "gasto_fijo" ? "Ej.: Internet CNT" : "Ej.: Lunas de agosto"} /></label>
-        <label>Empresa<select name="empresa_id" defaultValue=""><option value="">General (las 3 sucursales)</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></label>
+        <label>¿De quién es la deuda?<select name="empresa_id" defaultValue=""><option value="">General (las 3 sucursales)</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}<option value="personal">Personal (Shu)</option></select></label>
         {tipo !== "gasto_fijo" && <label>¿Cómo se paga?<select value={modalidad} onChange={(e) => setModalidad(e.target.value as ModalidadDeuda)}><option value="cuotas">{modalidades.cuotas}</option><option value="libre">{modalidades.libre}</option></select></label>}
       </div>
       {modalidad === "cuotas" && <div className="new-patient-form" style={{ marginTop: 12 }}>
@@ -218,5 +224,38 @@ function Historial({ deuda, onClose }: { deuda: BusinessDebt; onClose: () => voi
     <p className="section-label">PAGOS REGISTRADOS</p><h2>{deuda.proveedor}</h2>
     {pagos.length ? <div className="task-list">{pagos.map((p) => <article className="task-card" key={p.id}><div className="task-main"><p style={{ margin: 0 }}><strong>{fechaCorta(p.fecha_pago)}</strong> · {metodos.find((m) => m.value === p.metodo)?.label ?? p.metodo}{p.periodo ? ` · mes ${nombreMes(p.periodo.slice(0, 7))}` : ""}{p.referencia ? ` · Ref. ${p.referencia}` : ""}</p>{p.notas && <p className="field-hint" style={{ margin: 0 }}>{p.notas}</p>}</div><div className="task-actions"><strong>{money(Number(p.monto))}</strong></div></article>)}</div>
       : <p className={s.empty}>Todavía no hay pagos registrados.</p>}
+  </section></div>;
+}
+
+function EditarDeuda({ deuda, companies, onClose, onSaved }: { deuda: BusinessDebt; companies: PrivateAdminData["companies"]; onClose: () => void; onSaved: (m: string) => void }) {
+  const [error, setError] = useState(""); const [pending, start] = useTransition();
+  const destino = deuda.ambito === "personal" ? "personal" : deuda.empresa_id ?? "";
+  const submit = (form: HTMLFormElement) => start(async () => {
+    setError("");
+    const data = new FormData(form); data.set("deuda_id", deuda.id); data.set("modalidad", deuda.modalidad);
+    const r = await actualizarDeuda(data);
+    if (!r.ok) { setError(r.error); return; }
+    onSaved(`"${data.get("proveedor")}" actualizada.`);
+  });
+  return <div className="modal-backdrop"><section className="new-patient-modal task-modal" role="dialog" aria-modal="true" style={{ width: "min(620px, 100%)" }}>
+    <button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>
+    <p className="section-label">EDITAR DEUDA · {modalidades[deuda.modalidad].toUpperCase()}</p><h2>{deuda.proveedor}</h2>
+    <form onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }}>
+      <div className="new-patient-form">
+        <label>{deuda.tipo === "gasto_fijo" ? "¿Qué se paga?" : "¿A quién le debes?"}<input name="proveedor" required defaultValue={deuda.proveedor} /></label>
+        <label>Detalle<input name="concepto" defaultValue={deuda.concepto} /></label>
+        <label>¿De quién es la deuda?<select name="empresa_id" defaultValue={destino}><option value="">General (las 3 sucursales)</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}<option value="personal">Personal (Shu)</option></select></label>
+        {deuda.modalidad !== "libre" && <label>{deuda.modalidad === "mensual" ? "Monto mensual $" : "Valor de cada cuota $"}<input name="monto_cuota" inputMode="decimal" required defaultValue={deuda.monto_cuota ?? ""} /></label>}
+        {deuda.modalidad !== "libre" && <label>Día de pago (1–31)<input name="dia_pago" inputMode="numeric" defaultValue={deuda.dia_pago ?? ""} placeholder="Vacío = por confirmar" /></label>}
+        {deuda.modalidad === "cuotas" && <label>Número total de cuotas<input name="cuotas_total" inputMode="numeric" required defaultValue={deuda.cuotas_total ?? ""} /></label>}
+        {deuda.modalidad === "cuotas" && <label>Cuotas pagadas antes de LumOS<input name="cuotas_previas" inputMode="numeric" defaultValue={deuda.cuotas_previas} /></label>}
+        {deuda.modalidad === "libre" && <label>Monto total $<input name="monto_original" inputMode="decimal" required defaultValue={deuda.monto_original} /></label>}
+        {deuda.modalidad !== "mensual" && <label>Saldo que falta pagar $<input name="saldo" inputMode="decimal" required defaultValue={deuda.saldo} /></label>}
+        {deuda.modalidad === "libre" && <label>Fecha límite (opcional)<input name="fecha_vencimiento" type="date" defaultValue={deuda.fecha_vencimiento ?? ""} /></label>}
+        <label className="task-description" style={{ gridColumn: "1 / -1" }}>Notas<textarea name="notas" defaultValue={deuda.notas ?? ""} /></label>
+      </div>
+      {error && <p className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 700 }}>{error}</p>}
+      <div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" type="submit" disabled={pending}>{pending ? "Guardando…" : "Guardar cambios"}</button></div>
+    </form>
   </section></div>;
 }

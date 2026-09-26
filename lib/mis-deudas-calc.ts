@@ -27,6 +27,7 @@ export const sumarMeses = (ym: string, n: number) => { const [y, m] = ym.split("
 export const mesesEntre = (desde: string, hasta: string) => { const [a, b] = desde.split("-").map(Number); const [c, d] = hasta.split("-").map(Number); return (c - a) * 12 + (d - b); };
 export const nombreMes = (ym: string) => new Intl.DateTimeFormat("es-EC", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${ym}-15T12:00:00Z`));
 export const fechaCorta = (fecha: string) => new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short", timeZone: "UTC" }).format(new Date(`${fecha}T12:00:00Z`));
+// Sin día de pago confirmado se usa el último día del mes (así no se marca vencido antes de tiempo).
 export const diaDelMes = (ym: string, dia: number) => { const [y, m] = ym.split("-").map(Number); const ultimo = new Date(Date.UTC(y, m, 0)).getUTCDate(); return `${ym}-${String(Math.min(dia, ultimo)).padStart(2, "0")}`; };
 
 const periodosPagados = (d: BusinessDebt) => new Set(d.pagos_deuda_negocio.map((p) => (p.periodo ?? p.fecha_pago).slice(0, 7)));
@@ -61,11 +62,11 @@ export function itemsDelMes(deudas: BusinessDebt[], ym: string, hoy = hoyEcuador
       if (idx < 0 || idx >= d.cuotas_total) continue;
       const pagada = idx < d.cuotas_previas || pagadoEnMes(d, ym);
       if (d.estado === "pagada" && !pagada) continue;
-      const fecha = diaDelMes(ym, d.dia_pago ?? Number(d.fecha_inicio.slice(8, 10)));
+      const fecha = diaDelMes(ym, d.dia_pago ?? 31);
       items.push({ deuda: d, fecha, monto: Number(d.monto_cuota), etiqueta: `Cuota ${idx + 1} de ${d.cuotas_total}`, estado: estadoPara(fecha, pagada, hoy), periodo: ym });
     } else if (d.modalidad === "mensual" && d.monto_cuota) {
       if (d.fecha_inicio && mesDe(d.fecha_inicio) > ym) continue;
-      const fecha = diaDelMes(ym, d.dia_pago ?? 1);
+      const fecha = diaDelMes(ym, d.dia_pago ?? 31);
       items.push({ deuda: d, fecha, monto: Number(d.monto_cuota), etiqueta: "Pago mensual", estado: estadoPara(fecha, pagadoEnMes(d, ym), hoy), periodo: ym });
     } else if (d.modalidad === "libre" && d.fecha_vencimiento && mesDe(d.fecha_vencimiento) === ym) {
       const pagada = d.estado === "pagada";
@@ -86,11 +87,11 @@ export function atrasadas(deudas: BusinessDebt[], ym: string, hoy = hoyEcuador()
       for (let i = Math.max(0, d.cuotas_previas); i < d.cuotas_total; i++) {
         const mes = sumarMeses(inicio, i);
         if (mes >= ym) break;
-        if (diaDelMes(mes, d.dia_pago ?? 1) < hoy && !pagadoEnMes(d, mes)) items.push({ deuda: d, fecha: diaDelMes(mes, d.dia_pago ?? 1), monto: Number(d.monto_cuota), etiqueta: `Cuota ${i + 1} de ${d.cuotas_total}`, estado: "vencido", periodo: mes });
+        if (diaDelMes(mes, d.dia_pago ?? 31) < hoy && !pagadoEnMes(d, mes)) items.push({ deuda: d, fecha: diaDelMes(mes, d.dia_pago ?? 31), monto: Number(d.monto_cuota), etiqueta: `Cuota ${i + 1} de ${d.cuotas_total}`, estado: "vencido", periodo: mes });
       }
     } else if (d.modalidad === "mensual" && d.monto_cuota && d.fecha_inicio) {
       for (let mes = mesDe(d.fecha_inicio); mes < ym; mes = sumarMeses(mes, 1)) {
-        if (diaDelMes(mes, d.dia_pago ?? 1) < hoy && !pagadoEnMes(d, mes)) items.push({ deuda: d, fecha: diaDelMes(mes, d.dia_pago ?? 1), monto: Number(d.monto_cuota), etiqueta: "Pago mensual", estado: "vencido", periodo: mes });
+        if (diaDelMes(mes, d.dia_pago ?? 31) < hoy && !pagadoEnMes(d, mes)) items.push({ deuda: d, fecha: diaDelMes(mes, d.dia_pago ?? 31), monto: Number(d.monto_cuota), etiqueta: "Pago mensual", estado: "vencido", periodo: mes });
       }
     } else if (d.modalidad === "libre" && d.fecha_vencimiento && mesDe(d.fecha_vencimiento) < ym && d.fecha_vencimiento < hoy) {
       items.push({ deuda: d, fecha: d.fecha_vencimiento, monto: Number(d.saldo), etiqueta: "Fecha límite vencida", estado: "vencido", periodo: mesDe(d.fecha_vencimiento) });
@@ -110,7 +111,7 @@ export function proximoPago(d: BusinessDebt, hoy = hoyEcuador()): { fecha: strin
       if (idx >= d.cuotas_total) return null;
       if (idx < d.cuotas_previas) continue;
     }
-    if (!pagadoEnMes(d, mes)) return { fecha: diaDelMes(mes, d.dia_pago ?? 1), monto: Number(d.monto_cuota) };
+    if (!pagadoEnMes(d, mes)) return { fecha: diaDelMes(mes, d.dia_pago ?? 31), monto: Number(d.monto_cuota) };
   }
   return null;
 }

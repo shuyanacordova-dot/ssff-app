@@ -27,11 +27,12 @@ export async function crearDeuda(form: FormData): Promise<Resultado> {
     const { supabase, profile } = await privateContext();
     const tipo = value(form, "tipo"); const modalidad = value(form, "modalidad");
     const proveedor = value(form, "proveedor"); const concepto = value(form, "concepto") || proveedor; const notas = value(form, "notas");
-    const empresaId = value(form, "empresa_id") || null;
+    const destino = value(form, "empresa_id");
+    const empresaId = destino && destino !== "personal" ? destino : null; const ambito = destino === "personal" ? "personal" : "general";
     if (!["proveedor", "prestamo_banco", "tarjeta", "prestamo_personal", "gasto_fijo"].includes(tipo)) return { ok: false, error: "Elige el tipo de deuda." };
     if (!["cuotas", "libre", "mensual"].includes(modalidad)) return { ok: false, error: "Elige cómo se paga." };
     if (!proveedor) return { ok: false, error: "Escribe a quién le debes (acreedor)." };
-    const base = { tipo, modalidad, proveedor, concepto, notas: notas || null, empresa_id: empresaId, sucursal_id: null, created_by: profile.id };
+    const base = { tipo, modalidad, proveedor, concepto, notas: notas || null, empresa_id: empresaId, ambito, sucursal_id: null, created_by: profile.id };
     let fila: Record<string, unknown>;
     if (modalidad === "cuotas") {
       const cuota = numero(form, "monto_cuota"); const total = Math.round(numero(form, "cuotas_total")); const previas = Math.max(0, Math.round(numero(form, "cuotas_previas") || 0));
@@ -81,4 +82,47 @@ export async function archivarDeuda(deudaId: string): Promise<Resultado> {
     revalidatePath("/mi-espacio");
     return { ok: true };
   } catch (err) { return { ok: false, error: err instanceof Error ? err.message : "No se pudo archivar la deuda." }; }
+}
+
+export async function actualizarDeuda(form: FormData): Promise<Resultado> {
+  try {
+    const { supabase } = await privateContext();
+    const id = value(form, "deuda_id"); const modalidad = value(form, "modalidad");
+    const proveedor = value(form, "proveedor"); const concepto = value(form, "concepto") || proveedor;
+    const destino = value(form, "empresa_id");
+    if (!id || !proveedor) return { ok: false, error: "Escribe a quién le debes." };
+    const cambios: Record<string, unknown> = {
+      proveedor, concepto, notas: value(form, "notas") || null,
+      empresa_id: destino && destino !== "personal" ? destino : null, ambito: destino === "personal" ? "personal" : "general",
+      actualizado_en: new Date().toISOString(),
+    };
+    const diaTexto = value(form, "dia_pago");
+    if (modalidad !== "libre") {
+      const dia = diaTexto ? Math.round(numero(form, "dia_pago")) : null;
+      if (dia !== null && !(dia >= 1 && dia <= 31)) return { ok: false, error: "El día de pago debe estar entre 1 y 31." };
+      const cuota = numero(form, "monto_cuota");
+      if (!(cuota > 0)) return { ok: false, error: modalidad === "mensual" ? "Indica el monto mensual." : "Indica el valor de la cuota." };
+      cambios.dia_pago = dia; cambios.monto_cuota = cuota;
+    }
+    if (modalidad === "cuotas") {
+      const total = Math.round(numero(form, "cuotas_total")); const previas = Math.max(0, Math.round(numero(form, "cuotas_previas") || 0));
+      if (!(total > 0) || previas > total) return { ok: false, error: "Revisa el número de cuotas y las cuotas ya pagadas." };
+      cambios.cuotas_total = total; cambios.cuotas_previas = previas; cambios.monto_original = Math.round(total * Number(cambios.monto_cuota) * 100) / 100;
+    }
+    if (modalidad === "mensual") { cambios.monto_original = cambios.monto_cuota; cambios.saldo = cambios.monto_cuota; }
+    else {
+      const saldo = numero(form, "saldo");
+      if (!(saldo >= 0)) return { ok: false, error: "Indica el saldo que falta pagar." };
+      cambios.saldo = saldo; cambios.estado = saldo > 0 ? "pendiente" : "pagada";
+      if (modalidad === "libre") {
+        const total = numero(form, "monto_original");
+        if (!(total > 0) || saldo > total) return { ok: false, error: "El saldo no puede ser mayor que el monto total." };
+        cambios.monto_original = total; cambios.fecha_vencimiento = value(form, "fecha_vencimiento") || null;
+      } else if (saldo > Number(cambios.monto_original) + 0.01) cambios.monto_original = saldo;
+    }
+    const { error } = await supabase.from("deudas_negocio").update(cambios).eq("id", id);
+    if (error) return { ok: false, error: `No se pudo actualizar: ${error.message}` };
+    revalidatePath("/mi-espacio");
+    return { ok: true };
+  } catch (err) { return { ok: false, error: err instanceof Error ? err.message : "No se pudo actualizar la deuda." }; }
 }
