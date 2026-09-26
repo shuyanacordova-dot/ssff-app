@@ -1,3 +1,5 @@
+import { cache } from "react";
+import { getCurrentUser } from "@/lib/supabase/current-user";
 import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { loadBranchIdentities, type BranchIdentity, type CompanyIdentity } from "@/lib/sucursales";
@@ -18,9 +20,10 @@ export type OperationalContext = {
   brandingSchemaReady: boolean;
 };
 
-export async function getOperationalContext(): Promise<OperationalContext | null> {
+// Se calcula una sola vez por carga de página aunque varias funciones la pidan.
+export const getOperationalContext = cache(async (): Promise<OperationalContext | null> => {
   const supabase = await createSupabaseServerClient();
-  const { data: auth } = await supabase.auth.getUser();
+  const auth = { user: await getCurrentUser() };
   if (!auth.user) return null;
   const { data: rawProfile, error: profileError } = await supabase.from("usuarios")
     .select("id,auth_user_id,nombre,empresa_id,sucursal_id,activo,roles(nombre)")
@@ -58,4 +61,4 @@ export async function getOperationalContext(): Promise<OperationalContext | null
     canSwitchBranch: accessibleBranches.length > 1,
     brandingSchemaReady: branchResult.schemaReady,
   };
-}
+});

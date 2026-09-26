@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/supabase/current-user";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 import { getOperationalContext } from "@/lib/operational-context";
 import { diasCalendarioGuayaquil } from "@/lib/record-date";
@@ -23,7 +24,7 @@ export async function getCuentasCobrarData(): Promise<CuentasCobrarData> {
   if (!hasSupabaseConfiguration()) return { status: "needs_configuration", message: "Falta configurar la conexión segura de esta copia local.", ...empty };
   try {
     const supabase = await createSupabaseServerClient();
-    const { data: auth } = await supabase.auth.getUser();
+    const auth = { user: await getCurrentUser() };
     if (!auth.user) return { status: "needs_login", message: "Inicia sesión para ver cuentas por cobrar.", ...empty };
     const { data: rawProfile, error: profileError } = await supabase.from("usuarios").select("id,empresa_id,activo,roles(nombre)").eq("auth_user_id", auth.user.id).maybeSingle();
     const profile = rawProfile as unknown as { id: string; empresa_id: string; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null } | null;

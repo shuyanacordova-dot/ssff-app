@@ -21,7 +21,7 @@ const primeraCuotaFecha = () => { const d = new Date(); d.setMonth(d.getMonth() 
 const formatFecha = (d: Date) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "long", year: "numeric" }).format(d);
 const productCategoryLabel: Record<string, string> = { montura: "Armazón", lente: "Luna", accesorio: "Accesorio", gafas_sol: "Gafas", servicio: "Examen" };
 
-export default function Cart({ products, stock, branches, patients, empresasConvenio, defaultCompany, defaultBranch, defaultPacienteId, lockPatient, onDone, saldosFavor = {} }: { saldosFavor?: Record<string, number>; products: SaleProduct[]; stock: SaleStock[]; companies: SaleCompany[]; branches: SaleBranch[]; patients: SalePatient[]; empresasConvenio: EmpresaConvenio[]; defaultCompany: string; defaultBranch: string; defaultPacienteId?: string; lockPatient?: boolean; onDone: (message: string) => void }) {
+export default function Cart({ products, stock, branches, patients, empresasConvenio, defaultCompany, defaultBranch, defaultPacienteId, lockPatient, onDone, saldosFavor = {}, cargandoCatalogo = false }: { saldosFavor?: Record<string, number>; cargandoCatalogo?: boolean; products: SaleProduct[]; stock: SaleStock[]; companies: SaleCompany[]; branches: SaleBranch[]; patients: SalePatient[]; empresasConvenio: EmpresaConvenio[]; defaultCompany: string; defaultBranch: string; defaultPacienteId?: string; lockPatient?: boolean; onDone: (message: string) => void }) {
   const [modo, setModo] = useState<Modo>("");
   const [branch, setBranch] = useState(() => branches.find((b) => b.id === defaultBranch)?.id ?? branches.find((b) => b.empresa_id === defaultCompany)?.id ?? "");
   const company = branches.find((b) => b.id === branch)?.empresa_id ?? ""; const [cliente, setCliente] = useState(""); const [pacienteId, setPacienteId] = useState(defaultPacienteId ?? "");
@@ -104,7 +104,7 @@ export default function Cart({ products, stock, branches, patients, empresasConv
     {!lockPatient && <p className="field-hint" style={{ marginTop: 12 }}>Las ventas de lentes se hacen desde la carpeta del paciente (Pacientes → carpeta → Ventas → Nueva venta).</p>}
   </section>;
 
-  return <section className="glass agenda-board" style={{ marginBottom: 18 }}><p className="section-label">NUEVA VENTA · {modo === "rapida" ? "VENTA RÁPIDA" : "LENTES"}</p><h2>Carrito y cobro</h2>
+  return <section className="glass agenda-board" style={{ marginBottom: 18 }}><p className="section-label">NUEVA VENTA · {modo === "rapida" ? "VENTA RÁPIDA" : "LENTES"}</p>{cargandoCatalogo && !products.length && <p className="notice" role="status">Cargando productos…</p>}<h2>Carrito y cobro</h2>
     <button type="button" className="text-action" onClick={() => elegirModo("")}>← Cambiar tipo de venta</button>
     <form onSubmit={(event) => { event.preventDefault(); submit(event.currentTarget); }}>
       <div className="new-patient-form" style={{ marginTop: 10 }}>

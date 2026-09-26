@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/supabase/current-user";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 import { createSupabaseAdminClient, hasSupabaseAdminConfiguration } from "@/lib/supabase/admin";
 
@@ -16,7 +17,7 @@ export async function getEquipoData(): Promise<EquipoData> {
   if (!hasSupabaseConfiguration()) return emptyEquipoData("needs_configuration", "Falta configurar la conexión segura de esta copia local.");
   try {
     const supabase = await createSupabaseServerClient();
-    const { data: auth } = await supabase.auth.getUser();
+    const auth = { user: await getCurrentUser() };
     if (!auth.user) return emptyEquipoData("needs_login", "Inicia sesión para ver el equipo.");
     const { data: rawProfile, error: profileError } = await supabase.from("usuarios").select("id,activo,roles(nombre)").eq("auth_user_id", auth.user.id).maybeSingle();
     const profile = rawProfile as unknown as { id: string; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null } | null;

@@ -10,6 +10,7 @@ import { mensajeTicketVirtual } from "@/lib/mensajes";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import Cart from "./cart";
 import LabOrderModal from "./lab-order-modal";
+import { useCatalogoVenta } from "./use-catalogo-venta";
 import { actualizarEntregaVenta, anularVenta, crearProducto, registrarAbono } from "./actions";
 import { crearGarantia } from "./garantia-actions";
 import { branchLetterhead } from "@/lib/sucursales";
@@ -21,6 +22,7 @@ const statePillClass: Record<Sale["estado"], string> = { borrador: "", completad
 const categories = ["montura", "gafas_sol", "lente", "accesorio", "servicio", "tratamiento", "otro"];
 
 export default function SalesBoard(props: VentasData) {
+  const catalogo = useCatalogoVenta(props.status === "ready");
   const [notice, setNotice] = useState(props.message ?? "");
   const [showProduct, setShowProduct] = useState(false);
   const [anulling, setAnulling] = useState<Sale | null>(null);
@@ -33,7 +35,7 @@ export default function SalesBoard(props: VentasData) {
   const role = props.profile?.rol;
   const canCreateProduct = role === "superadmin" || role === "admin_sucursal";
   const canAnular = role === "superadmin";
-  const productoById = useMemo(() => new Map(props.products.map((product) => [product.id, product])), [props.products]);
+  const productoById = useMemo(() => new Map(catalogo.products.map((product) => [product.id, product])), [catalogo.products]);
   const patientById = useMemo(() => new Map(props.patients.map((patient) => [patient.id, patient])), [props.patients]);
   const accessibleBranchIds = useMemo(() => new Set(props.accessibleBranches.map((branch) => branch.id)), [props.accessibleBranches]);
   const visibleSales = useMemo(() => props.sales.filter((sale) => {
@@ -73,9 +75,9 @@ export default function SalesBoard(props: VentasData) {
   return <main className="page agenda-page"><div className="container agenda-shell">
     <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN COMERCIAL</p><h1>Cobros</h1><p className="subtitle">SHUVISION y Focus conservan ventas y saldos separados.</p></div>{canCreateProduct && <button className="new-task" type="button" onClick={() => setShowProduct(true)}><Plus size={18} /> Nuevo producto</button>}</header>
     {props.accessibleBranches.length > 1 && <section className="branch-filter-panel" aria-label="Filtrar ventas por sucursal"><div><Building2 size={18} /><span>Ver ventas de</span></div><div className="branch-filter-buttons"><button type="button" className={branchFilter === "all" ? "active" : ""} onClick={() => setBranchFilter("all")}>Todas</button>{props.accessibleBranches.map((branch) => <button type="button" key={branch.id} className={branchFilter === branch.id ? "active" : ""} onClick={() => setBranchFilter(branch.id)}>{branch.nombre}</button>)}</div></section>}
-    <section className="agenda-summary"><article><Package size={21} /><strong>{props.products.length}</strong><span>productos activos</span></article><article><Wallet size={21} /><strong>{money(collected)}</strong><span>cobros registrados</span></article><article><ReceiptText size={21} /><strong>{money(pendingTotal)}</strong><span>saldo pendiente</span></article></section>
+    <section className="agenda-summary"><article><Package size={21} /><strong>{catalogo.cargando && !catalogo.products.length ? "…" : catalogo.products.length}</strong><span>productos activos</span></article><article><Wallet size={21} /><strong>{money(collected)}</strong><span>cobros registrados</span></article><article><ReceiptText size={21} /><strong>{money(pendingTotal)}</strong><span>saldo pendiente</span></article></section>
     <div className="notice"><CircleAlert size={18} /><span>{notice || "Las ventas anuladas se conservan con el motivo registrado; no se eliminan."}</span></div>
-    <Cart products={props.products} stock={props.stock} companies={props.companies.filter((company) => props.accessibleBranches.some((branch) => branch.empresa_id === company.id))} branches={props.accessibleBranches} patients={props.patients} empresasConvenio={props.empresasConvenio} defaultCompany={props.profile?.empresa_id ?? props.companies[0]?.id ?? ""} defaultBranch={props.profile?.sucursal_id ?? ""} onDone={setNotice} />
+    <Cart products={catalogo.products} stock={catalogo.stock} cargandoCatalogo={catalogo.cargando} companies={props.companies.filter((company) => props.accessibleBranches.some((branch) => branch.empresa_id === company.id))} branches={props.accessibleBranches} patients={props.patients} empresasConvenio={props.empresasConvenio} defaultCompany={props.profile?.empresa_id ?? props.companies[0]?.id ?? ""} defaultBranch={props.profile?.sucursal_id ?? ""} onDone={(m) => { setNotice(m); catalogo.recargar(); }} />
     <section className="glass agenda-board"><p className="section-label">VENTAS RECIENTES</p><h2>Historial y cobros</h2>{visibleSales.length ? <div className="task-list">{visibleSales.map((sale) => <SaleCard key={sale.id} sale={sale} companyName={props.companies.find((c) => c.id === sale.empresa_id)?.nombre ?? "Empresa"} branchName={props.branches.find((b) => b.id === sale.sucursal_id)?.nombre} patient={sale.paciente_id ? patientById.get(sale.paciente_id) : undefined} lensItems={lensItemsFor(sale)} hasLabOrderItems={labOrderItemsFor(sale).length > 0} labOrders={props.labOrders.filter((o) => o.venta_id === sale.id)} canAnular={canAnular} pending={pending} onAbono={abonar} onRequestAnular={setAnulling} onCreateLabOrder={() => setLabOrderContext({ sale })} onViewOrder={(orderId) => setLabOrderContext({ sale, orderId })} onRecibo={() => setReciboSale(sale)} onDetalle={() => setDetailSale(sale)} onGarantia={() => setGarantiaModal({ defaultVentaId: sale.id })} />)}</div> : <section className="empty-state"><h3>No hay ventas en esta sucursal</h3><p>Selecciona otra sucursal o registra una nueva venta.</p></section>}</section>
 
     <section className="glass agenda-board"><div className="tab-actions" style={{ justifyContent: "space-between", display: "flex" }}><div><p className="section-label">GARANTÍAS</p><h2>Reclamos de armazón o luna</h2></div><button className="new-task" type="button" onClick={() => setGarantiaModal({})}><ShieldCheck size={16} /> Nueva garantía</button></div>
@@ -84,7 +86,7 @@ export default function SalesBoard(props: VentasData) {
 
     {showProduct && <ProductModal companies={props.companies} defaultCompany={props.profile?.empresa_id ?? props.companies[0]?.id ?? ""} onClose={() => setShowProduct(false)} onCreate={createProduct} pending={pending} />}
     {anulling && <AnularModal sale={anulling} pending={pending} onClose={() => setAnulling(null)} onConfirm={(motivo, opciones) => anular(anulling, motivo, opciones)} />}
-    {labOrderContext && <LabOrderModal sale={labOrderContext.sale} lensItems={labOrderItemsFor(labOrderContext.sale)} productoById={productoById} existingOrderId={labOrderContext.orderId} esGarantia={labOrderContext.esGarantia} patientName={patientNameFor(labOrderContext.sale)} patientPhone={labOrderContext.sale.paciente_id ? patientById.get(labOrderContext.sale.paciente_id)?.telefono : undefined} company={branchLetterhead(props.companies.find((c) => c.id === labOrderContext.sale.empresa_id), props.branches.find((b) => b.id === labOrderContext.sale.sucursal_id)) ?? undefined} branchName={props.branches.find((b) => b.id === labOrderContext.sale.sucursal_id)?.nombre} onClose={() => setLabOrderContext(null)} onCreated={(message) => setNotice(message)} />}
+    {labOrderContext && <LabOrderModal sale={labOrderContext.sale} lensItems={labOrderItemsFor(labOrderContext.sale)} productoById={catalogo.products.length ? productoById : undefined} existingOrderId={labOrderContext.orderId} esGarantia={labOrderContext.esGarantia} patientName={patientNameFor(labOrderContext.sale)} patientPhone={labOrderContext.sale.paciente_id ? patientById.get(labOrderContext.sale.paciente_id)?.telefono : undefined} company={branchLetterhead(props.companies.find((c) => c.id === labOrderContext.sale.empresa_id), props.branches.find((b) => b.id === labOrderContext.sale.sucursal_id)) ?? undefined} branchName={props.branches.find((b) => b.id === labOrderContext.sale.sucursal_id)?.nombre} onClose={() => setLabOrderContext(null)} onCreated={(message) => setNotice(message)} />}
     {reciboSale && <ReciboModal sale={reciboSale} patient={reciboSale.paciente_id ? patientById.get(reciboSale.paciente_id) : undefined} onClose={() => setReciboSale(null)} onSaved={(message) => setNotice(message)} />}
     {detailSale && <VentaDetailModal sale={detailSale} companyName={props.companies.find((c) => c.id === detailSale.empresa_id)?.nombre ?? "Empresa"} patient={detailSale.paciente_id ? patientById.get(detailSale.paciente_id) : undefined} onClose={() => setDetailSale(null)} />}
     {garantiaModal && <GarantiaModal sales={visibleSales.filter((s) => s.estado === "completada")} defaultVentaId={garantiaModal.defaultVentaId} productoById={productoById} patients={props.patients} onClose={() => setGarantiaModal(null)} onCreate={crearGarantiaSubmit} pending={pending} />}

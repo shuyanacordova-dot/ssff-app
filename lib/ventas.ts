@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/supabase/current-user";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 import { createSupabaseAdminClient, hasSupabaseAdminConfiguration } from "@/lib/supabase/admin";
@@ -28,7 +29,7 @@ export async function getVentasData(): Promise<VentasData> {
   if (!hasSupabaseConfiguration()) return { status: "needs_configuration", message: "Falta configurar la conexión segura de esta copia local.", ...empty };
   try {
     const supabase = await createSupabaseServerClient();
-    const { data: auth } = await supabase.auth.getUser();
+    const auth = { user: await getCurrentUser() };
     if (!auth.user) return { status: "needs_login", message: "Inicia sesión para abrir ventas.", ...empty };
     const { data: rawProfile, error: profileError } = await supabase.from("usuarios").select("id,empresa_id,sucursal_id,activo,roles(nombre)").eq("auth_user_id", auth.user.id).maybeSingle();
     const profile = rawProfile as unknown as { id: string; empresa_id: string; sucursal_id: string | null; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null } | null;
@@ -36,7 +37,7 @@ export async function getVentasData(): Promise<VentasData> {
     if (profileError || !profile?.activo || !role || !salesRoles.has(role)) return { status: "forbidden", message: "Tu perfil no tiene permiso para ventas.", ...empty };
 
     const [productsResult, salesResult, companiesResult, branchesResult, empresasConvenioResult, operationalContext] = await Promise.all([
-      fetchAll<SaleProduct>((from, to) => supabase.from("productos_catalogo").select("id,empresa_id,nombre,categoria,precio_venta,precio_venta_2,precio_venta_3,controla_inventario,codigo,codigo_barra,marca,modelo,color").eq("activo", true).order("nombre").order("id").range(from, to)),
+      Promise.resolve({ data: [] as SaleProduct[], error: null }), // el catálogo se carga al abrir una venta (app/ventas/catalogo-actions.ts)
       supabase.from("ventas").select("id,empresa_id,sucursal_id,paciente_id,cliente_nombre,estado,subtotal,descuento,total,pagado,saldo,motivo_anulacion,recibo_token,fecha_entrega_estimada,creado_en,folio,apartado,apartado_hasta,venta_items(id,producto_id,descripcion,cantidad,precio_unitario,descuento,total_linea),pagos_venta(id,metodo,monto,referencia,banco,creado_en)").order("creado_en", { ascending: false }).limit(30),
       supabase.from("empresas").select("id,nombre,direccion,telefono,email,logo_url").eq("activo", true).order("nombre"),
       loadBranchIdentities(supabase),

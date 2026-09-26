@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/supabase/current-user";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 
 export type InformeSucursal = { sucursal_id: string; sucursal_nombre: string; empresa_id: string; empresa_nombre: string; ventas_total: number; ingresos_total: number; ventas_count: number; cobrado_total: number; meta: number };
@@ -21,7 +22,7 @@ export async function getInformesData(): Promise<InformesData> {
   if (!hasSupabaseConfiguration()) return { status: "needs_configuration", message: "Falta configurar la conexión segura de esta copia local.", companies: [] };
   try {
     const supabase = await createSupabaseServerClient();
-    const { data: auth } = await supabase.auth.getUser();
+    const auth = { user: await getCurrentUser() };
     if (!auth.user) return { status: "needs_login", message: "Inicia sesión para ver informes.", companies: [] };
     const { data: rawProfile, error: profileError } = await supabase.from("usuarios").select("id,empresa_id,activo,roles(nombre)").eq("auth_user_id", auth.user.id).maybeSingle();
     const profile = rawProfile as unknown as { id: string; empresa_id: string; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null } | null;

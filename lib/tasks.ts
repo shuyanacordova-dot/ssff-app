@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/supabase/current-user";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 import { getOperationalContext } from "@/lib/operational-context";
 
@@ -14,7 +15,7 @@ export async function getTaskData(): Promise<TaskData> {
   if (!hasSupabaseConfiguration()) return { status: "error", message: "Falta configurar esta copia local.", ...empty };
   try {
     const supabase = await createSupabaseServerClient();
-    const { data: auth } = await supabase.auth.getUser();
+    const auth = { user: await getCurrentUser() };
     if (!auth.user) return { status: "needs_login", message: "Inicia sesión para ver tus tareas.", ...empty };
     const { data: raw, error: profileError } = await supabase.from("usuarios").select("id,nombre,activo,empresa_id,sucursal_id,roles(nombre)").eq("auth_user_id", auth.user.id).maybeSingle();
     const profile = raw as unknown as RawProfile | null;

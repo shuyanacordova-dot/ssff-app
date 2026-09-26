@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/supabase/current-user";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 
 export type VentaResumen = { id: string; creado_en: string; subtotal: number; descuento: number; total: number; paciente_nombre: string | null; cliente_nombre: string | null; autor_nombre: string | null };
@@ -22,7 +23,7 @@ export async function getResumenDiaData(fecha: string, empresaIdParam?: string):
   if (!hasSupabaseConfiguration()) return { status: "needs_configuration", message: "Falta configurar esta copia local.", ...empty };
   try {
     const supabase = await createSupabaseServerClient();
-    const { data: auth } = await supabase.auth.getUser();
+    const auth = { user: await getCurrentUser() };
     if (!auth.user) return { status: "needs_login", message: "Inicia sesión para ver el resumen del día.", ...empty };
     const { data: rawProfile, error: profileError } = await supabase.from("usuarios").select("id,empresa_id,activo,roles(nombre)").eq("auth_user_id", auth.user.id).maybeSingle();
     const profile = rawProfile as unknown as { id: string; empresa_id: string; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null } | null;

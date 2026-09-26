@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/supabase/current-user";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 import { getOperationalContext } from "@/lib/operational-context";
 import { branchLetterhead, type BranchIdentity, type CompanyIdentity } from "@/lib/sucursales";
@@ -50,7 +51,7 @@ export async function getLabMonitorData(): Promise<LabMonitorData> {
     const context = await getOperationalContext();
     if (!context) {
       const supabase = await createSupabaseServerClient();
-      const { data } = await supabase.auth.getUser();
+      const data = { user: await getCurrentUser() };
       return { status: data.user ? "forbidden" : "needs_login", message: data.user ? "Tu perfil no tiene acceso al laboratorio." : "Inicia sesión para abrir el laboratorio.", ...empty };
     }
     if (!allowedRoles.has(context.profile.rol)) return { status: "forbidden", message: "Tu rol no tiene acceso al laboratorio.", ...empty };

@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/supabase/current-user";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 import { getOperationalContext } from "@/lib/operational-context";
 import type { BranchIdentity, CompanyIdentity } from "@/lib/sucursales";
@@ -18,7 +19,7 @@ export async function getSucursalesConfigData(): Promise<SucursalesConfigData> {
     const context = await getOperationalContext();
     if (!context) {
       const supabase = await createSupabaseServerClient();
-      const { data } = await supabase.auth.getUser();
+      const data = { user: await getCurrentUser() };
       return empty(data.user ? "forbidden" : "needs_login", data.user ? "No tienes permiso para configurar sucursales." : "Inicia sesión para continuar.");
     }
     if (context.profile.rol !== "superadmin") return empty("forbidden", "Solo la administración general puede configurar la identidad de las sucursales.");
