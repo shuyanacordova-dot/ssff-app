@@ -117,7 +117,9 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
   const photos = usingExtraHistorial ? (historial[selected.id]?.photos ?? []) : props.photos.filter((photo) => photo.paciente_id === selected?.id);
   const sales = usingExtraHistorial ? (historial[selected.id]?.sales ?? []) : props.sales.filter((sale) => sale.paciente_id === selected?.id);
   const visibleConsultations = consultations.filter((consultation) => historyBranchId === "all" || consultation.sucursal_atencion_id === historyBranchId);
-  const visibleSales = sales.filter((sale) => historyBranchId === "all" || sale.sucursal_id === historyBranchId);
+  // Las ventas se ven solo en la sucursal donde se hicieron (la Superadministradora ve todas); las revisiones clínicas son compartidas.
+  const ventasPermitidas = props.profile?.rol === "superadmin" || !props.profile?.sucursal_id ? sales : sales.filter((sale) => sale.sucursal_id === props.profile?.sucursal_id);
+  const visibleSales = ventasPermitidas.filter((sale) => historyBranchId === "all" || sale.sucursal_id === historyBranchId);
   const patientBranchIds = useMemo(() => new Set([
     ...(selected?.sucursal_ids ?? []),
     ...consultations.map((consultation) => consultation.sucursal_atencion_id).filter((id): id is string => Boolean(id)),

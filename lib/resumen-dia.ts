@@ -1,11 +1,12 @@
 import { getCurrentUser } from "@/lib/supabase/current-user";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
+import { getOperationalContext } from "@/lib/operational-context";
 
-export type VentaResumen = { id: string; creado_en: string; subtotal: number; descuento: number; total: number; paciente_nombre: string | null; cliente_nombre: string | null; autor_nombre: string | null };
-export type AbonoResumen = { id: string; monto: number; metodo: string; creado_en: string; venta_id: string; venta_saldo: number; venta_fecha?: string; paciente_nombre: string | null; cliente_nombre: string | null; autor_nombre: string | null };
-export type SalidaResumen = { id: string; clasificacion: string; concepto: string; monto: number; observaciones: string | null; autor_nombre: string | null };
+export type VentaResumen = { id: string; sucursal_id: string | null; creado_en: string; subtotal: number; descuento: number; total: number; paciente_nombre: string | null; cliente_nombre: string | null; autor_nombre: string | null };
+export type AbonoResumen = { id: string; sucursal_id: string | null; monto: number; metodo: string; creado_en: string; venta_id: string; venta_saldo: number; venta_fecha?: string; paciente_nombre: string | null; cliente_nombre: string | null; autor_nombre: string | null };
+export type SalidaResumen = { id: string; sucursal_id: string | null; clasificacion: string; concepto: string; monto: number; observaciones: string | null; autor_nombre: string | null };
 export type ResumenCompany = { id: string; nombre: string };
-export type ResumenDiaData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: { id: string; empresa_id: string; rol: string }; companies: ResumenCompany[]; ventas: VentaResumen[]; abonos: AbonoResumen[]; salidas: SalidaResumen[] };
+export type ResumenDiaData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: { id: string; empresa_id: string; rol: string }; companies: ResumenCompany[]; sucursalActivaId?: string; sucursalActivaNombre?: string; multiSucursal?: boolean; ventas: VentaResumen[]; abonos: AbonoResumen[]; salidas: SalidaResumen[] };
 
 const roles = new Set(["superadmin", "admin_sucursal", "vendedor", "caja"]);
 const roleName = (profile: { roles: { nombre: string } | { nombre: string }[] | null } | null) => Array.isArray(profile?.roles) ? profile.roles[0]?.nombre : profile?.roles?.nombre;
@@ -36,16 +37,21 @@ export async function getResumenDiaData(fecha: string, empresaIdParam?: string):
     if (!empresa) return { status: "ready", profile: { id: profile.id, empresa_id: profile.empresa_id, rol: role }, ...empty, companies: companies ?? [] };
 
     const { inicio, fin } = rangoGuayaquil(fecha);
+    // Cada persona recibe solo las sucursales a las que tiene acceso (Superadministradora: todas las de la empresa).
+    const context = await getOperationalContext();
+    const sucursalIds = (context?.accessibleBranches ?? []).filter((b) => b.empresa_id === empresa).map((b) => b.id);
+    const esSuperadmin = role === "superadmin";
+    if (!sucursalIds.length) return { status: "ready", profile: { id: profile.id, empresa_id: profile.empresa_id, rol: role }, ...empty, companies: companies ?? [] };
 
     const [ventasResult, gastosResult] = await Promise.all([
-      supabase.from("ventas").select("id,creado_en,subtotal,descuento,total,saldo,cliente_nombre,paciente_id,created_by,estado").eq("empresa_id", empresa).gte("creado_en", inicio).lt("creado_en", fin).order("creado_en", { ascending: true }),
-      supabase.from("gastos").select("id,clasificacion,concepto,monto,observaciones,created_by").eq("empresa_id", empresa).eq("fecha", fecha).eq("origen", "caja").order("clasificacion"),
+      supabase.from("ventas").select("id,sucursal_id,creado_en,subtotal,descuento,total,saldo,cliente_nombre,paciente_id,created_by,estado").eq("empresa_id", empresa).in("sucursal_id", sucursalIds).gte("creado_en", inicio).lt("creado_en", fin).order("creado_en", { ascending: true }),
+      (esSuperadmin ? supabase.from("gastos").select("id,sucursal_id,clasificacion,concepto,monto,observaciones,created_by").eq("empresa_id", empresa) : supabase.from("gastos").select("id,sucursal_id,clasificacion,concepto,monto,observaciones,created_by").eq("empresa_id", empresa).in("sucursal_id", sucursalIds)).eq("fecha", fecha).eq("origen", "caja").order("clasificacion"),
     ]);
     if (ventasResult.error || gastosResult.error) return { status: "error", message: "No se pudo cargar el resumen del día.", ...empty };
 
     const pagosResult = await supabase.from("pagos_venta")
-      .select("id,venta_id,metodo,monto,creado_en,recibido_por,ventas!inner(id,creado_en,saldo,cliente_nombre,paciente_id,estado,anulacion_modo)")
-      .eq("ventas.empresa_id", empresa).neq("metodo", "saldo_favor")
+      .select("id,venta_id,metodo,monto,creado_en,recibido_por,ventas!inner(id,sucursal_id,creado_en,saldo,cliente_nombre,paciente_id,estado,anulacion_modo)")
+      .eq("ventas.empresa_id", empresa).in("ventas.sucursal_id", sucursalIds).neq("metodo", "saldo_favor")
       .gte("creado_en", inicio).lt("creado_en", fin).order("creado_en", { ascending: true });
     if (pagosResult.error) return { status: "error", message: "No se pudieron cargar los abonos del día.", ...empty };
     // El dinero de una venta anulada con devolución o saldo a favor sí entró ese día; las anulaciones antiguas
@@ -70,7 +76,7 @@ export async function getResumenDiaData(fecha: string, empresaIdParam?: string):
     const ventaById = new Map(ventasPagadas.map((v) => [v.id, v]));
 
     const ventas: VentaResumen[] = (ventasResult.data ?? []).filter((v) => v.estado !== "anulada").map((v) => ({
-      id: v.id, creado_en: v.creado_en, subtotal: Number(v.subtotal), descuento: Number(v.descuento), total: Number(v.total),
+      id: v.id, sucursal_id: (v.sucursal_id as string | null) ?? null, creado_en: v.creado_en, subtotal: Number(v.subtotal), descuento: Number(v.descuento), total: Number(v.total),
       paciente_nombre: v.paciente_id ? pacienteNombre.get(v.paciente_id) ?? null : null, cliente_nombre: v.cliente_nombre,
       autor_nombre: v.created_by ? usuarioNombre.get(v.created_by) ?? null : null,
     }));
@@ -78,7 +84,7 @@ export async function getResumenDiaData(fecha: string, empresaIdParam?: string):
     const abonos: AbonoResumen[] = (pagosResult.data ?? []).map((p) => {
       const venta = ventaById.get(p.venta_id);
       return {
-        id: p.id, monto: Number(p.monto), metodo: p.metodo, creado_en: p.creado_en, venta_id: p.venta_id,
+        id: p.id, sucursal_id: (venta as { sucursal_id?: string | null } | undefined)?.sucursal_id ?? null, monto: Number(p.monto), metodo: p.metodo, creado_en: p.creado_en, venta_id: p.venta_id,
         venta_saldo: venta ? Number(venta.saldo) : 0,
         venta_fecha: venta?.creado_en,
         paciente_nombre: venta?.paciente_id ? pacienteNombre.get(venta.paciente_id) ?? null : null,
@@ -88,10 +94,11 @@ export async function getResumenDiaData(fecha: string, empresaIdParam?: string):
     });
 
     const salidas: SalidaResumen[] = (gastosResult.data ?? []).map((g) => ({
-      id: g.id, clasificacion: g.clasificacion, concepto: g.concepto, monto: Number(g.monto), observaciones: g.observaciones,
+      id: g.id, sucursal_id: (g.sucursal_id as string | null) ?? null, clasificacion: g.clasificacion, concepto: g.concepto, monto: Number(g.monto), observaciones: g.observaciones,
       autor_nombre: g.created_by ? usuarioNombre.get(g.created_by) ?? null : null,
     }));
 
-    return { status: "ready", profile: { id: profile.id, empresa_id: profile.empresa_id, rol: role }, companies: companies ?? [], ventas, abonos, salidas };
+    const activa = context?.activeBranch && sucursalIds.includes(context.activeBranch.id) ? context.activeBranch : null;
+    return { status: "ready", profile: { id: profile.id, empresa_id: profile.empresa_id, rol: role }, companies: companies ?? [], sucursalActivaId: activa?.id, sucursalActivaNombre: activa?.nombre, multiSucursal: sucursalIds.length > 1, ventas, abonos, salidas };
   } catch { return { status: "error", message: "El resumen del día no está disponible.", ...empty }; }
 }
