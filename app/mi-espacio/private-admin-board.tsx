@@ -81,14 +81,14 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
         <button type="button" className={filtro === "todas" ? "active" : ""} onClick={() => setFiltro("todas")}>Todas ({activas.length})</button>
         {(Object.keys(tipos) as TipoDeuda[]).map((t) => <button key={t} type="button" className={filtro === t ? "active" : ""} onClick={() => setFiltro(t)}>{tipos[t].plural} ({activas.filter((d) => d.tipo === t).length})</button>)}
       </div>
-      {listaTipo.length ? <div className={s.grid}>{listaTipo.map((d) => <TarjetaDeuda key={d.id} deuda={d} empresa={d.ambito === "personal" ? "Personal Shu" : props.companies.find((c) => c.id === d.empresa_id)?.nombre} pending={pending} onEditar={() => setEditando(d)} onPagar={() => { const p = proximoPago(d, hoy); setPagando({ deuda: d, monto: p?.monto ?? Number(d.saldo), periodo: p ? mesDe(p.fecha) : mesDe(hoy) }); }} onHistorial={() => setHistorial(d)} onArchivar={() => archivar(d)} />)}</div>
+      {listaTipo.length ? <div className={s.grid}>{listaTipo.map((d) => <TarjetaDeuda key={d.id} deuda={d} empresa={d.ambito === "personal" ? "Personal Shu" : d.sucursal_id ? props.branches.find((b) => b.id === d.sucursal_id)?.nombre : props.companies.find((c) => c.id === d.empresa_id)?.nombre} pending={pending} onEditar={() => setEditando(d)} onPagar={() => { const p = proximoPago(d, hoy); setPagando({ deuda: d, monto: p?.monto ?? Number(d.saldo), periodo: p ? mesDe(p.fecha) : mesDe(hoy) }); }} onHistorial={() => setHistorial(d)} onArchivar={() => archivar(d)} />)}</div>
         : <p className={s.empty}>No hay deudas activas en esta categoría.</p>}
     </section>
 
-    {nueva && <NuevaDeuda companies={props.companies} onClose={() => setNueva(false)} onSaved={(m) => { setNotice(m); setNueva(false); router.refresh(); }} />}
+    {nueva && <NuevaDeuda companies={props.companies} branches={props.branches} onClose={() => setNueva(false)} onSaved={(m) => { setNotice(m); setNueva(false); router.refresh(); }} />}
     {pagando && <PagarDeuda pago={pagando} branches={props.branches} onClose={() => setPagando(null)} onSaved={(m) => { setNotice(m); setPagando(null); router.refresh(); }} />}
     {historial && <Historial deuda={historial} onClose={() => setHistorial(null)} />}
-    {editando && <EditarDeuda deuda={editando} companies={props.companies} onClose={() => setEditando(null)} onSaved={(m) => { setNotice(m); setEditando(null); router.refresh(); }} />}
+    {editando && <EditarDeuda deuda={editando} companies={props.companies} branches={props.branches} onClose={() => setEditando(null)} onSaved={(m) => { setNotice(m); setEditando(null); router.refresh(); }} />}
   </div></main>;
 }
 
@@ -104,7 +104,7 @@ function FilaPago({ item, onPagar }: { item: ItemMes; onPagar: () => void }) {
     <div className={s.day}><strong>{dd}</strong><small>{mesCorto || mm}</small></div>
     <div className={s.bar} style={{ background: t.color }} />
     <div className={s.info}><h3>{item.deuda.proveedor}</h3><p><TipoTag tipo={item.deuda.tipo} />{item.deuda.ambito === "personal" && <span className={s.tipoTag} style={{ color: "#5a4a8a", background: "#efeafb", marginLeft: 4 }}>Personal</span>} {item.etiqueta}{!item.deuda.dia_pago && item.deuda.modalidad !== "libre" ? " · día por confirmar" : ""}{item.deuda.concepto && item.deuda.concepto !== item.deuda.proveedor ? ` · ${item.deuda.concepto}` : ""}</p></div>
-    <div className={s.right}><span className={s.amount}>{money(item.monto)}</span><span className={`${s.pill} ${estadoClase[item.estado]}`}>{estadoTexto[item.estado]}</span>{item.estado !== "pagado" && <button className="new-consultation" type="button" onClick={onPagar}>Pagar</button>}</div>
+    <div className={s.right}><span className={s.amount}>{money(item.monto)}</span><span className={`${s.pill} ${estadoClase[item.estado]}`}>{estadoTexto[item.estado]}</span>{item.estado !== "pagado" && <button className="new-consultation" type="button" onClick={onPagar}>{item.deuda.tipo === "gasto_fijo" ? "Marcar pagado" : "Pagar"}</button>}</div>
   </article>;
 }
 
@@ -131,7 +131,7 @@ function TarjetaDeuda({ deuda, empresa, pending, onPagar, onHistorial, onArchiva
   </article>;
 }
 
-function NuevaDeuda({ companies, onClose, onSaved }: { companies: PrivateAdminData["companies"]; onClose: () => void; onSaved: (m: string) => void }) {
+function NuevaDeuda({ companies, branches, onClose, onSaved }: { companies: PrivateAdminData["companies"]; branches: PrivateAdminData["branches"]; onClose: () => void; onSaved: (m: string) => void }) {
   const [tipo, setTipo] = useState<TipoDeuda | null>(null);
   const [modalidad, setModalidad] = useState<ModalidadDeuda>("libre");
   const [cuota, setCuota] = useState(""); const [nCuotas, setNCuotas] = useState(""); const [previas, setPrevias] = useState("0");
@@ -175,6 +175,7 @@ function NuevaDeuda({ companies, onClose, onSaved }: { companies: PrivateAdminDa
         <label>Monto mensual $<input name="monto_cuota" inputMode="decimal" required value={cuota} onChange={(e) => setCuota(limpiarMonto(e.target.value))} /></label>
         <label>Día de pago (1–31)<input name="dia_pago" inputMode="numeric" required placeholder="Ej.: 1" /></label>
         <label>Desde el mes<input name="desde" type="month" defaultValue={mesDe(hoyEcuador())} /></label>
+        {tipo === "gasto_fijo" && <label>Sucursal (se registra el egreso en su caja)<select name="sucursal_id" defaultValue=""><option value="">Ninguna / pago general</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label>}
       </div>}
       <div className="new-patient-form" style={{ marginTop: 12 }}><label className="task-description" style={{ gridColumn: "1 / -1" }}>Notas (opcional)<textarea name="notas" /></label></div>
       {error && <p className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 700 }}>{error}</p>}
@@ -186,8 +187,8 @@ function NuevaDeuda({ companies, onClose, onSaved }: { companies: PrivateAdminDa
 function PagarDeuda({ pago, branches, onClose, onSaved }: { pago: Pago; branches: PrivateAdminData["branches"]; onClose: () => void; onSaved: (m: string) => void }) {
   const d = pago.deuda;
   const [monto, setMonto] = useState(pago.monto.toFixed(2));
-  const [metodo, setMetodo] = useState("transferencia");
-  const [egreso, setEgreso] = useState(false);
+  const [metodo, setMetodo] = useState(d.sucursal_id ? "efectivo" : "transferencia");
+  const [egreso, setEgreso] = useState(!!d.sucursal_id);
   const [error, setError] = useState(""); const [pending, start] = useTransition();
   const submit = (form: HTMLFormElement) => start(async () => {
     setError("");
@@ -210,7 +211,7 @@ function PagarDeuda({ pago, branches, onClose, onSaved }: { pago: Pago; branches
         <label>Nota (opcional)<input name="notas" /></label>
       </div>
       <label className="radio-row" style={{ marginTop: 12, fontWeight: 700, fontSize: 13 }}><input type="checkbox" checked={egreso} onChange={(e) => setEgreso(e.target.checked)} /> El dinero salió de la caja de una sucursal (registrar también como egreso de caja)</label>
-      {egreso && <div className="new-patient-form" style={{ marginTop: 8 }}><label>Sucursal<select name="egreso_sucursal" required defaultValue=""><option value="" disabled>Selecciona</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label></div>}
+      {egreso && <div className="new-patient-form" style={{ marginTop: 8 }}><label>Sucursal<select name="egreso_sucursal" required defaultValue={d.sucursal_id ?? ""}><option value="" disabled>Selecciona</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label></div>}
       {error && <p className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 700 }}>{error}</p>}
       <div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" type="submit" disabled={pending || !(Number(monto) > 0)}>{pending ? "Guardando…" : "Registrar pago"}</button></div>
     </form>
@@ -227,7 +228,7 @@ function Historial({ deuda, onClose }: { deuda: BusinessDebt; onClose: () => voi
   </section></div>;
 }
 
-function EditarDeuda({ deuda, companies, onClose, onSaved }: { deuda: BusinessDebt; companies: PrivateAdminData["companies"]; onClose: () => void; onSaved: (m: string) => void }) {
+function EditarDeuda({ deuda, companies, branches, onClose, onSaved }: { deuda: BusinessDebt; companies: PrivateAdminData["companies"]; branches: PrivateAdminData["branches"]; onClose: () => void; onSaved: (m: string) => void }) {
   const [error, setError] = useState(""); const [pending, start] = useTransition();
   const destino = deuda.ambito === "personal" ? "personal" : deuda.empresa_id ?? "";
   const submit = (form: HTMLFormElement) => start(async () => {
@@ -247,6 +248,7 @@ function EditarDeuda({ deuda, companies, onClose, onSaved }: { deuda: BusinessDe
         <label>¿De quién es la deuda?<select name="empresa_id" defaultValue={destino}><option value="">General (las 3 sucursales)</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}<option value="personal">Personal (Shu)</option></select></label>
         {deuda.modalidad !== "libre" && <label>{deuda.modalidad === "mensual" ? "Monto mensual $" : "Valor de cada cuota $"}<input name="monto_cuota" inputMode="decimal" required defaultValue={deuda.monto_cuota ?? ""} /></label>}
         {deuda.modalidad !== "libre" && <label>Día de pago (1–31)<input name="dia_pago" inputMode="numeric" defaultValue={deuda.dia_pago ?? ""} placeholder="Vacío = por confirmar" /></label>}
+        {deuda.tipo === "gasto_fijo" ? <label>Sucursal (egreso en su caja)<select name="sucursal_id" defaultValue={deuda.sucursal_id ?? ""}><option value="">Ninguna / pago general</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label> : <input type="hidden" name="sucursal_id" value={deuda.sucursal_id ?? ""} />}
         {deuda.modalidad === "cuotas" && <label>Número total de cuotas<input name="cuotas_total" inputMode="numeric" required defaultValue={deuda.cuotas_total ?? ""} /></label>}
         {deuda.modalidad === "cuotas" && <label>Cuotas pagadas antes de LumOS<input name="cuotas_previas" inputMode="numeric" defaultValue={deuda.cuotas_previas} /></label>}
         {deuda.modalidad === "libre" && <label>Monto total $<input name="monto_original" inputMode="decimal" required defaultValue={deuda.monto_original} /></label>}

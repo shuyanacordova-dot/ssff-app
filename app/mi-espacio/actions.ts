@@ -32,7 +32,15 @@ export async function crearDeuda(form: FormData): Promise<Resultado> {
     if (!["proveedor", "prestamo_banco", "tarjeta", "prestamo_personal", "gasto_fijo"].includes(tipo)) return { ok: false, error: "Elige el tipo de deuda." };
     if (!["cuotas", "libre", "mensual"].includes(modalidad)) return { ok: false, error: "Elige cómo se paga." };
     if (!proveedor) return { ok: false, error: "Escribe a quién le debes (acreedor)." };
-    const base = { tipo, modalidad, proveedor, concepto, notas: notas || null, empresa_id: empresaId, ambito, sucursal_id: null, created_by: profile.id };
+    // Gastos fijos por sucursal (luz, internet, arriendo): el pago genera el egreso en la caja de esa sucursal.
+    const sucursalId = value(form, "sucursal_id") || null;
+    let empresaFinal = empresaId;
+    if (sucursalId) {
+      const { data: suc } = await supabase.from("sucursales").select("empresa_id").eq("id", sucursalId).maybeSingle();
+      if (!suc) return { ok: false, error: "La sucursal elegida no existe." };
+      empresaFinal = suc.empresa_id as string;
+    }
+    const base = { tipo, modalidad, proveedor, concepto, notas: notas || null, empresa_id: empresaFinal, ambito: sucursalId ? "general" : ambito, sucursal_id: sucursalId, created_by: profile.id };
     let fila: Record<string, unknown>;
     if (modalidad === "cuotas") {
       const cuota = numero(form, "monto_cuota"); const total = Math.round(numero(form, "cuotas_total")); const previas = Math.max(0, Math.round(numero(form, "cuotas_previas") || 0));
@@ -94,8 +102,14 @@ export async function actualizarDeuda(form: FormData): Promise<Resultado> {
     const cambios: Record<string, unknown> = {
       proveedor, concepto, notas: value(form, "notas") || null,
       empresa_id: destino && destino !== "personal" ? destino : null, ambito: destino === "personal" ? "personal" : "general",
+      sucursal_id: value(form, "sucursal_id") || null,
       actualizado_en: new Date().toISOString(),
     };
+    if (cambios.sucursal_id) {
+      const { data: suc } = await supabase.from("sucursales").select("empresa_id").eq("id", String(cambios.sucursal_id)).maybeSingle();
+      if (!suc) return { ok: false, error: "La sucursal elegida no existe." };
+      cambios.empresa_id = suc.empresa_id; cambios.ambito = "general";
+    }
     const diaTexto = value(form, "dia_pago");
     if (modalidad !== "libre") {
       const dia = diaTexto ? Math.round(numero(form, "dia_pago")) : null;
