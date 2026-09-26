@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowLeftRight, Calculator, Glasses, Package, Plus, ShoppingBag, Upload, X } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, Calculator, ClipboardList, Glasses, Package, Plus, ShoppingBag, Upload, X } from "lucide-react";
 import { useState, useTransition } from "react";
 import type { InventarioData, MovimientoInventario, Producto } from "@/lib/inventario";
 import { actualizarProductoInventario, actualizarStockMinimo, crearArmazonesMasivo, crearMovimientoInventario, crearProductoInventario, transferirInventario, type ArmazonMasivo } from "./actions";
@@ -81,7 +81,7 @@ export default function InventarioBoard(props: InventarioData & { grupoInicial?:
   const subtitulo = grupo === "lunas" ? "Existencias de lunas por sucursal." : "Monturas, gafas de sol y accesorios, separados por espacio.";
 
   return <main className="page agenda-page"><div className="container agenda-shell">
-    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN</p><h1>{titulo}</h1><p className="subtitle">{subtitulo}</p><Link className="outline-action" href="/inventario/lunas" style={{ marginTop: 8, display: "inline-flex" }}>Banco de lunas (bodega y garantías)</Link></div><div className="tabs">{props.companies.map((c) => <button key={c.id} className={c.id === empresaId ? "active" : ""} onClick={() => { setEmpresaId(c.id); setMarcaActiva(""); }}>{c.nombre}</button>)}</div></header>
+    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN</p><h1>{titulo}</h1><p className="subtitle">{subtitulo}</p><div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}><Link className="new-task" href="/inventario/conteo" style={{ display: "inline-flex" }}><ClipboardList size={16} /> Hacer inventario</Link><Link className="outline-action" href="/inventario/lunas" style={{ display: "inline-flex" }}>Banco de lunas (bodega y garantías)</Link></div></div><div className="tabs">{props.companies.map((c) => <button key={c.id} className={c.id === empresaId ? "active" : ""} onClick={() => { setEmpresaId(c.id); setMarcaActiva(""); }}>{c.nombre}</button>)}</div></header>
     <div className="notice"><AlertTriangle size={18} /><span>{notice || "El stock se descuenta solo al cerrar una venta con sucursal asignada."}</span></div>
 
     {grupo === "monturas" && !subgrupo ? <section className="glass agenda-board">
