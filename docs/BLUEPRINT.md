@@ -241,6 +241,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | 2026-09-25 | Caja y Cuentas por cobrar muestran solo la sucursal donde se trabaja (la elegida en el menú); casilla **"Todas las sucursales"** arriba para ver todas (se recuerda por navegador, `app/todas-sucursales-toggle.tsx`). En cuentas por cobrar la Superadministradora ve también las otras empresas al marcarla. | (este commit) |
 | 2026-09-25 | Menú: "Caja" renombrado a **"Cuadre de caja"** y agregado a la barra de arriba (Shuyana no lo encontraba). | (este commit) |
 | 2026-09-25 | Inicio: tarjeta **Resumen del día** de la sucursal activa (ventas, cobrado por método, egresos, caja de partida, efectivo esperado; usa `previsualizar_cierre_caja`) con botones Registrar egreso / Ver resumen completo / Cuadre de caja; acceso rápido "Registrar egreso". Cuadre de caja: la sección de cierre diario va antes de Gastos recientes. | (este commit) |
+| 2026-09-25 | Rendimiento: funciones de Vercel en **pdx1** (Oregón), junto a la base de datos Supabase (us-west-2); antes corrían en iad1 (Washington) y cada consulta cruzaba EE. UU. (`vercel.json`). Menú: **Mis deudas** (`/mi-espacio`) visible solo para la Superadministradora (`esSuperadminActual`). | (este commit) |
 
 ---
 
