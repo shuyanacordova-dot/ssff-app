@@ -14,9 +14,13 @@ import { printDocumentById } from "@/lib/print-document";
 
 const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
 const estadoOrder = Object.keys(estadoOrdenLabels) as EstadoOrdenLaboratorio[];
-type UsoLente = UsoCalculado | "intermedio";
-const distanciaUsoLabel: Record<UsoLente, string> = { lejos: "Lejos", cerca: "Cerca (lectura)", intermedio: "Intermedio/Ocupacional (computadora)", lejos_y_cerca: "Lejos y cerca (bifocal/progresivo)" };
-const usoDb = (uso: UsoLente): UsoCalculado => uso === "intermedio" ? "cerca" : uso;
+// Uso del lente: exactamente las 5 opciones de Optox (pedido de Shuyana 2026-09-28).
+// "Todas" = progresivo (lejos, intermedia y cerca); "Sólo lejos y cerca" = bifocal. Ambas se guardan como lejos_y_cerca.
+type UsoLente = "todas" | "cerca" | "intermedio" | "lejos" | "lejos_y_cerca";
+const distanciaUsoLabel: Record<UsoLente, string> = { todas: "Todas", cerca: "Sólo cerca", intermedio: "Sólo intermedia", lejos: "Sólo lejos", lejos_y_cerca: "Sólo lejos y cerca" };
+const usoDb = (uso: UsoLente): UsoCalculado => uso === "intermedio" ? "cerca" : uso === "todas" ? "lejos_y_cerca" : uso;
+const usoDesdeCalculado = (uso: UsoCalculado): UsoLente => uso === "lejos_y_cerca" ? "todas" : uso;
+const tipoParaUso = (uso: UsoLente): TipoLente => uso === "todas" ? "progresivo" : uso === "lejos_y_cerca" ? "bifocal" : tipoLenteSugerido(usoDb(uso));
 const calcularRx = (rx: OrdenLaboratorioRx, uso: UsoLente) => uso === "cerca" ? rxCerca(rx) : uso === "intermedio" ? rxIntermedia(rx) : { od: { ...rx.od }, oi: { ...rx.oi } };
 
 function RxEyeCard({ eye, value, onChange, disabled, cerca = false }: { eye: "OD" | "OI"; value: RxEye; onChange: (v: RxEye) => void; disabled?: boolean; cerca?: boolean }) {
@@ -76,7 +80,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
       setEstado(orden.estado); setItemId(orden.venta_item_id ?? lensItems[0]?.id ?? ""); setLaboratorio(orden.laboratorio); setOrderCreatedAt(orden.creado_en);
       setAnterior(orden);
       setConsultaId(orden.consulta_id ?? ""); setRx(orden.rx); setMedidas({ ...emptyMedidas(), ...orden.medidas }); setTipoLente(orden.tipo_lente); setNotas((orden.notas ?? "").replace(/^Intermedio\s*[:·—-]?\s*/i, ""));
-      setUso(/^Intermedio\b/i.test(orden.notas ?? "") ? "intermedio" : orden.uso_calculado);
+      setUso(/^Intermedio\b/i.test(orden.notas ?? "") ? "intermedio" : orden.uso_calculado === "lejos_y_cerca" ? (orden.tipo_lente === "bifocal" ? "lejos_y_cerca" : "todas") : orden.uso_calculado);
       setUsoElegido(true);
       if (orden.rx.examen_lejos) { setExamenManual(orden.rx.examen_lejos); setDnpLejos(orden.rx.dnp_lejos ?? ""); }
       else if (!orden.consulta_id && orden.uso_calculado !== "cerca") { setExamenManual(orden.rx); setDnpLejos(orden.medidas.dnp); }
@@ -101,7 +105,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
     return od !== null && oi !== null ? String(od + oi) : fallback;
   };
   const aplicarUso = (next: UsoLente, source: OrdenLaboratorioRx, resetDnp = false) => {
-    setUso(next); setTipoLente((current) => next === "lejos_y_cerca" && current === "bifocal" ? current : tipoLenteSugerido(usoDb(next)));
+    setUso(next); setTipoLente(tipoParaUso(next));
     setRx(calcularRx(source, next));
     const total = dnpExamen(source, resetDnp ? "" : dnpLejos);
     setMedidas((m) => ({ ...m, dnp: next === "cerca" ? dnpCerca(total, true) : total }));
@@ -109,14 +113,14 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
   const updateExamen = (source: OrdenLaboratorioRx) => {
     setExamenManual(source);
     if (!examen) setConsultaId("");
-    aplicarUso(usoElegido ? uso : calcularUso(source), source);
+    aplicarUso(usoElegido ? uso : usoDesdeCalculado(calcularUso(source)), source);
   };
   const selectConsulta = (id: string) => {
     setConsultaId(id);
     const found = refracciones.find((r) => r.id === id);
     const source = found ? rxFromRefraccion(found.refraccion) : emptyRx();
     setExamenManual(source); setDnpLejos("");
-    aplicarUso(usoElegido ? uso : calcularUso(source), source, true);
+    aplicarUso(usoElegido ? uso : usoDesdeCalculado(calcularUso(source)), source, true);
   };
   const notasGuardadas = [uso === "intermedio" ? "Intermedio" : "", notas.trim()].filter(Boolean).join(": ");
 
@@ -194,7 +198,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
 
         <div className="new-patient-form" style={{ marginTop: 10 }}>
           <label>Uso del lente<select value={uso} disabled={!examen} onChange={(event) => { setUsoElegido(true); if (examen) aplicarUso(event.target.value as UsoLente, examen); }}>{Object.entries(distanciaUsoLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label>Tipo de lente<select value={tipoLente} onChange={(event) => setTipoLente(event.target.value as TipoLente)}>{Object.entries(tipoLenteLabels).filter(([value]) => uso === "lejos_y_cerca" ? value === "bifocal" || value === "progresivo" : value === tipoLenteSugerido(usoDb(uso))).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label>Tipo de lente<select value={tipoLente} onChange={(event) => setTipoLente(event.target.value as TipoLente)}>{Object.entries(tipoLenteLabels).filter(([value]) => value === tipoParaUso(uso)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         </div>
         <p className="section-label" style={{ marginTop: 14 }}>Rx de lejos (examen)</p>
         {examen ? <div className="consultation-stats">{(["od", "oi"] as const).map((eye) => <span key={eye}><strong>{eye.toUpperCase()}</strong> Esf {examen[eye].esfera || "—"} · Cil {examen[eye].cilindro || "—"} · Eje {examen[eye].eje || "—"} · Add {examen[eye].add || "—"} · DNP {examen[eye].dnp || "—"}</span>)}</div> : <p className="field-hint">No está disponible la Rx del examen. La Rx guardada del laboratorio se conserva; selecciona una revisión o ingresa el examen para recalcular.</p>}
