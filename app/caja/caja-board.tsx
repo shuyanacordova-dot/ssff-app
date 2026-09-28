@@ -2,11 +2,12 @@
 import { fechaGuayaquil, formatRecordDate } from "@/lib/record-date";
 
 import Link from "next/link";
-import { AlertCircle, Banknote, CheckCircle2, Plus, Receipt, XCircle, X } from "lucide-react";
+import { AlertCircle, Banknote, CheckCircle2, Pencil, Plus, Receipt, Trash2, XCircle, X } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import type { CajaData, CajaBranch, CierreCaja } from "@/lib/caja";
+import type { CajaData, CajaBranch, CierreCaja, Gasto } from "@/lib/caja";
+import { useRouter } from "next/navigation";
 import { SucursalTabs } from "@/app/sucursal-tabs";
-import { crearCierreCaja, crearGasto, registrarAperturaCaja, previsualizarCierre, type ResultadoCierre, type VistaCierre } from "./actions";
+import { crearCierreCaja, crearGasto, editarGasto, eliminarGasto, registrarAperturaCaja, previsualizarCierre, type ResultadoCierre, type VistaCierre } from "./actions";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
 // Acepta coma o punto como decimal (teclados en español) y deja solo números.
@@ -27,6 +28,11 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean }) {
   const [pending, startTransition] = useTransition();
   const role = props.profile?.rol;
   const canSaldos = role === "superadmin" || role === "admin_sucursal" || role === "caja";
+  // Solo la Superadministradora corrige o borra egresos (queda copia en gastos_auditoria).
+  const esSuperadmin = role === "superadmin";
+  const [editandoGasto, setEditandoGasto] = useState<Gasto | null>(null);
+  const [borrandoGasto, setBorrandoGasto] = useState<Gasto | null>(null);
+  const router = useRouter();
 
   if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">FINANZAS</p><h1>Cuadre de caja</h1><p className="subtitle">{props.message ?? "No se pudo abrir caja."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/caja">Iniciar sesión</Link>}</header></div></main>;
 
@@ -54,8 +60,10 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean }) {
 
     <section className="glass agenda-board" style={{ marginBottom: 18 }}><div className="agenda-toolbar"><div><p className="section-label">CIERRE DIARIO</p><h2>Cuadre de caja</h2></div><button className="new-task" type="button" onClick={() => { setCierreSucursalId(""); setShowCierre(true); }}><Plus size={18} /> Nuevo cuadre</button></div>{cierres.length ? <div className="task-list">{cierres.map((cierre) => <CierreCard key={cierre.id} cierre={cierre} sucursalNombre={props.branches.find((b) => b.id === cierre.sucursal_id)?.nombre ?? "Sucursal"} />)}</div> : <section className="empty-state"><Banknote size={27} /><h3>Sin cuadres registrados</h3><p>El primer cierre diario aparecerá aquí.</p></section>}</section>
 
-    <section className="glass agenda-board"><div className="agenda-toolbar"><div><p className="section-label">EGRESOS</p><h2>Gastos recientes</h2></div><button className="new-task" type="button" onClick={() => setShowGasto(true)}><Plus size={18} /> Nuevo gasto</button></div>{gastos.length ? <div className="task-list">{gastos.slice(0, 15).map((gasto) => <article className="task-card" key={gasto.id}><div className="task-status"><span className="status-dot" /></div><div className="task-main"><div className="task-meta"><span>{clasificacionLabel[gasto.clasificacion]}</span><span>{gasto.origen === "banco" ? bancoLabel[cuentaById.get(gasto.cuenta_bancaria_id ?? "")?.banco ?? ""] || "Banco" : "Efectivo"}</span><span>{formatDate(gasto.fecha)}</span></div><h2>{gasto.concepto}</h2>{gasto.observaciones && <p>{gasto.observaciones}</p>}</div><div className="task-actions"><strong>{money(gasto.monto)}</strong></div></article>)}</div> : <section className="empty-state"><Receipt size={27} /><h3>Aún no hay gastos</h3><p>Registra el primer egreso de esta empresa.</p></section>}</section>
+    <section className="glass agenda-board"><div className="agenda-toolbar"><div><p className="section-label">EGRESOS</p><h2>Gastos recientes</h2></div><button className="new-task" type="button" onClick={() => setShowGasto(true)}><Plus size={18} /> Nuevo gasto</button></div>{gastos.length ? <div className="task-list">{gastos.slice(0, 15).map((gasto) => <article className="task-card" key={gasto.id}><div className="task-status"><span className="status-dot" /></div><div className="task-main"><div className="task-meta"><span>{clasificacionLabel[gasto.clasificacion]}</span><span>{gasto.origen === "banco" ? bancoLabel[cuentaById.get(gasto.cuenta_bancaria_id ?? "")?.banco ?? ""] || "Banco" : "Efectivo"}</span><span>{formatDate(gasto.fecha)}</span></div><h2>{gasto.concepto}</h2>{gasto.observaciones && <p>{gasto.observaciones}</p>}</div><div className="task-actions"><strong>{money(gasto.monto)}</strong>{esSuperadmin && <><button type="button" className="icon-button" title="Editar egreso" aria-label="Editar egreso" onClick={() => setEditandoGasto(gasto)}><Pencil size={15} /></button><button type="button" className="icon-button" title="Borrar egreso" aria-label="Borrar egreso" style={{ color: "#a24150" }} onClick={() => setBorrandoGasto(gasto)}><Trash2 size={15} /></button></>}</div></article>)}</div> : <section className="empty-state"><Receipt size={27} /><h3>Aún no hay gastos</h3><p>Registra el primer egreso de esta empresa.</p></section>}</section>
 
+    {editandoGasto && <EditarGastoModal gasto={editandoGasto} cuentas={props.cuentas.filter((c) => c.sucursal_id === editandoGasto.sucursal_id || (!editandoGasto.sucursal_id && c.empresa_id === editandoGasto.empresa_id))} cuadreGuardado={props.cierres.some((c) => c.sucursal_id === editandoGasto.sucursal_id && c.fecha === editandoGasto.fecha)} onClose={() => setEditandoGasto(null)} onSaved={(m) => { setEditandoGasto(null); setNotice(m); router.refresh(); }} />}
+    {borrandoGasto && <BorrarGastoModal gasto={borrandoGasto} cuadreGuardado={props.cierres.some((c) => c.sucursal_id === borrandoGasto.sucursal_id && c.fecha === borrandoGasto.fecha)} onClose={() => setBorrandoGasto(null)} onSaved={(m) => { setBorrandoGasto(null); setNotice(m); router.refresh(); }} />}
     {showGasto && <GastoModal empresaId={empresaVista} branches={branches} cuentas={cuentas} canSaldos={canSaldos} pending={pending} onClose={() => setShowGasto(false)} onSubmit={(form) => runAction(() => crearGasto(form), "Gasto registrado.")} />}
     {showCierre && <CierreModal key={`${empresaVista}:${cierreSucursalId}`} empresaId={empresaVista} branches={branches} initialSucursalId={cierreSucursalId || sucursalVista} onClose={(message) => { setShowCierre(false); if (message) setNotice(message); }} />}
   </div></main>;
@@ -271,4 +279,50 @@ function AperturaCaja({ empresaId, sucursalId, fecha, vista, onSaved }: { empres
       </form>}
     </>}
   </section>;
+}
+
+function EditarGastoModal({ gasto, cuentas, cuadreGuardado, onClose, onSaved }: { gasto: Gasto; cuentas: CajaData["cuentas"]; cuadreGuardado: boolean; onClose: () => void; onSaved: (m: string) => void }) {
+  const [origen, setOrigen] = useState<"caja" | "banco">(gasto.origen);
+  const [montoTexto, setMontoTexto] = useState(String(gasto.monto));
+  const [error, setError] = useState(""); const [pending, start] = useTransition();
+  const submit = (form: HTMLFormElement) => start(async () => {
+    setError("");
+    const data = new FormData(form); data.set("gasto_id", gasto.id);
+    const r = await editarGasto(data);
+    if (!r.ok) { setError(r.error); return; }
+    onSaved(`Egreso "${gasto.concepto}" corregido.`);
+  });
+  return <div className="modal-backdrop"><section className="new-patient-modal" role="dialog" aria-modal="true" aria-labelledby="editar-gasto-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button><p className="section-label">EDITAR EGRESO</p><h2 id="editar-gasto-title">{gasto.concepto}</h2>
+    {cuadreGuardado && <p className="notice"><AlertCircle size={16} /> El cuadre de caja de ese día ya se guardó con el valor anterior; el cambio se verá desde el siguiente cuadre.</p>}
+    <form onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }}><div className="new-patient-form">
+      <label>Fecha<input name="fecha" type="date" defaultValue={gasto.fecha} required /></label>
+      <label>Clasificación<select name="clasificacion" defaultValue={gasto.clasificacion}>{Object.entries(clasificacionLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <label>Concepto<input name="concepto" defaultValue={gasto.concepto} required /></label>
+      <label>Monto<input name="monto" inputMode="decimal" value={montoTexto} onChange={(e) => setMontoTexto(montoInput(e.target.value))} required /></label>
+      <label>Origen<span className="radio-row"><label><input type="radio" name="origen" value="caja" checked={origen === "caja"} onChange={() => setOrigen("caja")} /> Caja (efectivo)</label><label><input type="radio" name="origen" value="banco" checked={origen === "banco"} onChange={() => setOrigen("banco")} /> Banco</label></span></label>
+      {origen === "banco" && <label>Cuenta bancaria<select name="cuenta_bancaria_id" defaultValue={gasto.cuenta_bancaria_id ?? ""} required><option value="" disabled>Selecciona la cuenta</option>{cuentas.map((c) => <option key={c.id} value={c.id}>{bancoLabel[c.banco]}</option>)}</select></label>}
+      <label className="task-description">Observaciones<textarea name="observaciones" defaultValue={gasto.observaciones ?? ""} /></label>
+      <label className="task-description">Motivo de la corrección (opcional)<input name="motivo" placeholder="Ej.: el monto era 90, no 100" /></label>
+    </div>
+    {error && <p className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 700 }}>{error}</p>}
+    <div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" disabled={pending} type="submit">{pending ? "Guardando…" : "Guardar cambios"}</button></div></form>
+  </section></div>;
+}
+
+function BorrarGastoModal({ gasto, cuadreGuardado, onClose, onSaved }: { gasto: Gasto; cuadreGuardado: boolean; onClose: () => void; onSaved: (m: string) => void }) {
+  const [motivo, setMotivo] = useState("");
+  const [error, setError] = useState(""); const [pending, start] = useTransition();
+  const borrar = () => start(async () => {
+    setError("");
+    const r = await eliminarGasto(gasto.id, motivo);
+    if (!r.ok) { setError(r.error); return; }
+    onSaved(`Egreso "${gasto.concepto}" de ${money(gasto.monto)} borrado.`);
+  });
+  return <div className="modal-backdrop"><section className="new-patient-modal" role="dialog" aria-modal="true" aria-labelledby="borrar-gasto-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button><p className="section-label">BORRAR EGRESO</p><h2 id="borrar-gasto-title">{gasto.concepto} · {money(gasto.monto)}</h2>
+    <p>{formatDate(gasto.fecha)} · {clasificacionLabel[gasto.clasificacion]} · {gasto.origen === "banco" ? "Banco (el dinero vuelve al saldo de la cuenta)" : "Caja (efectivo)"}</p>
+    {cuadreGuardado && <p className="notice"><AlertCircle size={16} /> El cuadre de caja de ese día ya se guardó con este egreso; el cambio se verá desde el siguiente cuadre.</p>}
+    <label className="task-description" style={{ display: "grid", gap: 5, fontSize: 12, fontWeight: 800, color: "#5d7086" }}>¿Por qué se borra?<input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej.: registrado dos veces" autoFocus style={{ border: "1px solid #d4e0ea", borderRadius: 9, padding: 10 }} /></label>
+    {error && <p className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 700 }}>{error}</p>}
+    <div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="cancel-appointment" disabled={pending || motivo.trim().length < 3} type="button" onClick={borrar}>{pending ? "Borrando…" : "Borrar egreso"}</button></div>
+  </section></div>;
 }

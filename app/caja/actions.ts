@@ -77,3 +77,27 @@ export async function registrarAperturaCaja(form: FormData) {
   if (error) throw new Error(error.message || "No se pudo registrar la apertura.");
   revalidatePath("/caja");
 }
+
+// Corregir egresos (solo Superadministradora): devuelven { ok, error } para mostrar el mensaje real.
+export async function editarGasto(form: FormData): Promise<{ ok: true } | { ok: false; error: string }> {
+  const valor = monto(form, "monto");
+  if (!Number.isFinite(valor) || valor <= 0) return { ok: false, error: "Indica un monto válido." };
+  const origen = text(form, "origen");
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("editar_gasto", {
+    p_gasto: text(form, "gasto_id"), p_fecha: text(form, "fecha") || null, p_clasificacion: text(form, "clasificacion"), p_concepto: text(form, "concepto"),
+    p_monto: valor, p_origen: origen, p_cuenta: origen === "banco" ? text(form, "cuenta_bancaria_id") || null : null,
+    p_observaciones: text(form, "observaciones") || null, p_motivo: text(form, "motivo") || null,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/caja"); revalidatePath("/resumen-dia"); revalidatePath("/mi-espacio/bancos");
+  return { ok: true };
+}
+
+export async function eliminarGasto(gastoId: string, motivo: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("eliminar_gasto", { p_gasto: gastoId, p_motivo: motivo });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/caja"); revalidatePath("/resumen-dia"); revalidatePath("/mi-espacio/bancos");
+  return { ok: true };
+}
