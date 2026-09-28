@@ -30,3 +30,12 @@ export async function registrarCuadreBanco(cuentaId: string, fecha: string, sald
   revalidatePath("/mi-espacio/bancos"); revalidatePath("/mi-espacio"); revalidatePath("/caja");
   return { ok: true, data: data as ResultadoCuadreBanco };
 }
+
+export async function guardarCuadreGeneral(fecha: string, tarjetas: Record<string, number>, notas: string): Promise<Resultado<{ sucursales: number; diferencia_total: number }>> {
+  if (Object.values(tarjetas).some((v) => !Number.isFinite(v) || v < 0)) return { ok: false, error: "Las tarjetas por acreditar deben ser montos positivos." };
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("guardar_cuadre_general", { p_fecha: fecha, p_tarjetas: tarjetas, p_notas: notas || null });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/mi-espacio/bancos");
+  return { ok: true, data: data as { sucursales: number; diferencia_total: number } };
+}

@@ -7,6 +7,7 @@ import { useEffect, useState, useTransition } from "react";
 import { fechaCorta, hoyEcuador, money } from "@/lib/mis-deudas-calc";
 import { previsualizarCuadreBanco, registrarCuadreBanco, type MovimientoCuadre, type ResultadoCuadreBanco, type VistaCuadreBanco } from "./actions";
 import s from "../mis-deudas.module.css";
+import CuadreGeneral, { type FilaCuadreGeneral } from "./cuadre-general";
 
 export type CuentaCuadre = { id: string; empresa_id: string; empresa_nombre: string; sucursal_nombre: string; banco: string; saldo_actual: number };
 export type CuadreGuardado = { id: string; cuenta_id: string; fecha: string; desde: string | null; saldo_anterior: number | null; transferencias: number; tarjetas: number; depositos_caja: number; otros_ingresos: number; egresos: number; comisiones: number; saldo_esperado: number | null; saldo_real: number; diferencia: number | null; notas: string | null };
@@ -25,9 +26,11 @@ function PillDiferencia({ diferencia }: { diferencia: number | null }) {
   return <span className={`${s.pill} ${s.pillVencido}`}>{diferencia > 0 ? `Sobra ${money(diferencia)}` : `Falta ${money(-diferencia)}`}</span>;
 }
 
-export default function CuadreBancosBoard(props: { status: "ready" | "needs_login" | "forbidden"; cuentas: CuentaCuadre[]; historial: CuadreGuardado[] }) {
+export default function CuadreBancosBoard(props: { status: "ready" | "needs_login" | "forbidden"; fecha: string; cuentas: CuentaCuadre[]; historial: CuadreGuardado[]; general: FilaCuadreGeneral[] }) {
   const router = useRouter();
-  const [fecha, setFecha] = useState(hoyEcuador());
+  // La fecha va en la dirección (?fecha=) para que el cuadre general se calcule en el servidor.
+  const fecha = props.fecha;
+  const setFecha = (f: string) => router.push(`/mi-espacio/bancos?fecha=${f}`);
   const [abierta, setAbierta] = useState<CuentaCuadre | null>(null);
   const [notice, setNotice] = useState("");
 
@@ -42,10 +45,12 @@ export default function CuadreBancosBoard(props: { status: "ready" | "needs_logi
 
   return <main className="page agenda-page"><div className="container agenda-shell">
     <header className="agenda-header">
-      <div><Link className="back-link" href="/mi-espacio">← Mis deudas</Link><p className="eyebrow">ESPACIO PRIVADO · SOLO PARA TI</p><h1>Cuadre de bancos</h1><p className="subtitle">Cada sábado: compara el saldo real de cada cuenta con lo que LumOS esperaba según transferencias, tarjetas, depósitos y pagos de la semana.</p></div>
+      <div><Link className="back-link" href="/mi-espacio">← Mis deudas</Link><p className="eyebrow">ESPACIO PRIVADO · SOLO PARA TI</p><h1>Cuadre de bancos</h1><p className="subtitle">Cada sábado: el saldo real de cada cuenta y el efectivo de cada caja, comparados con lo que LumOS esperaba según ventas, abonos, depósitos y pagos.</p></div>
       <label style={{ display: "grid", gap: 4, fontSize: 12, fontWeight: 800, color: "#5d7086" }}>Fecha del cuadre<input type="date" value={fecha} max={hoyEcuador()} onChange={(e) => setFecha(e.target.value || hoyEcuador())} style={{ border: "1px solid #d4e0ea", borderRadius: 10, padding: "8px 10px" }} /></label>
     </header>
     {notice && <div className="notice"><LockKeyhole size={18} /><span>{notice}</span></div>}
+    {props.general.length > 0 && <CuadreGeneral key={`${fecha}:${props.general.map((g) => g.guardado?.creado_en ?? "").join()}`} fecha={fecha} filas={props.general} />}
+
     {!esSabado && <div className="notice"><Landmark size={18} /><span>El cuadre toca los sábados, pero puedes hacerlo cualquier día: se cuenta desde el último cuadre de cada cuenta hasta la fecha elegida.</span></div>}
 
     <div className={s.cards} style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>

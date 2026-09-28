@@ -1,17 +1,23 @@
 import { getOperationalContext } from "@/lib/operational-context";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { fechaGuayaquil } from "@/lib/record-date";
 import CuadreBancosBoard, { type CuadreGuardado, type CuentaCuadre } from "./cuadre-bancos-board";
+import type { FilaCuadreGeneral } from "./cuadre-general";
 
 export const dynamic = "force-dynamic";
 
-export default async function CuadreBancosPage() {
+export default async function CuadreBancosPage({ searchParams }: { searchParams: Promise<{ fecha?: string }> }) {
+  const hoy = fechaGuayaquil();
+  const pedida = (await searchParams).fecha;
+  const fecha = pedida && /^\d{4}-\d{2}-\d{2}$/.test(pedida) && pedida <= hoy ? pedida : hoy;
   const context = await getOperationalContext();
-  if (!context) return <CuadreBancosBoard status="needs_login" cuentas={[]} historial={[]} />;
-  if (context.profile.rol !== "superadmin") return <CuadreBancosBoard status="forbidden" cuentas={[]} historial={[]} />;
+  if (!context) return <CuadreBancosBoard status="needs_login" fecha={fecha} cuentas={[]} historial={[]} general={[]} />;
+  if (context.profile.rol !== "superadmin") return <CuadreBancosBoard status="forbidden" fecha={fecha} cuentas={[]} historial={[]} general={[]} />;
   const supabase = await createSupabaseServerClient();
-  const [cuentasResult, historialResult] = await Promise.all([
+  const [cuentasResult, historialResult, generalResult] = await Promise.all([
     supabase.from("cuentas_bancarias").select("id,empresa_id,sucursal_id,banco,saldo_actual").eq("activo", true),
     supabase.from("cuadres_banco").select("id,cuenta_id,fecha,desde,saldo_anterior,transferencias,tarjetas,depositos_caja,otros_ingresos,egresos,comisiones,saldo_esperado,saldo_real,diferencia,notas").order("fecha", { ascending: false }).limit(60),
+    supabase.rpc("cuadre_general", { p_fecha: fecha }),
   ]);
   const empresa = new Map(context.companies.map((c) => [c.id, c.nombre]));
   const sucursal = new Map(context.branches.map((b) => [b.id, b.nombre]));
@@ -25,5 +31,5 @@ export default async function CuadreBancosPage() {
     depositos_caja: Number(h.depositos_caja), otros_ingresos: Number(h.otros_ingresos), egresos: Number(h.egresos), comisiones: Number(h.comisiones),
     saldo_esperado: num(h.saldo_esperado), saldo_real: Number(h.saldo_real), diferencia: num(h.diferencia), notas: h.notas,
   }));
-  return <CuadreBancosBoard status="ready" cuentas={cuentas} historial={historial} />;
+  return <CuadreBancosBoard status="ready" fecha={fecha} cuentas={cuentas} historial={historial} general={(generalResult.data ?? []) as FilaCuadreGeneral[]} />;
 }
