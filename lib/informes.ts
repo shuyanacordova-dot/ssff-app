@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/supabase/current-user";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 
-export type InformeSucursal = { sucursal_id: string; sucursal_nombre: string; empresa_id: string; empresa_nombre: string; ventas_total: number; ingresos_total: number; ventas_count: number; cobrado_total: number; meta: number };
+export type InformeSucursal = { sucursal_id: string; sucursal_nombre: string; empresa_id: string; empresa_nombre: string; ventas_total: number; ingresos_total: number; ventas_count: number; cobrado_total: number; gastos_total?: number; meta: number };
 export type InformeMensual = {
   mes: string;
   por_sucursal: InformeSucursal[];

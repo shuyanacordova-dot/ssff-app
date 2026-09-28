@@ -77,11 +77,16 @@ function MetasDashboard({ informe, message }: { informe: InformeMensual | null; 
       const cobrado = row.cobrado_total ?? 0;
       const cumplimiento = pct(cobrado, row.meta);
       const restante = Math.max(0, row.meta - cobrado);
+      const egresos = Number(row.gastos_total ?? 0);
+      const acumulado = cobrado - egresos;
       return <article className="goal-card" key={row.sucursal_id}>
         <div className="goal-card-top"><div><span>{row.empresa_nombre}</span><h3>{row.sucursal_nombre}</h3></div><strong>{row.meta > 0 ? `${cumplimiento}%` : "Sin meta"}</strong></div>
         <div className="goal-progress"><span style={{ width: `${Math.min(100, cumplimiento)}%` }} /></div>
         <p><strong>{money(cobrado)}</strong> A cuenta del mes</p>
         <small>{row.meta > 0 ? `Meta ${money(row.meta)} · Faltan ${money(restante)}` : "Configura la meta mensual de esta sucursal"}</small>
+        {/* Acumulado del mes: lo que entró a cuenta menos los egresos de la sucursal (caja y banco). */}
+        <p style={{ margin: "8px 0 0", paddingTop: 8, borderTop: "1px solid #e1e8ef" }}><strong style={{ color: acumulado < 0 ? "#a24150" : "#247658" }}>{acumulado < 0 ? "−" : ""}{money(Math.abs(acumulado))}</strong> Acumulado</p>
+        <small>A cuenta {money(cobrado)} − egresos {money(egresos)}</small>
       </article>;
     })}</div> : <div className="goal-empty"><Target size={22} /><p>Aún no hay metas de sucursales disponibles para este mes.</p></div>}
   </section>;
