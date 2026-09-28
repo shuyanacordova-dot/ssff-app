@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Archive, ChevronLeft, ChevronRight, History, LockKeyhole, Pencil, Plus, Wallet, X } from "lucide-react";
+import { Archive, ChevronLeft, ChevronRight, History, Landmark, LockKeyhole, Pencil, Plus, Wallet, X } from "lucide-react";
 import type { PrivateAdminData } from "@/lib/mi-espacio";
 import { atrasadas, avance, cuotasPagadas, fechaCorta, hoyEcuador, itemsDelMes, mesDe, modalidades, money, nombreMes, pagosDelMes, proximoPago, sumarMeses, tipos, type BusinessDebt, type ItemMes, type ModalidadDeuda, type TipoDeuda } from "@/lib/mis-deudas-calc";
 import { actualizarDeuda, archivarDeuda, crearDeuda, registrarPagoDeuda } from "./actions";
@@ -12,6 +12,7 @@ import s from "./mis-deudas.module.css";
 const estadoTexto = { pagado: "Pagado", vencido: "Vencido", hoy: "Vence hoy", proximo: "Próximo" } as const;
 const estadoClase = { pagado: s.pillPagado, vencido: s.pillVencido, hoy: s.pillHoy, proximo: s.pillProximo } as const;
 const metodos = [{ value: "transferencia", label: "Transferencia" }, { value: "efectivo", label: "Efectivo" }, { value: "tarjeta", label: "Tarjeta" }, { value: "otro", label: "Otro" }];
+const bancoLabel: Record<string, string> = { pichincha: "Pichincha", guayaquil: "Guayaquil", internacional: "Internacional" };
 const limpiarMonto = (v: string) => v.replace(/,/g, ".").replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
 type Pago = { deuda: BusinessDebt; monto: number; periodo: string };
 
@@ -39,6 +40,9 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
   const pagadoMes = deudas.reduce((sum, d) => sum + pagosDelMes(d, mes).reduce((a, p) => a + Number(p.monto), 0), 0);
   const vencido = [...atraso, ...items.filter((i) => i.estado === "vencido")].reduce((sum, i) => sum + i.monto, 0);
   const deudaTotal = activas.filter((d) => d.modalidad !== "mensual").reduce((sum, d) => sum + Number(d.saldo), 0);
+  // Recordatorio del cuadre de bancos: los sábados, o si pasó más de una semana desde el último.
+  const diasDesdeCuadre = props.ultimoCuadreBanco ? Math.round((Date.parse(`${hoy}T12:00:00Z`) - Date.parse(`${props.ultimoCuadreBanco}T12:00:00Z`)) / 86400000) : null;
+  const tocaCuadre = props.ultimoCuadreBanco !== hoy && ((new Date(`${hoy}T12:00:00Z`).getUTCDay() === 6) || diasDesdeCuadre === null || diasDesdeCuadre > 7);
   const listaTipo = activas.filter((d) => filtro === "todas" || d.tipo === filtro);
 
   const archivar = (d: BusinessDebt) => {
@@ -49,9 +53,10 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
   return <main className="page agenda-page"><div className="container agenda-shell">
     <header className="agenda-header">
       <div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">ESPACIO PRIVADO · SOLO PARA TI</p><h1>Mis deudas</h1><p className="subtitle">Lo que debe la óptica y cuándo toca pagarlo.</p></div>
-      <button className="new-task" type="button" onClick={() => setNueva(true)}><Plus size={18} /> Nueva deuda</button>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><Link className="outline-action" href="/mi-espacio/bancos" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Landmark size={16} /> Cuadre de bancos</Link><button className="new-task" type="button" onClick={() => setNueva(true)}><Plus size={18} /> Nueva deuda</button></div>
     </header>
     {notice && <div className="notice"><LockKeyhole size={18} /><span>{notice}</span></div>}
+    {tocaCuadre && <Link href="/mi-espacio/bancos" className="notice" style={{ textDecoration: "none", fontWeight: 800 }}><Landmark size={18} /><span>{new Date(`${hoy}T12:00:00Z`).getUTCDay() === 6 ? "Hoy es sábado: toca el cuadre de bancos." : "Hace más de una semana que no cuadras los bancos."} Ábrelo aquí →</span></Link>}
 
     <div className="tabs" style={{ marginBottom: 10 }}>{([["todo", "Todo"], ["optica", "Óptica"], ["personal", "Personal Shu"]] as const).map(([v, label]) => <button key={v} type="button" className={vista === v ? "active" : ""} onClick={() => setVista(v)}>{label}</button>)}</div>
     <div className={s.monthNav}>
@@ -86,7 +91,7 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
     </section>
 
     {nueva && <NuevaDeuda companies={props.companies} branches={props.branches} onClose={() => setNueva(false)} onSaved={(m) => { setNotice(m); setNueva(false); router.refresh(); }} />}
-    {pagando && <PagarDeuda pago={pagando} branches={props.branches} onClose={() => setPagando(null)} onSaved={(m) => { setNotice(m); setPagando(null); router.refresh(); }} />}
+    {pagando && <PagarDeuda pago={pagando} branches={props.branches} cuentas={props.cuentas} companies={props.companies} onClose={() => setPagando(null)} onSaved={(m) => { setNotice(m); setPagando(null); router.refresh(); }} />}
     {historial && <Historial deuda={historial} onClose={() => setHistorial(null)} />}
     {editando && <EditarDeuda deuda={editando} companies={props.companies} branches={props.branches} onClose={() => setEditando(null)} onSaved={(m) => { setNotice(m); setEditando(null); router.refresh(); }} />}
   </div></main>;
@@ -184,18 +189,26 @@ function NuevaDeuda({ companies, branches, onClose, onSaved }: { companies: Priv
   </section></div>;
 }
 
-function PagarDeuda({ pago, branches, onClose, onSaved }: { pago: Pago; branches: PrivateAdminData["branches"]; onClose: () => void; onSaved: (m: string) => void }) {
+function PagarDeuda({ pago, branches, cuentas, companies, onClose, onSaved }: { pago: Pago; branches: PrivateAdminData["branches"]; cuentas: PrivateAdminData["cuentas"]; companies: PrivateAdminData["companies"]; onClose: () => void; onSaved: (m: string) => void }) {
   const d = pago.deuda;
+  // Por defecto la transferencia sale del Pichincha de la empresa de la deuda (las personales, de otra cuenta).
+  const cuentaInicial = d.ambito === "personal" ? "" : cuentas.find((c) => c.empresa_id === d.empresa_id && c.banco === "pichincha")?.id ?? "";
+  const [cuentaId, setCuentaId] = useState(cuentaInicial);
+  const nombreCuenta = (c: PrivateAdminData["cuentas"][number]) => `${bancoLabel[c.banco] ?? c.banco} · ${companies.find((e) => e.id === c.empresa_id)?.nombre ?? "Empresa"}`;
   const [monto, setMonto] = useState(pago.monto.toFixed(2));
   const [metodo, setMetodo] = useState(d.sucursal_id ? "efectivo" : "transferencia");
   const [egreso, setEgreso] = useState(!!d.sucursal_id);
   const [error, setError] = useState(""); const [pending, start] = useTransition();
   const submit = (form: HTMLFormElement) => start(async () => {
     setError("");
-    const data = new FormData(form); data.set("deuda_id", d.id); if (!egreso) data.delete("egreso_sucursal");
+    const data = new FormData(form); data.set("deuda_id", d.id);
+    const desdeCuenta = metodo === "transferencia" && !!cuentaId;
+    if (desdeCuenta) { data.set("cuenta_id", cuentaId); if (d.sucursal_id) data.set("egreso_sucursal", d.sucursal_id); }
+    else if (!egreso || metodo === "transferencia" || metodo === "tarjeta") data.delete("egreso_sucursal");
     const r = await registrarPagoDeuda(data);
     if (!r.ok) { setError(r.error); return; }
-    onSaved(`Pago de ${money(Number(monto))} a "${d.proveedor}" registrado.${egreso ? " También quedó como egreso de caja." : ""}`);
+    const cuenta = cuentas.find((c) => c.id === cuentaId);
+    onSaved(`Pago de ${money(Number(monto))} a "${d.proveedor}" registrado.${desdeCuenta && cuenta ? ` Salió de ${nombreCuenta(cuenta)} y entra al cuadre de bancos.` : egreso && metodo !== "transferencia" && metodo !== "tarjeta" ? " También quedó como egreso de caja." : ""}`);
   });
   return <div className="modal-backdrop"><section className="new-patient-modal" role="dialog" aria-modal="true">
     <button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>
@@ -210,8 +223,9 @@ function PagarDeuda({ pago, branches, onClose, onSaved }: { pago: Pago; branches
         <label>Referencia (opcional)<input name="referencia" placeholder="N.º de transferencia o recibo" /></label>
         <label>Nota (opcional)<input name="notas" /></label>
       </div>
-      <label className="radio-row" style={{ marginTop: 12, fontWeight: 700, fontSize: 13 }}><input type="checkbox" checked={egreso} onChange={(e) => setEgreso(e.target.checked)} /> El dinero salió de la caja de una sucursal (registrar también como egreso de caja)</label>
-      {egreso && <div className="new-patient-form" style={{ marginTop: 8 }}><label>Sucursal<select name="egreso_sucursal" required defaultValue={d.sucursal_id ?? ""}><option value="" disabled>Selecciona</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label></div>}
+      {metodo === "transferencia" && <div className="new-patient-form" style={{ marginTop: 10 }}><label>¿De qué cuenta salió?<select value={cuentaId} onChange={(e) => setCuentaId(e.target.value)}>{cuentas.map((c) => <option key={c.id} value={c.id}>{nombreCuenta(c)}</option>)}<option value="">Otra cuenta (personal, no entra al cuadre)</option></select></label></div>}
+      {(metodo === "efectivo" || metodo === "otro") && <label className="radio-row" style={{ marginTop: 12, fontWeight: 700, fontSize: 13 }}><input type="checkbox" checked={egreso} onChange={(e) => setEgreso(e.target.checked)} /> El dinero salió de la caja de una sucursal (registrar también como egreso de caja)</label>}
+      {egreso && (metodo === "efectivo" || metodo === "otro") && <div className="new-patient-form" style={{ marginTop: 8 }}><label>Sucursal<select name="egreso_sucursal" required defaultValue={d.sucursal_id ?? ""}><option value="" disabled>Selecciona</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label></div>}
       {error && <p className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 700 }}>{error}</p>}
       <div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" type="submit" disabled={pending || !(Number(monto) > 0)}>{pending ? "Guardando…" : "Registrar pago"}</button></div>
     </form>

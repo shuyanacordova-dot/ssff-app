@@ -71,13 +71,16 @@ export async function registrarPagoDeuda(form: FormData): Promise<Resultado> {
     const { supabase } = await privateContext();
     const deudaId = value(form, "deuda_id"); const monto = numero(form, "monto"); const periodo = value(form, "periodo");
     if (!deudaId || !(monto > 0)) return { ok: false, error: "Indica un monto válido." };
-    const { error } = await supabase.rpc("registrar_pago_deuda_v2", {
-      p_deuda: deudaId, p_monto: monto, p_fecha: value(form, "fecha_pago") || null, p_metodo: value(form, "metodo") || "transferencia",
+    const metodo = value(form, "metodo") || "transferencia";
+    const { error } = await supabase.rpc("registrar_pago_deuda_v3", {
+      p_deuda: deudaId, p_monto: monto, p_fecha: value(form, "fecha_pago") || null, p_metodo: metodo,
       p_referencia: value(form, "referencia") || null, p_notas: value(form, "notas") || null,
       p_periodo: /^\d{4}-\d{2}$/.test(periodo) ? `${periodo}-01` : null, p_egreso_sucursal: value(form, "egreso_sucursal") || null,
+      // Transferencia desde una cuenta de la óptica: el egreso sale de esa cuenta y entra al cuadre de bancos.
+      p_cuenta: metodo === "transferencia" ? value(form, "cuenta_id") || null : null,
     });
     if (error) return { ok: false, error: error.message };
-    revalidatePath("/mi-espacio"); revalidatePath("/caja");
+    revalidatePath("/mi-espacio"); revalidatePath("/mi-espacio/bancos"); revalidatePath("/caja");
     return { ok: true };
   } catch (err) { return { ok: false, error: err instanceof Error ? err.message : "No se pudo registrar el pago." }; }
 }
