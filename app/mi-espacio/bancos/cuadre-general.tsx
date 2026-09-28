@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Scale, XCircle } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { fechaCorta, money } from "@/lib/mis-deudas-calc";
-import { guardarCuadreGeneral } from "./actions";
+import { guardarCuadreSucursal } from "./actions";
 import s from "../mis-deudas.module.css";
 
 export type FilaCuadreGeneral = {
@@ -12,10 +13,10 @@ export type FilaCuadreGeneral = {
   cuentas_total: number; cuentas_cuadradas: number; bancos_real: number; bancos_esperado: number;
   caja_contada: boolean; caja_fecha: string | null; caja_real: number | null; caja_esperada: number;
   caja_base_origen: string | null; caja_base_monto: number | null;
+  tarjetas_cobradas: number; tarjetas_desde: string;
   guardado: { tarjetas_por_acreditar: number; diferencia: number; notas: string | null; creado_en: string } | null;
 };
 
-const nombreSucursal = (n: string) => n === "Shuvision" ? "Shuvision Shushufindi" : n;
 const limpiarMonto = (v: string) => v.replace(/,/g, ".").replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
 const cuadra = (d: number) => Math.abs(d) < 0.005;
 const redondear = (n: number) => Math.round(n * 100) / 100;
@@ -25,75 +26,70 @@ function Pill({ diferencia }: { diferencia: number }) {
   return <span className={`${s.pill} ${s.pillVencido}`}>{diferencia > 0 ? `Sobra ${money(diferencia)}` : `Falta ${money(-diferencia)}`}</span>;
 }
 
-// Cuadre general por sucursal: bancos (saldo real del cuadre de hoy) + efectivo en caja + tarjetas por acreditar vs lo esperado.
-export default function CuadreGeneral({ fecha, filas }: { fecha: string; filas: FilaCuadreGeneral[] }) {
+export function ExtrasSucursal({ fila, fecha }: { fila: FilaCuadreGeneral; fecha: string }) {
   const router = useRouter();
-  const [tarjetas, setTarjetas] = useState<Record<string, string>>(() => Object.fromEntries(filas.map((f) => [f.sucursal_id, f.guardado?.tarjetas_por_acreditar ? String(f.guardado.tarjetas_por_acreditar) : ""])));
-  const [notas, setNotas] = useState(filas.find((f) => f.guardado?.notas)?.guardado?.notas ?? "");
+  const [tarjetas, setTarjetas] = useState(fila.guardado ? String(Number(fila.guardado.tarjetas_por_acreditar)) : "");
+  const [notas, setNotas] = useState(fila.guardado?.notas ?? "");
   const [mensaje, setMensaje] = useState("");
+  const [error, setError] = useState("");
   const [pending, start] = useTransition();
 
-  const calculo = filas.map((f) => {
-    const tarj = Number(tarjetas[f.sucursal_id] || 0) || 0;
-    const cajaReal = f.caja_real ?? f.caja_esperada;
-    const real = redondear(Number(f.bancos_real) + Number(cajaReal) + tarj);
-    const esperado = redondear(Number(f.bancos_esperado) + Number(f.caja_esperada));
-    return { f, tarj, real, esperado, diferencia: redondear(real - esperado) };
-  });
-  const totalReal = redondear(calculo.reduce((a, c) => a + c.real, 0));
-  const totalEsperado = redondear(calculo.reduce((a, c) => a + c.esperado, 0));
-  const totalDif = redondear(totalReal - totalEsperado);
-  const faltanCuentas = filas.reduce((a, f) => a + (f.cuentas_total - f.cuentas_cuadradas), 0);
-  const cajasSinContar = filas.filter((f) => !f.caja_contada).length;
-  const completo = faltanCuentas === 0 && cajasSinContar === 0;
+  const montoTarjetas = Number(tarjetas) || 0;
+  const real = Number(fila.bancos_real) + Number(fila.caja_real ?? 0) + montoTarjetas;
+  const esperado = Number(fila.bancos_esperado) + Number(fila.caja_esperada);
+  const diferencia = redondear(real - esperado);
+  const faltanCuentas = Number(fila.cuentas_total) - Number(fila.cuentas_cuadradas);
+  const desde = new Date(`${fila.tarjetas_desde}T12:00:00Z`);
+  desde.setUTCDate(desde.getUTCDate() + 1);
+  const guardadoFecha = fila.guardado ? new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Guayaquil", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date(fila.guardado.creado_en)) : null;
 
   const guardar = () => start(async () => {
     setMensaje("");
-    const r = await guardarCuadreGeneral(fecha, Object.fromEntries(calculo.map((c) => [c.f.sucursal_id, c.tarj])), notas);
-    if (!r.ok) { setMensaje(r.error); return; }
-    setMensaje(`Cuadre general del ${fechaCorta(fecha)} guardado.`);
+    setError("");
+    const r = await guardarCuadreSucursal(fila.sucursal_id, fecha, tarjetas, notas);
+    if (!r.ok) { setError(r.error); return; }
+    setMensaje("Resultado guardado.");
     router.refresh();
   });
 
-  return <section className="glass agenda-board" style={{ marginBottom: 18 }}>
-    <p className="section-label">CUADRE GENERAL · {fechaCorta(fecha).toUpperCase()}</p>
-    <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}><Scale size={22} /> Bancos + efectivo + tarjetas</h2>
-    <p style={{ marginTop: 0, color: "#66768b", fontSize: 14 }}>Por cada sucursal: el saldo real de sus bancos, el efectivo de su caja y las tarjetas que el banco aún no deposita, comparado con lo que LumOS espera según ventas, abonos, egresos y depósitos.</p>
-
-    <div className={`${s.card} ${completo && cuadra(totalDif) ? s.cardGreen : cuadra(totalDif) ? s.cardNavy : s.cardRed}`} style={{ marginBottom: 14 }}>
-      <span>{completo && cuadra(totalDif) ? "Cuentas cuadradas" : cuadra(totalDif) ? "Cuadra con lo registrado hasta ahora" : totalDif > 0 ? "Sobra dinero" : "Falta dinero"}</span>
-      <strong style={{ display: "flex", alignItems: "center", gap: 8 }}>{cuadra(totalDif) ? <CheckCircle2 size={26} /> : <XCircle size={26} />}{cuadra(totalDif) ? money(totalReal) : `${totalDif > 0 ? "+" : "−"}${money(Math.abs(totalDif))}`}</strong>
-      <small>Real {money(totalReal)} · Esperado {money(totalEsperado)}{!completo ? ` · ${[faltanCuentas ? `${faltanCuentas} cuenta(s) sin cuadrar` : "", cajasSinContar ? `${cajasSinContar} caja(s) sin cuadre de hoy` : ""].filter(Boolean).join(" · ")}` : ""}</small>
-    </div>
-
-    <div className={s.grid} style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>{calculo.map(({ f, real, esperado, diferencia }) => <article key={f.sucursal_id} className={s.debt}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}><h3>{nombreSucursal(f.sucursal_nombre)}</h3><Pill diferencia={diferencia} /></div>
-
-      <div style={{ display: "grid", gap: 2 }}>
-        <p style={{ fontWeight: 800, color: "#274c77" }}>Bancos</p>
-        <p>Real {money(Number(f.bancos_real))} · esperado {money(Number(f.bancos_esperado))}</p>
-        {f.cuentas_cuadradas < f.cuentas_total && <p style={{ color: "#a24150", fontWeight: 700 }}><AlertTriangle size={12} /> {f.cuentas_cuadradas} de {f.cuentas_total} cuentas cuadradas hoy: faltan en el total.</p>}
-      </div>
-
-      <div style={{ display: "grid", gap: 2 }}>
-        <p style={{ fontWeight: 800, color: "#274c77" }}>Efectivo en caja</p>
-        {f.caja_contada
-          ? <p>Contado {money(Number(f.caja_real))} · esperado {money(Number(f.caja_esperada))} (cuadre de caja de este día)</p>
-          : <><p>Debería haber <strong>{money(Number(f.caja_esperada))}</strong></p>
-            <p style={{ color: "#9a6400", fontWeight: 700 }}><AlertTriangle size={12} /> Sin cuadre de caja este día. {f.caja_fecha ? `Parte del ${f.caja_base_origen === "apertura" ? "efectivo de apertura" : "último cuadre"} del ${fechaCorta(f.caja_fecha)} (${money(Number(f.caja_base_monto ?? 0))}) + cobros en efectivo − egresos en efectivo desde entonces.` : "No hay cuadre ni apertura anterior."}</p></>}
-      </div>
-
-      <label style={{ display: "grid", gap: 4, fontSize: 12, fontWeight: 800, color: "#5d7086" }}>Tarjetas cobradas que el banco aún no deposita $
-        <input inputMode="decimal" value={tarjetas[f.sucursal_id] ?? ""} onChange={(e) => setTarjetas({ ...tarjetas, [f.sucursal_id]: limpiarMonto(e.target.value) })} placeholder="0.00" style={{ border: "1px solid #d4e0ea", borderRadius: 9, padding: "7px 9px" }} />
+  return <>
+    <article className={s.debt} style={{ borderTop: "4px solid #7a3fa0" }}>
+      <h3>Tarjetas por depositar</h3>
+      <p>Cobrado con tarjeta desde el {fechaCorta(desde.toISOString().slice(0, 10))}: {money(Number(fila.tarjetas_cobradas))}</p>
+      <p>Datafast deposita días después: escribe cuánto de eso todavía no llega al banco.</p>
+      <label style={{ display: "grid", gap: 4, fontSize: 12, fontWeight: 800, color: "#5d7086" }}>Por depositar $
+        <input type="text" inputMode="decimal" value={tarjetas} disabled={pending} onChange={(e) => { setTarjetas(limpiarMonto(e.target.value)); setMensaje(""); }} placeholder="0.00" style={{ border: "1px solid #d4e0ea", borderRadius: 9, padding: "7px 9px" }} />
       </label>
+    </article>
 
-      <div className={s.summaryLine} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><span>Real {money(real)}</span><span>Esperado {money(esperado)}</span></div>
-    </article>)}</div>
+    <article className={s.debt} style={{ borderTop: "4px solid #247658" }}>
+      <h3>Efectivo en caja</h3>
+      {fila.caja_contada ? <>
+        <p>Último cuadre de caja: {fila.caja_fecha ? fechaCorta(fila.caja_fecha) : "—"}</p>
+        <div className={s.saldo}>{money(Number(fila.caja_real ?? 0))}</div>
+        <p>Esperado {money(Number(fila.caja_esperada))}</p>
+        <div><Pill diferencia={redondear(Number(fila.caja_real ?? 0) - Number(fila.caja_esperada))} /></div>
+      </> : <p>Sin cuadre de caja todavía</p>}
+      <Link href="/caja" className="text-action">Ver cuadre de caja</Link>
+    </article>
 
-    <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
-      <input value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Notas (ej. diferencia de Sacha por abonos de Optox sin registrar)" style={{ border: "1px solid #d4e0ea", borderRadius: 10, padding: "9px 10px" }} />
-      {mensaje && <p className="notice" role="status">{mensaje}</p>}
-      <button className="new-consultation" type="button" disabled={pending} onClick={guardar}>{pending ? "Guardando…" : filas.some((f) => f.guardado) ? "Actualizar cuadre general" : "Guardar cuadre general"}</button>
+    <div className={`${s.card} ${faltanCuentas > 0 ? s.cardNavy : cuadra(diferencia) ? s.cardGreen : s.cardRed}`} style={{ gridColumn: "1 / -1" }}>
+      <span>{faltanCuentas > 0 ? `Faltan ${faltanCuentas} cuenta(s) por cuadrar hoy` : cuadra(diferencia) ? "Todo cuadrado" : diferencia > 0 ? "Sobra dinero" : "Falta dinero"}</span>
+      {faltanCuentas <= 0 && <strong style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {cuadra(diferencia) ? <><CheckCircle2 size={26} aria-hidden="true" />{money(real)}</> : `${diferencia > 0 ? "+" : "−"}${money(Math.abs(diferencia))}`}
+      </strong>}
+      <small>Real {money(real)} · Esperado {money(esperado)}</small>
+      <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+        <label style={{ display: "grid", gap: 4, fontSize: 12, fontWeight: 800 }}>Notas (opcional)
+          <input value={notas} disabled={pending} onChange={(e) => { setNotas(e.target.value); setMensaje(""); }} style={{ border: "1px solid #d4e0ea", borderRadius: 10, padding: "9px 10px", color: "#1f2f44", background: "#fff" }} />
+        </label>
+        {guardadoFecha && <small>Guardado el {fechaCorta(guardadoFecha)}</small>}
+        {error && <p className="notice" role="alert">{error}</p>}
+        {mensaje && <p role="status">{mensaje}</p>}
+        <button className="new-consultation" type="button" disabled={pending} onClick={guardar}>{pending ? "Guardando…" : fila.guardado ? "Actualizar resultado" : "Guardar resultado"}</button>
+      </div>
     </div>
-  </section>;
+  </>;
 }

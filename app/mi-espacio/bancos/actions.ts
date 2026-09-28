@@ -39,3 +39,13 @@ export async function guardarCuadreGeneral(fecha: string, tarjetas: Record<strin
   revalidatePath("/mi-espacio/bancos");
   return { ok: true, data: data as { sucursales: number; diferencia_total: number } };
 }
+
+export async function guardarCuadreSucursal(sucursalId: string, fecha: string, tarjetas: string, notas: string): Promise<Resultado<{ total_real: number; total_esperado: number; diferencia: number }>> {
+  const monto = tarjetas.trim() ? Number(tarjetas.replace(/,/g, ".")) : 0;
+  if (!Number.isFinite(monto) || monto < 0) return { ok: false, error: "Escribe un monto de tarjetas por depositar igual o mayor que cero." };
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("guardar_cuadre_sucursal", { p_sucursal: sucursalId, p_fecha: fecha, p_tarjetas: monto, p_notas: notas || null });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/mi-espacio/bancos");
+  return { ok: true, data: data as { total_real: number; total_esperado: number; diferencia: number } };
+}

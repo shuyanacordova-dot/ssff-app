@@ -7,7 +7,7 @@ import { useEffect, useState, useTransition } from "react";
 import { fechaCorta, hoyEcuador, money } from "@/lib/mis-deudas-calc";
 import { previsualizarCuadreBanco, registrarCuadreBanco, type MovimientoCuadre, type ResultadoCuadreBanco, type VistaCuadreBanco } from "./actions";
 import s from "../mis-deudas.module.css";
-import CuadreGeneral, { type FilaCuadreGeneral } from "./cuadre-general";
+import { ExtrasSucursal, type FilaCuadreGeneral } from "./cuadre-general";
 
 export type CuentaCuadre = { id: string; empresa_id: string; empresa_nombre: string; sucursal_nombre: string; banco: string; saldo_actual: number };
 export type CuadreGuardado = { id: string; cuenta_id: string; fecha: string; desde: string | null; saldo_anterior: number | null; transferencias: number; tarjetas: number; depositos_caja: number; otros_ingresos: number; egresos: number; comisiones: number; saldo_esperado: number | null; saldo_real: number; diferencia: number | null; notas: string | null };
@@ -49,7 +49,6 @@ export default function CuadreBancosBoard(props: { status: "ready" | "needs_logi
       <label style={{ display: "grid", gap: 4, fontSize: 12, fontWeight: 800, color: "#5d7086" }}>Fecha del cuadre<input type="date" value={fecha} max={hoyEcuador()} onChange={(e) => setFecha(e.target.value || hoyEcuador())} style={{ border: "1px solid #d4e0ea", borderRadius: 10, padding: "8px 10px" }} /></label>
     </header>
     {notice && <div className="notice"><LockKeyhole size={18} /><span>{notice}</span></div>}
-    {props.general.length > 0 && <CuadreGeneral key={`${fecha}:${props.general.map((g) => g.guardado?.creado_en ?? "").join()}`} fecha={fecha} filas={props.general} />}
 
     {!esSabado && <div className="notice"><Landmark size={18} /><span>El cuadre toca los sábados, pero puedes hacerlo cualquier día: se cuenta desde el último cuadre de cada cuenta hasta la fecha elegida.</span></div>}
 
@@ -58,7 +57,9 @@ export default function CuadreBancosBoard(props: { status: "ready" | "needs_logi
       <div className={`${s.card} ${s.cardTeal}`}><span>Saldo total en LumOS</span><strong>{money(props.cuentas.reduce((a, c) => a + c.saldo_actual, 0))}</strong><small>según el último cuadre y lo registrado después</small></div>
     </div>
 
-    {sucursales.map((sucursal) => <section key={sucursal} style={{ marginBottom: 18 }}>
+    {sucursales.map((sucursal) => {
+      const fila = props.general.find((g) => g.sucursal_nombre === sucursal);
+      return <section key={sucursal} style={{ marginBottom: 18 }}>
       <div className={s.sectionTitle}><h2>{nombreSucursal(sucursal)}</h2></div>
       <div className={s.grid}>{props.cuentas.filter((c) => c.sucursal_nombre === sucursal).map((c) => {
         const u = ultimo(c.id); const hecha = u?.fecha === fecha;
@@ -69,8 +70,11 @@ export default function CuadreBancosBoard(props: { status: "ready" | "needs_logi
           <p>{u ? `Último cuadre: ${fechaCorta(u.fecha)} · saldo real ${money(u.saldo_real)}` : "Todavía sin cuadrar: el primer cuadre fija el punto de partida."}</p>
           <div className={s.actions}><button type="button" className={hecha ? "outline-action" : "new-consultation"} onClick={() => setAbierta(c)}>{hecha ? "Rehacer cuadre" : "Cuadrar"}</button></div>
         </article>;
-      })}</div>
-    </section>)}
+      })}
+        {fila && <ExtrasSucursal key={`${fila.sucursal_id}:${fecha}:${fila.guardado?.creado_en ?? ""}`} fila={fila} fecha={fecha} />}
+      </div>
+    </section>;
+    })}
 
     <section className="glass agenda-board">
       <p className="section-label">HISTORIAL</p><h2>Cuadres anteriores</h2>
