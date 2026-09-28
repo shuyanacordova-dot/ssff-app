@@ -74,7 +74,9 @@ function MetasDashboard({ informe, message }: { informe: InformeMensual | null; 
   return <section className="goal-overview glass">
     <div className="goal-overview-heading"><div><p className="section-label">METAS DEL MES</p><h2>Avance por sucursal</h2><p>{mes}</p></div><Link className="outline-action" href="/informes"><Target size={15} /> Configurar metas</Link></div>
     {message ? <p className="field-hint">{message}</p> : informe?.por_sucursal.length ? <div className="goal-grid">{informe.por_sucursal.map((row) => {
-      const cobrado = row.cobrado_total ?? 0;
+      // "A cuenta" = TODO el dinero que entró en el mes: lentes nuevos, abonos de quienes retiran y abonos de convenios
+      // (pagos registrados de ventas vigentes). Antes solo contaba lo pagado de las ventas creadas en el mes.
+      const cobrado = Number(row.ingresos_total ?? 0);
       const cumplimiento = pct(cobrado, row.meta);
       const restante = Math.max(0, row.meta - cobrado);
       const egresos = Number(row.gastos_total ?? 0);
