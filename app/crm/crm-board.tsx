@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { CalendarHeart, FolderOpen, MessageCircle, NotebookPen, Users, X } from "lucide-react";
 import { motivoLabels, type CrmData, type CrmItem, type CrmMotivo } from "@/lib/crm-labels";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
+import { mensajeLentesListos } from "@/lib/mensajes";
 import { formatRecordDate } from "@/lib/record-date";
 import { registrarContactoCrm } from "./actions";
 
@@ -18,7 +19,7 @@ function mensaje(item: CrmItem, empresa: string) {
   switch (item.motivo) {
     case "control": return `Hola ${n}, te saludamos de ${empresa}. Ya te corresponde tu control visual. ¿Te agendamos una cita esta semana?`;
     case "examen_sin_compra": return `Hola ${n}, te saludamos de ${empresa}. Gracias por realizar tu examen visual con nosotros. ¿Pudiste elegir tus lentes? Te ayudamos con opciones y facilidades de pago.`;
-    case "lentes_listos": return `Hola ${n}, te saludamos de ${empresa}. Tus lentes ya están listos para retirar. ¡Te esperamos!`;
+    case "lentes_listos": return mensajeLentesListos({ nombre: item.nombre, empresa });
     case "postventa": return `Hola ${n}, te saludamos de ${empresa}. ¿Cómo te has adaptado a tus nuevos lentes? Si sientes alguna molestia, con gusto te ayudamos.`;
     case "cumpleanos": return `¡Feliz cumpleaños, ${n}! De parte de todo el equipo de ${empresa} te deseamos un excelente día.`;
     case "inactivo": return `Hola ${n}, te saludamos de ${empresa}. Hace tiempo no revisamos tu visión. ¿Te gustaría agendar un control?`;

@@ -21,8 +21,17 @@ export async function getRefraccionesPaciente(pacienteId: string): Promise<Refra
 export async function crearOrdenLaboratorio(form: FormData) {
   const supabase = await createSupabaseServerClient();
   const ventaId = String(form.get("venta_id") || "");
-  const ventaItemId = String(form.get("venta_item_id") || "") || null;
+  let ventaItemId = String(form.get("venta_item_id") || "") || null;
   const consultaId = String(form.get("consulta_id") || "") || null;
+  // La orden va ligada a la luna, nunca al armazón (pasó en Sacha: salían 2 armazones y sin material).
+  const { data: itemsVenta } = await supabase.from("venta_items").select("id,productos_catalogo(categoria)").eq("venta_id", ventaId);
+  const categoriaDe = (item: { productos_catalogo: unknown }) => ((Array.isArray(item.productos_catalogo) ? item.productos_catalogo[0] : item.productos_catalogo) as { categoria?: string } | null)?.categoria ?? null;
+  const esArmazon = (item: { productos_catalogo: unknown }) => ["montura", "gafas_sol", "accesorio"].includes(categoriaDe(item) ?? "");
+  const elegido = (itemsVenta ?? []).find((item) => item.id === ventaItemId);
+  if (!elegido || esArmazon(elegido)) {
+    const luna = (itemsVenta ?? []).find((item) => categoriaDe(item) === "lente") ?? (itemsVenta ?? []).find((item) => !esArmazon(item));
+    if (luna) ventaItemId = luna.id;
+  }
   const laboratorio = String(form.get("laboratorio") || "");
   const usoCalculado = String(form.get("uso_calculado") || "");
   const tipoLente = String(form.get("tipo_lente") || "");

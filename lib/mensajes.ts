@@ -41,10 +41,22 @@ const diasVencidos = (iso?: string | null) => {
   return dias > 0 ? dias : 0;
 };
 
+// Nombre comercial y ciudad a partir del nombre de empresa o sucursal ("Shuvisión", "Shuvision Sacha", "Focus").
+const opticaDesdeNombre = (nombre?: string | null) => /focus/i.test(nombre ?? "") ? "Focus Óptica" : "ShuVision Óptica";
+const lugarDesdeSucursal = (sucursal?: string | null) => !sucursal || /focus/i.test(sucursal) ? "" : /sacha/i.test(sucursal) ? " en nuestra sucursal de Sacha" : " en nuestra sucursal de Shushufindi";
+
+// Aviso de lentes listos para retirar (Ventas, Laboratorio, Cuentas por cobrar y CRM usan el mismo texto).
+export function mensajeLentesListos({ nombre, empresa, sucursal, saldo, ticketUrl }: { nombre: string; empresa?: string | null; sucursal?: string | null; saldo?: number | null; ticketUrl?: string | null }) {
+  const saludo = primerNombre(nombre);
+  const optica = opticaDesdeNombre(sucursal || empresa);
+  const saldoLine = saldo && saldo > 0 ? `\n\nPara tu comodidad, te recordamos que el saldo pendiente es de $${Number(saldo).toFixed(2)}.` : "";
+  return `Hola ${saludo || "😊"} 👋, te saludamos de ${optica}.\n\n✨ ¡Tenemos buenas noticias! Tus lentes ya están listos y te esperan${lugarDesdeSucursal(sucursal)}. Cuando vengas a retirarlos, con gusto te los ajustamos para que te queden perfectos. 👓${saldoLine}\n\n¡Te esperamos con mucho cariño! 💙${ticketLine(ticketUrl)}`;
+}
+
 export function construirMensajeContacto(plantilla: PlantillaContactoId, contexto: ContextoMensaje) {
   const saldo = `$${Number(contexto.saldo ?? 0).toFixed(2)}`;
   if (plantilla === "listo_retiro") {
-    return `Hola ${contexto.nombre}. Tus lentes ya están listos para retirar en ${contexto.empresa}. ¡Te esperamos!${ticketLine(contexto.ticketUrl)}`;
+    return mensajeLentesListos({ nombre: contexto.nombre, empresa: contexto.empresa, sucursal: contexto.empresa, saldo: contexto.saldo, ticketUrl: contexto.ticketUrl });
   }
   if (plantilla === "cobro_mensual") {
     return `Hola ${contexto.nombre}. Te enviamos tu recordatorio mensual de ${contexto.empresa}. Mantienes un saldo pendiente de ${saldo}. Por favor, indícanos cuándo podemos coordinar tu pago. Gracias.${ticketLine(contexto.ticketUrl)}`;

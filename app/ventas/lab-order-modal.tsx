@@ -84,7 +84,16 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
     return () => { active = false; };
   }, [existingOrderId, lensItems]);
 
-  const selectedItem = lensItems.find((item) => item.id === itemId);
+  // Solo lunas (o productos sin categoría) se pueden mandar al laboratorio; el armazón va aparte en la orden.
+  const categoriaItem = (item: SaleItem) => item.producto_id ? productoById?.get(item.producto_id)?.categoria : undefined;
+  const candidatosLuna = productoById ? lensItems.filter((item) => !["montura", "gafas_sol", "accesorio"].includes(categoriaItem(item) ?? "")) : lensItems;
+  const opcionesProducto = candidatosLuna.length ? candidatosLuna : lensItems;
+  const primeraLuna = (opcionesProducto.find((item) => categoriaItem(item) === "lente") ?? opcionesProducto[0])?.id ?? "";
+  useEffect(() => {
+    // Cuando llega el catálogo, si quedó elegido un armazón (el primero de la venta), se cambia a la luna.
+    if (!existingOrderId && primeraLuna && !opcionesProducto.some((item) => item.id === itemId)) setItemId(primeraLuna);
+  }, [existingOrderId, primeraLuna, opcionesProducto, itemId]);
+  const selectedItem = sale.venta_items.find((item) => item.id === itemId);
   const selectedRefraction = refracciones.find((option) => option.id === consultaId);
   const examen = examenManual ?? (selectedRefraction ? rxFromRefraccion(selectedRefraction.refraccion) : null);
   const dnpExamen = (source: OrdenLaboratorioRx, fallback = dnpLejos) => {
@@ -165,7 +174,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
       {lensSaleItems.map((item) => <span key={item.id}><strong>Luna</strong>{item.descripcion}</span>)}
     </div>}
   </>;
-  const productDescription = [selectedItem?.descripcion, ...frameItems.map((item) => item.descripcion)].filter(Boolean).join(" + ");
+  const productDescription = [selectedItem?.descripcion, ...frameItems.filter((item) => item.id !== selectedItem?.id).map((item) => item.descripcion)].filter(Boolean).join(" + ");
 
   if (loadingExisting) return <div className="modal-backdrop"><section className="new-patient-modal task-modal lab-modal" role="dialog" aria-modal="true"><p className="field-hint">Cargando orden…</p></section></div>;
 
@@ -175,7 +184,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
 
       {step === "form" ? <>
         {!orderId && <div className="new-patient-form">
-          {lensItems.length > 1 && <label>Producto<select value={itemId} onChange={(event) => setItemId(event.target.value)}>{lensItems.map((item) => <option key={item.id} value={item.id}>{item.descripcion}</option>)}</select></label>}
+          {opcionesProducto.length > 1 && <label>Producto<select value={itemId} onChange={(event) => setItemId(event.target.value)}>{opcionesProducto.map((item) => <option key={item.id} value={item.id}>{item.descripcion}</option>)}</select></label>}
           <label>Laboratorio<select value={laboratorio} onChange={(event) => setLaboratorio(event.target.value as LaboratorioProveedor)}>{Object.entries(laboratorioLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         </div>}
         {orderId && <div className="new-patient-form"><label>Laboratorio<select value={laboratorio} onChange={(event) => setLaboratorio(event.target.value as LaboratorioProveedor)}>{Object.entries(laboratorioLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>}

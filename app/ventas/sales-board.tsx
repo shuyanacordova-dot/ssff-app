@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Building2, CircleAlert, FlaskConical, MoreVertical, Plus, Package, ReceiptText, ShieldCheck, Wallet, MessageCircle, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { Garantia, Sale, SaleItem, SaleLabOrder, SaleProduct, VentasData } from "@/lib/ventas";
-import { mensajeTicketVirtual } from "@/lib/mensajes";
+import { mensajeLentesListos, mensajeTicketVirtual } from "@/lib/mensajes";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import Cart from "./cart";
 import LabOrderModal from "./lab-order-modal";
@@ -109,7 +109,7 @@ export function SaleCard({ sale, companyName, branchName, patient, lensItems, ha
   const resumenItems = items.slice(0, 2).map((item) => `${item.descripcion} ×${item.cantidad}`).join(", ");
   const resumen = items.length ? (items.length > 2 ? `${resumenItems} +${items.length - 2} más` : resumenItems) : "Sin líneas";
   const nombrePila = patient ? patient.nombres : (sale.cliente_nombre || "").split(" ")[0] || "";
-  const waListo = patient && lensItems.length > 0 ? enlaceWhatsapp(patient.telefono, `Hola ${nombrePila}! Tu(s) luna(s)/lente(s) de tu compra en ${companyName} ya está(n) listo(s) para retirar. Te esperamos!`) : null;
+  const waListo = patient && lensItems.length > 0 ? enlaceWhatsapp(patient.telefono, mensajeLentesListos({ nombre: nombrePila, empresa: companyName, sucursal: branchName, saldo: sale.saldo })) : null;
   return <article ref={cardRef} className="task-card" style={{ cursor: "pointer", ...(autoAbono ? { outline: "2px solid #1f7a70", outlineOffset: 2 } : {}) }} onClick={onDetalle}><div className="task-status"><span className={`status-dot ${statePillClass[sale.estado]}`} /></div><div className="task-main"><div className="task-meta"><span>{companyName}</span>{branchName && <span className="branch-meta">Sucursal {branchName}</span>}{patient && <span>Paciente</span>}<span>{new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "short", year: "numeric" }).format(new Date(sale.creado_en))}</span></div><h2>{displayName}</h2><p>{resumen}{items.length > 0 && <span className="text-action" style={{ marginLeft: 8 }}>Ver detalle</span>}</p><p>Total: <strong>{money(sale.total)}</strong> · Pagado: {money(sale.pagado)} · Saldo: <strong>{money(sale.saldo)}</strong></p>{sale.estado === "anulada" && sale.motivo_anulacion && <p className="notice">Motivo de anulación: {sale.motivo_anulacion}</p>}{sale.apartado && sale.estado !== "anulada" && sale.saldo > 0 && <p className="notice"><strong>Apartado</strong> — entregar solo cuando pague todo{sale.apartado_hasta ? ` · plazo hasta ${new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${sale.apartado_hasta}T12:00:00-05:00`))}` : ""}.</p>}
     {labOrders.length > 0 && <div className="lab-order-badges" onClick={(event) => event.stopPropagation()}>{labOrders.map((order) => <button key={order.id} type="button" className="check-badge ok" onClick={() => onViewOrder(order.id)}><FlaskConical size={13} /> {order.laboratorio} · {order.estado}{order.es_garantia ? " · garantía" : ""}</button>)}</div>}
     {sale.estado === "completada" && <div className="sale-primary-actions" onClick={(event) => event.stopPropagation()}>
