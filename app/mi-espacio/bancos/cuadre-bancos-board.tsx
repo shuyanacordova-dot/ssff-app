@@ -8,13 +8,15 @@ import { fechaCorta, hoyEcuador, money } from "@/lib/mis-deudas-calc";
 import { previsualizarCuadreBanco, registrarCuadreBanco, type MovimientoCuadre, type ResultadoCuadreBanco, type VistaCuadreBanco } from "./actions";
 import s from "../mis-deudas.module.css";
 
-export type CuentaCuadre = { id: string; empresa_id: string; empresa_nombre: string; banco: string; saldo_actual: number };
+export type CuentaCuadre = { id: string; empresa_id: string; empresa_nombre: string; sucursal_nombre: string; banco: string; saldo_actual: number };
 export type CuadreGuardado = { id: string; cuenta_id: string; fecha: string; desde: string | null; saldo_anterior: number | null; transferencias: number; tarjetas: number; depositos_caja: number; otros_ingresos: number; egresos: number; comisiones: number; saldo_esperado: number | null; saldo_real: number; diferencia: number | null; notas: string | null };
 
 const bancoLabel: Record<string, string> = { pichincha: "Banco Pichincha", guayaquil: "Banco Guayaquil", internacional: "Banco Internacional" };
 const bancoColor: Record<string, string> = { pichincha: "#c99a00", guayaquil: "#c2185b", internacional: "#1f4e8c" };
 const grupoLabel: Record<MovimientoCuadre["grupo"], string> = { transferencias: "Transferencia", tarjetas: "Tarjeta", depositos_caja: "Depósito", otros_ingresos: "Ingreso", egresos: "Egreso" };
 const limpiarMonto = (v: string) => v.replace(/,/g, ".").replace(/[^0-9.-]/g, "").replace(/(?!^)-/g, "").replace(/(\..*)\./g, "$1");
+// "Shuvision" es la sucursal de Shushufindi.
+const nombreSucursal = (n: string) => n === "Shuvision" ? "Shuvision Shushufindi" : n;
 const cuadra = (d: number | null) => d !== null && Math.abs(d) < 0.005;
 
 function PillDiferencia({ diferencia }: { diferencia: number | null }) {
@@ -33,7 +35,8 @@ export default function CuadreBancosBoard(props: { status: "ready" | "needs_logi
 
   const ultimo = (cuentaId: string) => props.historial.find((h) => h.cuenta_id === cuentaId);
   const esSabado = new Date(`${fecha}T12:00:00Z`).getUTCDay() === 6;
-  const empresas = Array.from(new Set(props.cuentas.map((c) => c.empresa_nombre)));
+  // Cada sucursal tiene sus propias cuentas: Shuvision (Shushufindi), Shuvision Sacha y Focus.
+  const sucursales = Array.from(new Set(props.cuentas.map((c) => c.sucursal_nombre)));
   const hechasEnFecha = props.cuentas.filter((c) => props.historial.some((h) => h.cuenta_id === c.id && h.fecha === fecha)).length;
   const cuentaPorId = new Map(props.cuentas.map((c) => [c.id, c]));
 
@@ -50,9 +53,9 @@ export default function CuadreBancosBoard(props: { status: "ready" | "needs_logi
       <div className={`${s.card} ${s.cardTeal}`}><span>Saldo total en LumOS</span><strong>{money(props.cuentas.reduce((a, c) => a + c.saldo_actual, 0))}</strong><small>según el último cuadre y lo registrado después</small></div>
     </div>
 
-    {empresas.map((empresa) => <section key={empresa} style={{ marginBottom: 18 }}>
-      <div className={s.sectionTitle}><h2>{empresa}</h2></div>
-      <div className={s.grid}>{props.cuentas.filter((c) => c.empresa_nombre === empresa).map((c) => {
+    {sucursales.map((sucursal) => <section key={sucursal} style={{ marginBottom: 18 }}>
+      <div className={s.sectionTitle}><h2>{nombreSucursal(sucursal)}</h2></div>
+      <div className={s.grid}>{props.cuentas.filter((c) => c.sucursal_nombre === sucursal).map((c) => {
         const u = ultimo(c.id); const hecha = u?.fecha === fecha;
         return <article key={c.id} className={s.debt} style={{ borderTop: `4px solid ${bancoColor[c.banco] ?? "#274c77"}` }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}><h3>{bancoLabel[c.banco] ?? c.banco}</h3>{u && <PillDiferencia diferencia={u.diferencia} />}</div>
@@ -71,7 +74,7 @@ export default function CuadreBancosBoard(props: { status: "ready" | "needs_logi
         return <div key={h.id} className={s.row} style={{ gridTemplateColumns: "62px 6px minmax(0, 1fr) auto" }}>
           <div className={s.day}><strong>{h.fecha.slice(8, 10)}</strong><small>{fechaCorta(h.fecha).replace(/^\d+\s*/, "")}</small></div>
           <div className={s.bar} style={{ background: bancoColor[c?.banco ?? ""] ?? "#274c77" }} />
-          <div className={s.info}><h3>{bancoLabel[c?.banco ?? ""] ?? "Cuenta"} · {c?.empresa_nombre ?? ""}</h3><p>{h.saldo_esperado === null ? "Punto de partida" : `Esperado ${money(h.saldo_esperado)}`} · Real {money(h.saldo_real)}{h.comisiones ? ` · Comisiones ${money(h.comisiones)}` : ""}{h.notas ? ` · ${h.notas}` : ""}</p></div>
+          <div className={s.info}><h3>{bancoLabel[c?.banco ?? ""] ?? "Cuenta"} · {nombreSucursal(c?.sucursal_nombre ?? "")}</h3><p>{h.saldo_esperado === null ? "Punto de partida" : `Esperado ${money(h.saldo_esperado)}`} · Real {money(h.saldo_real)}{h.comisiones ? ` · Comisiones ${money(h.comisiones)}` : ""}{h.notas ? ` · ${h.notas}` : ""}</p></div>
           <div className={s.right}><PillDiferencia diferencia={h.diferencia} /></div>
         </div>;
       })}</div> : <p className={s.empty}>Aún no hay cuadres. Empieza con cualquier cuenta: el primero solo guarda el saldo real como punto de partida.</p>}
@@ -109,7 +112,7 @@ function CuadreModal({ cuenta, fecha, onClose, onSaved }: { cuenta: CuentaCuadre
     const r = await registrarCuadreBanco(cuenta.id, fecha, saldoReal, comisiones, notas);
     if (!r.ok) { setError(r.error); return; }
     setResultado(r.data);
-    onSaved(`Cuadre de ${bancoLabel[cuenta.banco] ?? cuenta.banco} · ${cuenta.empresa_nombre} guardado.`);
+    onSaved(`Cuadre de ${bancoLabel[cuenta.banco] ?? cuenta.banco} · ${nombreSucursal(cuenta.sucursal_nombre)} guardado.`);
   });
 
   const Linea = ({ signo, texto, monto, ayuda }: { signo: string; texto: string; monto: number; ayuda?: string }) => <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "7px 0", borderBottom: "1px solid #edf2f7" }}>
@@ -120,7 +123,7 @@ function CuadreModal({ cuenta, fecha, onClose, onSaved }: { cuenta: CuentaCuadre
   return <div className="modal-backdrop"><section className="new-patient-modal sale-modal-shell" role="dialog" aria-modal="true" aria-labelledby="cuadre-banco-title">
     <button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>
     <p className="section-label">CUADRE DE BANCOS · {fechaCorta(fecha).toUpperCase()}</p>
-    <h2 id="cuadre-banco-title">{bancoLabel[cuenta.banco] ?? cuenta.banco} · {cuenta.empresa_nombre}</h2>
+    <h2 id="cuadre-banco-title">{bancoLabel[cuenta.banco] ?? cuenta.banco} · {nombreSucursal(cuenta.sucursal_nombre)}</h2>
 
     {resultado ? <div style={{ display: "grid", justifyItems: "center", gap: 10, padding: "18px 0", textAlign: "center" }}>
       {resultado.primer_cuadre ? <><CheckCircle2 size={48} color="#274c77" /><h3 style={{ margin: 0 }}>Punto de partida guardado</h3><p>Desde ahora, cada cuadre comparará contra {money(resultado.saldo_real)}.</p></>
@@ -150,7 +153,7 @@ function CuadreModal({ cuenta, fecha, onClose, onSaved }: { cuenta: CuentaCuadre
         {esperado !== null && <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0 4px", fontSize: 17 }}><strong>= Saldo esperado</strong><strong>{money(esperado)}</strong></div>}
       </div>
 
-      {Number(vista.transferencias_sin_banco) > 0 && <p className="notice"><AlertTriangle size={16} /> Hay {money(Number(vista.transferencias_sin_banco))} en transferencias de {vista.empresa_nombre} sin banco anotado en este periodo: no se sabe a qué cuenta llegaron y no se suman aquí.</p>}
+      {Number(vista.transferencias_sin_banco) > 0 && <p className="notice"><AlertTriangle size={16} /> Hay {money(Number(vista.transferencias_sin_banco))} en transferencias de {nombreSucursal(cuenta.sucursal_nombre)} sin banco anotado en este periodo: no se sabe a qué cuenta llegaron y no se suman aquí.</p>}
 
       {vista.detalle.length > 0 && <button type="button" className="text-action" onClick={() => setVerDetalle(!verDetalle)}>{verDetalle ? "Ocultar movimientos" : `Ver los ${vista.detalle.length} movimientos`}</button>}
       {verDetalle && <div style={{ display: "grid", gap: 4, margin: "8px 0", maxHeight: 260, overflow: "auto" }}>{vista.detalle.map((m, i) => <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13, background: "#f6f9fc", borderRadius: 8, padding: "6px 10px" }}>

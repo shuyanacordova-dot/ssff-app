@@ -58,6 +58,7 @@ export default function DashboardShell({ taskData, informeMensual, metasMessage,
       <Link href="/agenda"><span className="quick-icon lilac"><CalendarDays size={21} /></span><span><strong>Agenda</strong><small>Ver citas de hoy</small></span></Link>
       <Link href="/caja?gasto=1"><span className="quick-icon amber"><Receipt size={21} /></span><span><strong>Registrar egreso</strong><small>Gasto o pago de caja</small></span></Link>
       {role === "superadmin" && <Link href="/mi-espacio"><span className="quick-icon blue"><LockKeyhole size={21} /></span><span><strong>Mi espacio</strong><small>Deudas privadas por sucursal</small></span></Link>}
+      {role === "superadmin" && <Link href="/mi-espacio/bancos"><span className="quick-icon teal"><Landmark size={21} /></span><span><strong>Cuadre de bancos</strong><small>Saldo real de cada cuenta</small></span></Link>}
     </section>
 
     {resumenHoy && <ResumenDelDia r={resumenHoy} />}

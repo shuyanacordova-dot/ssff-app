@@ -34,7 +34,8 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean }) {
   const branchVista = props.branches.find((branch) => branch.id === sucursalVista);
   const empresaVista = branchVista?.empresa_id ?? props.profile?.empresa_id ?? "";
   const branches = branchVista ? [branchVista] : [];
-  const cuentas = props.cuentas.filter((cuenta) => cuenta.empresa_id === empresaVista);
+  // Cada sucursal tiene sus propias cuentas (Sacha no usa las de Shushufindi).
+  const cuentas = props.cuentas.filter((cuenta) => cuenta.sucursal_id === sucursalVista);
   const gastos = props.gastos.filter((gasto) => gasto.sucursal_id === sucursalVista);
   const cierres = props.cierres.filter((cierre) => cierre.sucursal_id === sucursalVista);
   const cuentaById = new Map(cuentas.map((cuenta) => [cuenta.id, cuenta]));

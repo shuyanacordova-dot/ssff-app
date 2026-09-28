@@ -192,9 +192,9 @@ function NuevaDeuda({ companies, branches, onClose, onSaved }: { companies: Priv
 function PagarDeuda({ pago, branches, cuentas, companies, onClose, onSaved }: { pago: Pago; branches: PrivateAdminData["branches"]; cuentas: PrivateAdminData["cuentas"]; companies: PrivateAdminData["companies"]; onClose: () => void; onSaved: (m: string) => void }) {
   const d = pago.deuda;
   // Por defecto la transferencia sale del Pichincha de la empresa de la deuda (las personales, de otra cuenta).
-  const cuentaInicial = d.ambito === "personal" ? "" : cuentas.find((c) => c.empresa_id === d.empresa_id && c.banco === "pichincha")?.id ?? "";
+  const cuentaInicial = d.ambito === "personal" ? "" : (cuentas.find((c) => d.sucursal_id && c.sucursal_id === d.sucursal_id && c.banco === "pichincha") ?? cuentas.find((c) => c.empresa_id === d.empresa_id && c.banco === "pichincha"))?.id ?? "";
   const [cuentaId, setCuentaId] = useState(cuentaInicial);
-  const nombreCuenta = (c: PrivateAdminData["cuentas"][number]) => `${bancoLabel[c.banco] ?? c.banco} · ${companies.find((e) => e.id === c.empresa_id)?.nombre ?? "Empresa"}`;
+  const nombreCuenta = (c: PrivateAdminData["cuentas"][number]) => `${bancoLabel[c.banco] ?? c.banco} · ${branches.find((b) => b.id === c.sucursal_id)?.nombre ?? companies.find((e) => e.id === c.empresa_id)?.nombre ?? "Empresa"}`;
   const [monto, setMonto] = useState(pago.monto.toFixed(2));
   const [metodo, setMetodo] = useState(d.sucursal_id ? "efectivo" : "transferencia");
   const [egreso, setEgreso] = useState(!!d.sucursal_id);

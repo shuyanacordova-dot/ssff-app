@@ -3,7 +3,7 @@ import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supa
 import { getOperationalContext } from "@/lib/operational-context";
 
 export type Banco = "pichincha" | "guayaquil" | "internacional";
-export type CuentaBancaria = { id: string; empresa_id: string; banco: Banco; saldo_actual: number };
+export type CuentaBancaria = { id: string; empresa_id: string; sucursal_id: string | null; banco: Banco; saldo_actual: number };
 export type Gasto = { id: string; empresa_id: string; sucursal_id: string | null; fecha: string; clasificacion: string; concepto: string; monto: number; origen: "caja" | "banco"; cuenta_bancaria_id: string | null; observaciones: string | null; creado_en: string };
 export type MovimientoBancario = { id: string; cuenta_id: string; fecha: string; tipo: string; monto: number; observaciones: string | null; creado_en: string };
 export type CierreCaja = { id: string; empresa_id: string; sucursal_id: string; fecha: string; responsable_id: string; caja_anterior: number; caja_fisica: number; ventas_brutas: number; cobro_efectivo: number; cobro_tarjeta: number; cobro_transferencia_pichincha: number; cobro_transferencia_guayaquil: number; cobro_transferencia_internacional: number; cobro_credito: number; cobro_otro: number; declarado_efectivo: number; declarado_tarjeta: number; declarado_transferencia_pichincha: number; declarado_transferencia_guayaquil: number; declarado_transferencia_internacional: number; diferencia_cobros_declarados: number; check_metodos_pago: boolean; egresos_efectivo: number; egresos_banco: number; deposito_pichincha: number; deposito_guayaquil: number; deposito_internacional: number; depositos: number; caja_esperada: number; diferencia: number; check_cobros_ventas: boolean | null; check_caja_fisica: boolean; cuadre_correcto: boolean; observaciones: string | null; creado_en: string };
@@ -30,7 +30,7 @@ export async function getCajaData(): Promise<CajaData> {
     const [companiesResult, branchesResult, cuentasResult, gastosResult, operationalContext] = await Promise.all([
       supabase.from("empresas").select("id,nombre").eq("activo", true).order("nombre"),
       supabase.from("sucursales").select("id,empresa_id,nombre").eq("activo", true).order("nombre"),
-      supabase.from("cuentas_bancarias").select("id,empresa_id,banco,saldo_actual").eq("activo", true).order("banco"),
+      supabase.from("cuentas_bancarias").select("id,empresa_id,sucursal_id,banco,saldo_actual").eq("activo", true).order("banco"),
       supabase.from("gastos").select("id,empresa_id,sucursal_id,fecha,clasificacion,concepto,monto,origen,cuenta_bancaria_id,observaciones,creado_en").order("fecha", { ascending: false }).limit(100),
       getOperationalContext(),
     ]);

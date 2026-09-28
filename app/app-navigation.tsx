@@ -49,6 +49,7 @@ const menuItems: NavItem[] = [
   { href: "/convenios", label: "Convenios", detail: "Empresas aliadas", icon: Building2, group: "Finanzas" },
   { href: "/informes", label: "Informes y metas", detail: "Resultados por sucursal", icon: BarChart3, group: "Finanzas" },
   { href: "/mi-espacio", label: "Mis deudas", detail: "Deudas de la óptica · solo para ti", icon: LockKeyhole, group: "Finanzas", soloSuperadmin: true },
+  { href: "/mi-espacio/bancos", label: "Cuadre de bancos", detail: "Saldo real de cada cuenta por sucursal · solo para ti", icon: Landmark, group: "Finanzas", soloSuperadmin: true },
   { href: "/asistente", label: "Asistente Shu", detail: "Plantillas y ayuda administrativa", icon: Sparkles, group: "Administración" },
   { href: "/equipo", label: "Equipo y accesos", detail: "Usuarios, roles y contraseñas", icon: Users, group: "Administración" },
   { href: "/configuracion/sucursales", label: "Sucursales e identidad", detail: "Logo, contacto y presentación", icon: Settings, group: "Administración" },
