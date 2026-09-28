@@ -19,6 +19,7 @@ export type SalesProfile = { id: string; empresa_id: string; sucursal_id: string
 export type SaleLabOrder = { id: string; venta_id: string; venta_item_id: string | null; estado: string; laboratorio: string; creado_en: string; tipo_lente: string; es_garantia: boolean };
 export type EmpresaConvenio = { id: string; nombre: string };
 export type Garantia = { id: string; venta_id: string; venta_item_id: string | null; tipo: "armazon" | "luna"; motivo: string; estado: "abierta" | "resuelta" | "rechazada"; orden_laboratorio_id: string | null; notas: string | null; creado_en: string };
+export const CONSUMIDOR_FINAL_CEDULA = "9999999999999";
 export type VentasData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: SalesProfile; products: SaleProduct[]; stock: SaleStock[]; sales: Sale[]; companies: SaleCompany[]; branches: SaleBranch[]; accessibleBranches: SaleBranch[]; patients: SalePatient[]; labOrders: SaleLabOrder[]; garantias: Garantia[]; empresasConvenio: EmpresaConvenio[] };
 
 const salesRoles = new Set(["superadmin", "admin_sucursal", "vendedor", "caja", "optometra"]);
@@ -51,15 +52,18 @@ export async function getVentasData(): Promise<VentasData> {
     // después de validar que la sesión tenga un rol autorizado para Ventas.
     const patientReader = hasSupabaseAdminConfiguration() ? createSupabaseAdminClient() : supabase;
     const salePatientIds = Array.from(new Set((salesResult.data ?? []).map((sale) => sale.paciente_id).filter(Boolean))) as string[];
-    const [patientDirectoryResult, salePatientsResult] = await Promise.all([
+    const [patientDirectoryResult, salePatientsResult, consumidorFinalResult] = await Promise.all([
       patientReader.from("pacientes_clinicos").select("id,nombres,apellidos,cedula,telefono").order("apellidos").order("nombres").limit(500),
       salePatientIds.length
         ? patientReader.from("pacientes_clinicos").select("id,nombres,apellidos,cedula,telefono").in("id", salePatientIds)
         : Promise.resolve({ data: [] as SalePatient[], error: null }),
+      // Carpeta "CONSUMIDOR FINAL" (identificación SRI 9999999999999) siempre disponible para la venta rápida.
+      patientReader.from("pacientes_clinicos").select("id,nombres,apellidos,cedula,telefono").eq("cedula", CONSUMIDOR_FINAL_CEDULA),
     ]);
     const patientMap = new Map<string, SalePatient>();
     (patientDirectoryResult.data ?? []).forEach((patient) => patientMap.set(patient.id, patient));
     (salePatientsResult.data ?? []).forEach((patient) => patientMap.set(patient.id, patient));
+    (consumidorFinalResult.data ?? []).forEach((patient) => patientMap.set(patient.id, patient));
 
     const productIds = (productsResult.data ?? []).map((product) => product.id);
     const stockResult = productIds.length ? await fetchAll<SaleStock>((from, to) => supabase.from("inventario_stock").select("producto_id,sucursal_id,cantidad").order("id").range(from, to)) : { data: [], error: null };

@@ -8,6 +8,10 @@ import { crearAcuerdoPago, crearEmpresaConvenio, type AcuerdoPago } from "./conv
 import AcuerdoPagoView from "./acuerdo-pago-view";
 import type { EmpresaConvenio, PaymentMethod, SaleBranch, SaleCompany, SalePatient, SaleProduct, SaleStock } from "@/lib/ventas";
 
+// Carpeta "CONSUMIDOR FINAL" (identificación del SRI) para ventas rápidas sin datos del cliente.
+const CONSUMIDOR_FINAL_CEDULA = "9999999999999";
+const nombrePaciente = (p: SalePatient) => [p.apellidos, p.nombres].filter((x) => x && x.trim()).join(", ");
+
 type CartItem = { producto_id: string; cantidad: number; descuento: number; precio?: string };
 // Armazones y lunas: el precio se puede editar en la venta.
 const precioEditable = (p?: SaleProduct) => !!p && (p.categoria === "montura" || p.categoria === "lente");
@@ -25,6 +29,7 @@ export default function Cart({ products, stock, branches, patients, empresasConv
   const [modo, setModo] = useState<Modo>("");
   const [branch, setBranch] = useState(() => branches.find((b) => b.id === defaultBranch)?.id ?? branches.find((b) => b.empresa_id === defaultCompany)?.id ?? "");
   const company = branches.find((b) => b.id === branch)?.empresa_id ?? ""; const [cliente, setCliente] = useState(""); const [pacienteId, setPacienteId] = useState(defaultPacienteId ?? "");
+  const consumidorFinal = patients.find((p) => p.cedula === CONSUMIDOR_FINAL_CEDULA);
   const [items, setItems] = useState<CartItem[]>([]); const [payments, setPayments] = useState<CartPayment[]>([]);
   const [notice, setNotice] = useState(""); const [pending, start] = useTransition();
   const [convenioActivo, setConvenioActivo] = useState(false);
@@ -110,7 +115,7 @@ export default function Cart({ products, stock, branches, patients, empresasConv
       <div className="new-patient-form" style={{ marginTop: 10 }}>
         <input type="hidden" name="empresa_id" value={company} />
         <label>Sucursal<select name="sucursal_id" required value={branch} onChange={(event) => resetBranch(event.target.value)}><option value="" disabled>Selecciona una sucursal</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label>
-        {lockPatient ? <label>Paciente<input value={patients[0] ? `${patients[0].apellidos}, ${patients[0].nombres}` : ""} disabled /><input type="hidden" name="paciente_id" value={pacienteId} /></label> : <label>Paciente<select name="paciente_id" value={pacienteId} onChange={(event) => setPacienteId(event.target.value)}><option value="">Sin paciente (cliente ocasional)</option>{patients.map((patient) => <option key={patient.id} value={patient.id}>{patient.apellidos}, {patient.nombres}{patient.cedula ? ` · ${patient.cedula}` : ""}</option>)}</select></label>}
+        {lockPatient ? <label>Paciente<input value={patients[0] ? `${patients[0].apellidos}, ${patients[0].nombres}` : ""} disabled /><input type="hidden" name="paciente_id" value={pacienteId} /></label> : <label>Paciente<select name="paciente_id" value={pacienteId} onChange={(event) => setPacienteId(event.target.value)}><option value="">Sin paciente (cliente ocasional)</option>{patients.map((patient) => <option key={patient.id} value={patient.id}>{nombrePaciente(patient)}{patient.cedula ? ` · ${patient.cedula}` : ""}</option>)}</select>{consumidorFinal && <button type="button" className={pacienteId === consumidorFinal.id ? "new-consultation" : "outline-action"} style={{ marginTop: 6 }} onClick={() => setPacienteId(consumidorFinal.id)}>Consumidor final</button>}</label>}
         <label>Cliente<input name="cliente_nombre" placeholder="Opcional" value={pacienteId ? "" : cliente} disabled={!!pacienteId} onChange={(event) => setCliente(event.target.value)} /></label>
         {modo === "rapida" && <label>Agregar producto<select defaultValue="" onChange={(event) => { addProduct(event.target.value); event.currentTarget.value = ""; }}><option value="">Selecciona un producto</option>{availableRapida.map((p) => <option key={p.id} value={p.id}>{p.nombre} · {money(Number(p.precio_venta))}</option>)}</select></label>}
       </div>
