@@ -127,6 +127,8 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 - WhatsApp de "lentes listos" y "seguimiento" siempre con confirmación humana antes de enviar.
 - Focus y SHUVISION no comparten datos automáticamente.
 - No se instalan complementos/plugins de repositorios no verificados. Codex se usa mediante el plugin oficial ya instalado (`codex:rescue`).
+- **Acumulados e informes con datos de LumOS desde septiembre 2026 en adelante** (Shuyana, 2026-09-28). Para cualquier informe de meses anteriores se usan los **backups de Optox** en `~/Downloads` (usar siempre el archivo con la fecha más reciente de cada tipo): `Mi Optox - Backup - Ventas (…).csv` (último 23-09-2026), `Mi Optox - Backup - Pacientes (…).csv`, `Mi Optox - Backup - Revisiones (…).csv`, `Optox backup - Egresos de caja chica (…).xlsx`, `Optox Ventas Por sucursal (…).xlsx` (último 24-09-2026), `Optox backup - Productos y Servicios`, `Monturas`, `Proveedores`. No se vuelven a importar a LumOS (L-duplicados): solo se leen para responder.
+- **Acumulado del mes por sucursal** = todo el dinero que entró (pagos de ventas vigentes: lentes nuevos, abonos de quienes retiran, abonos de convenios) − todos los egresos del mes (caja y banco).
 
 ---
 
