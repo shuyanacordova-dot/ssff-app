@@ -23,11 +23,11 @@ const usoDesdeCalculado = (uso: UsoCalculado): UsoLente => uso === "lejos_y_cerc
 const tipoParaUso = (uso: UsoLente): TipoLente => uso === "todas" ? "progresivo" : uso === "lejos_y_cerca" ? "bifocal" : tipoLenteSugerido(usoDb(uso));
 const calcularRx = (rx: OrdenLaboratorioRx, uso: UsoLente) => uso === "cerca" ? rxCerca(rx) : uso === "intermedio" ? rxIntermedia(rx) : { od: { ...rx.od }, oi: { ...rx.oi } };
 
-function RxEyeCard({ eye, value, onChange, disabled, cerca = false }: { eye: "OD" | "OI"; value: RxEye; onChange: (v: RxEye) => void; disabled?: boolean; cerca?: boolean }) {
+function RxEyeCard({ eye, value, onChange, disabled, cerca = false, conProcesar = true }: { eye: "OD" | "OI"; value: RxEye; onChange: (v: RxEye) => void; disabled?: boolean; cerca?: boolean; conProcesar?: boolean }) {
   const set = (k: keyof RxEye) => (event: React.ChangeEvent<HTMLInputElement>) => onChange({ ...value, [k]: event.target.value });
-  const off = disabled || !value.procesar;
+  const off = disabled || (conProcesar && !value.procesar);
   return <div className={`eye-card ${rxStyles.card}`}>
-    <div className="eye-card-header with-toggle"><span>{eye}</span><label className="eye-toggle"><input type="checkbox" checked={value.procesar} onChange={(event) => onChange({ ...value, procesar: event.target.checked })} disabled={disabled} /> Procesar</label></div>
+    <div className="eye-card-header with-toggle"><span>{eye}</span>{conProcesar && <label className="eye-toggle"><input type="checkbox" checked={value.procesar} onChange={(event) => onChange({ ...value, procesar: event.target.checked })} disabled={disabled} /> Procesar</label>}</div>
     <div className={rxStyles.body}>
       <RxNumberField label="Esf" kind="esfera" value={value.esfera} onChange={(v) => onChange({ ...value, esfera: v })} disabled={off} />
       <RxNumberField label="Cil" kind="cilindro" value={value.cilindro} onChange={(v) => onChange({ ...value, cilindro: v })} disabled={off} onTranspose={(cilindro) => onChange({ ...value, ...transponer({ ...value, cilindro }) })} />
@@ -106,7 +106,8 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
   };
   const aplicarUso = (next: UsoLente, source: OrdenLaboratorioRx, resetDnp = false) => {
     setUso(next); setTipoLente(tipoParaUso(next));
-    setRx(calcularRx(source, next));
+    // Recalcular la receta NO cambia qué ojos se procesan (antes volvía a marcar los dos al cambiar el uso o el examen).
+    setRx((prev) => { const calc = calcularRx(source, next); return { ...calc, od: { ...calc.od, procesar: prev.od.procesar }, oi: { ...calc.oi, procesar: prev.oi.procesar } }; });
     const total = dnpExamen(source, resetDnp ? "" : dnpLejos);
     setMedidas((m) => ({ ...m, dnp: next === "cerca" ? dnpCerca(total, true) : total }));
   };
@@ -141,6 +142,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
     const alturaError = validarAlturaMontaje(tipoLente, medidas, rx, anterior);
     if (alturaError) { setError(alturaError); return; }
     if (!orderId && !itemId) { setError("Elige el producto de esta venta."); return; }
+    if (!rx.od.procesar && !rx.oi.procesar) { setError("Marca al menos un ojo para procesar (OD u OI)."); return; }
     start(async () => {
       const data = new FormData();
       data.set("laboratorio", laboratorio);
@@ -203,8 +205,8 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
         <p className="section-label" style={{ marginTop: 14 }}>Rx de lejos (examen)</p>
         {examen ? <div className="consultation-stats">{(["od", "oi"] as const).map((eye) => <span key={eye}><strong>{eye.toUpperCase()}</strong> Esf {examen[eye].esfera || "—"} · Cil {examen[eye].cilindro || "—"} · Eje {examen[eye].eje || "—"} · Add {examen[eye].add || "—"} · DNP {examen[eye].dnp || "—"}</span>)}</div> : <p className="field-hint">No está disponible la Rx del examen. La Rx guardada del laboratorio se conserva; selecciona una revisión o ingresa el examen para recalcular.</p>}
         {(!consultaId || !examen) && <details open={!orderId && !consultaId ? true : undefined}><summary>Ingresar o corregir Rx de lejos manualmente</summary><p className="field-hint">Estos cambios recalculan la Rx del laboratorio y reemplazan sus ajustes manuales.</p><div className={rxStyles.cards}>
-          <RxEyeCard eye="OD" value={examen?.od ?? emptyRx().od} onChange={(value) => updateExamen({ ...(examen ?? emptyRx()), od: value })} />
-          <RxEyeCard eye="OI" value={examen?.oi ?? emptyRx().oi} onChange={(value) => updateExamen({ ...(examen ?? emptyRx()), oi: value })} />
+          <RxEyeCard eye="OD" conProcesar={false} value={examen?.od ?? emptyRx().od} onChange={(value) => updateExamen({ ...(examen ?? emptyRx()), od: value })} />
+          <RxEyeCard eye="OI" conProcesar={false} value={examen?.oi ?? emptyRx().oi} onChange={(value) => updateExamen({ ...(examen ?? emptyRx()), oi: value })} />
         </div><label>DNP de lejos binocular (mm)<input inputMode="decimal" value={dnpLejos} onChange={(event) => { const value = event.target.value; setDnpLejos(value); setMedidas((m) => ({ ...m, dnp: uso === "cerca" ? dnpCerca(value, true) : value })); }} /></label></details>}
         {(uso === "cerca" || uso === "intermedio") && examen && (["od", "oi"] as const).some((eye) => rx[eye].procesar && !(parseRxNumber(examen[eye].add) ?? 0)) && <p className="notice" role="status">Falta la adición para calcular la visión de cerca</p>}
         <p className="section-label" style={{ marginTop: 14 }}>Rx calculada para el laboratorio</p>

@@ -11,8 +11,11 @@ export default async function InformeConvenioPage({ params, searchParams }: {
   const [{ id }, filtros] = await Promise.all([params, searchParams]);
   const context = await getOperationalContext();
   if (!context) return <InformeConvenio status="needs_login" convenioId={id} />;
+  const supabase = await createSupabaseServerClient();
   if (!["superadmin", "admin_sucursal"].includes(context.profile.rol)) {
-    return <InformeConvenio status="forbidden" convenioId={id} />;
+    // Permiso por persona (ej. Yuli entrega los informes a las empresas).
+    const { data: permitido } = await supabase.rpc("tiene_permiso", { p_recurso: "informes_convenio", p_accion: "leer" });
+    if (!permitido) return <InformeConvenio status="forbidden" convenioId={id} />;
   }
 
   const hoy = new Intl.DateTimeFormat("en-CA", {
@@ -25,7 +28,6 @@ export default async function InformeConvenioPage({ params, searchParams }: {
   const opticas = (context.profile.rol === "superadmin" ? context.companies : [context.activeCompany])
     .map(({ id, nombre }) => ({ id, nombre }));
   const optica = opticas.find(({ id }) => id === filtros.optica)?.id ?? context.activeCompany.id;
-  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("informe_convenio_mensual", {
     p_convenio: id, p_optica: optica, p_mes: `${mes}-01`,
   });

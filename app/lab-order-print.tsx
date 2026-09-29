@@ -96,9 +96,11 @@ export default function LabOrderPrint(props: LabOrderPrintProps) {
 
     <p className="lab-print-product"><Binoculars size={19} /> <span>{props.productDescription || "Producto no especificado"}</span></p>
 
+    {/* Solo se imprime el ojo que se procesa (Shuyana 2026-09-29). */}
     <section className="lab-print-rx">
-      <EyeLine label="OD" eye={props.rx.od} altura={alturaMontaje(props.medidas, "od")} />
-      <EyeLine label="OI" eye={props.rx.oi} altura={alturaMontaje(props.medidas, "oi")} />
+      {props.rx.od.procesar && <EyeLine label="OD" eye={props.rx.od} altura={alturaMontaje(props.medidas, "od")} />}
+      {props.rx.oi.procesar && <EyeLine label="OI" eye={props.rx.oi} altura={alturaMontaje(props.medidas, "oi")} />}
+      {props.rx.od.procesar !== props.rx.oi.procesar && <p className="lab-print-no-process">Procesar solo {props.rx.od.procesar ? "OD (ojo derecho)" : "OI (ojo izquierdo)"}</p>}
     </section>
 
     <section className="lab-print-review">
