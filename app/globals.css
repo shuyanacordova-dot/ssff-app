@@ -304,3 +304,54 @@ body { font-family: var(--font-body), Arial, sans-serif; background: radial-grad
 .lab-branch-badge.tone-matriz { background: #1f7a70; }
 .lab-branch-badge.tone-sacha { background: #6b4fa0; }
 .lab-branch-badge.tone-focus { background: #c46a1c; }
+
+/* Calendario de citas y actividades de las ópticas. */
+.cal-header-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.cal-filters { display: flex; flex-wrap: wrap; width: fit-content; margin-bottom: 14px; }
+.cal-legend { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-bottom: 18px; color: #526b65; font-size: 12px; }
+.cal-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.cal-shuvision { --cal-color: #1f7a6d; }
+.cal-sacha { --cal-color: #1f5f8b; }
+.cal-focus { --cal-color: #57176e; }
+.cal-all { --cal-color: #a0762a; }
+.cal-unspecified { --cal-color: #65758b; }
+.cal-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--cal-color); flex: 0 0 auto; }
+.cal-month { display: grid; gap: 6px; min-width: 0; }
+.cal-weekdays, .cal-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.cal-weekdays { color: #62776e; font-size: 11px; font-weight: 800; text-align: center; padding: 6px 0; }
+.cal-cell { display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: 140px; padding: 8px; border: 1px solid var(--mist); border-radius: 12px; background: rgba(255,255,255,.62); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.cal-cell:hover { border-color: var(--teal); background: rgba(255,255,255,.9); }
+.cal-cell:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+.cal-empty { visibility: hidden; }
+.cal-today { border: 2px solid var(--teal-deep); background: rgba(31,122,109,.08); }
+.cal-number { align-self: flex-start; display: grid; place-items: center; width: 25px; height: 25px; margin-bottom: 5px; font-size: 13px; font-weight: 700; }
+.cal-today .cal-number { background: var(--teal-deep); border-radius: 50%; color: white; }
+.cal-chips { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cal-chip { display: block; min-width: 0; padding: 4px 5px; border-radius: 5px; border-left: 3px solid var(--cal-color); background: color-mix(in srgb, var(--cal-color) 12%, white); color: var(--cal-color); font-size: 11px; font-weight: 700; }
+.cal-chip-text { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cal-cancelled { opacity: .5; text-decoration: line-through; }
+.cal-more { margin-top: 5px; font-size: 11px; font-weight: 800; color: #526b65; }
+.cal-activities { display: grid; gap: 12px; margin-bottom: 24px; }
+.cal-activities > h2 { margin-bottom: 0; }
+.cal-activity { min-width: 0; padding: 16px; border-radius: 15px; border-left: 4px solid var(--cal-color); }
+.cal-activity h3 { margin: 12px 0 8px; overflow-wrap: anywhere; }
+.cal-activity p { color: #617086; font-size: 13px; }
+.cal-description { white-space: pre-wrap; overflow-wrap: anywhere; }
+.cal-activity-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 12px; }
+.cal-error { padding: 12px; border-radius: 10px; background: #fff2f3; color: #9a3e4b; }
+@media (max-width: 780px) {
+  .cal-header-actions { width: 100%; }
+  .cal-header-actions > button { flex: 1 1 160px; }
+  .cal-cell { min-height: 125px; padding: 5px; }
+}
+@media (max-width: 520px) {
+  .cal-weekdays, .cal-days { gap: 3px; }
+  .cal-weekdays { font-size: 9px; }
+  .cal-cell { min-height: 88px; padding: 4px 2px; border-radius: 8px; }
+  .cal-number { width: 22px; height: 22px; font-size: 11px; }
+  .cal-chips { flex-direction: row; flex-wrap: wrap; gap: 3px; }
+  .cal-chip { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 50%; background: var(--cal-color); }
+  .cal-chip-text { display: none; }
+  .cal-more { font-size: 9px; }
+  .cal-legend { gap: 7px 12px; font-size: 11px; }
+}

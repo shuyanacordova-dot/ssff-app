@@ -53,3 +53,56 @@ export async function cambiarEstadoCita(formData: FormData) {
   } catch (error) { return { error: errorText(error) }; }
   revalidatePath("/agenda"); return { success: true };
 }
+
+const activityTypes = new Set(["reunion", "campana", "convenio", "pago", "capacitacion", "entrega", "otro"]);
+const activityStates = new Set(["pendiente", "hecha", "cancelada"]);
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function crearActividad(formData: FormData) {
+  try {
+    const { supabase, profile, role } = await currentProfile();
+    const titulo = field(formData, "titulo");
+    const fecha = field(formData, "fecha");
+    const tipo = field(formData, "tipo");
+    const horaInicio = field(formData, "hora_inicio");
+    const horaFin = field(formData, "hora_fin");
+    const sucursalId = field(formData, "sucursal_id");
+    const responsableId = field(formData, "responsable_id");
+    if (!titulo || [...titulo].length > 160) throw new Error("El título debe tener entre 1 y 160 caracteres.");
+    const parsedDate = new Date(fecha + "T00:00:00Z");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== fecha) throw new Error("La fecha no es válida.");
+    if (!activityTypes.has(tipo)) throw new Error("Selecciona un tipo de actividad válido.");
+    const validTime = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+    if ((horaInicio && !validTime(horaInicio)) || (horaFin && !validTime(horaFin))) throw new Error("Las horas no son válidas.");
+    if (horaFin && (!horaInicio || horaFin < horaInicio)) throw new Error("La hora fin debe ser igual o posterior a la hora inicio.");
+    if (!sucursalId && role !== "superadmin") throw new Error("Selecciona una óptica.");
+    if (sucursalId) {
+      if (!uuidPattern.test(sucursalId)) throw new Error("La óptica no es válida.");
+      const { data: branch, error } = await supabase.from("sucursales").select("id,empresa_id").eq("id", sucursalId).maybeSingle();
+      if (error || !branch || (role !== "superadmin" && branch.empresa_id !== profile.empresa_id)) throw new Error("No tienes permiso para crear actividades en esta óptica.");
+    }
+    if (responsableId) {
+      const { data, error } = await supabase.rpc("directorio_tareas");
+      if (error || !(data as AgendaTeamMember[] | null)?.some((member) => member.id === responsableId)) throw new Error("La persona responsable no pertenece al equipo disponible.");
+    }
+    const { error } = await supabase.from("actividades_agenda").insert({
+      titulo, fecha, tipo, hora_inicio: horaInicio || null, hora_fin: horaFin || null,
+      sucursal_id: sucursalId || null, responsable_id: responsableId || null,
+      descripcion: field(formData, "descripcion") || null, estado: "pendiente", created_by: profile.id,
+    });
+    if (error) throw new Error("No se pudo registrar la actividad.");
+  } catch (error) { return { error: error instanceof Error ? error.message : "No se pudo guardar la actividad." }; }
+  revalidatePath("/agenda"); return { success: true };
+}
+
+export async function cambiarEstadoActividad(formData: FormData) {
+  try {
+    const { supabase } = await currentProfile();
+    const actividadId = field(formData, "actividad_id");
+    const estado = field(formData, "estado");
+    if (!uuidPattern.test(actividadId) || !activityStates.has(estado)) throw new Error("La actividad o el estado no son válidos.");
+    const { data, error } = await supabase.from("actividades_agenda").update({ estado, actualizado_en: new Date().toISOString() }).eq("id", actividadId).select("id").maybeSingle();
+    if (error || !data) throw new Error("No se pudo actualizar la actividad. Revisa tus permisos.");
+  } catch (error) { return { error: error instanceof Error ? error.message : "No se pudo actualizar la actividad." }; }
+  revalidatePath("/agenda"); return { success: true };
+}
