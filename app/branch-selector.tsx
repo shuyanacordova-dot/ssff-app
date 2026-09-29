@@ -45,7 +45,7 @@ export function BranchDirectory({ activeId, branches }: { activeId: string; bran
     <div className="branch-directory-heading"><div><p className="section-label">SUCURSALES</p><h2 id="branch-directory-title">Tus sucursales</h2></div><span>La información operativa se mantiene separada por sede.</span></div>
     <div className="branch-directory-grid">{branches.map((branch) => {
       const active = branch.id === activeId;
-      return <article className={`branch-directory-card ${active ? "active" : ""}`} key={branch.id}><div><span className="branch-company">{branch.empresaNombre}</span><h3>{branch.nombre}</h3><small>{active ? "Sucursal activa" : "Disponible"}</small></div><button type="button" disabled={pending || active} onClick={() => enter(branch.id)}>{active ? <><CheckCircle2 size={15} /> Activa</> : pendingId === branch.id ? "Abriendo…" : "Ingresar"}</button></article>;
+      return <article className={`branch-directory-card ${active ? "active" : ""}`} key={branch.id} onClick={() => { if (!pending) enter(branch.id); }} style={{ cursor: active ? "default" : "pointer" }}><div><span className="branch-company">{branch.empresaNombre}</span><h3>{branch.nombre}</h3><small>{active ? "Estás trabajando aquí" : "Toca para trabajar aquí"}</small></div><button type="button" disabled={pending || active} onClick={(event) => { event.stopPropagation(); enter(branch.id); }}>{active ? <><CheckCircle2 size={15} /> Aquí</> : pendingId === branch.id ? "Abriendo…" : "Entrar"}</button></article>;
     })}</div>
     {error && <p className="field-hint">{error}</p>}
   </section>;
