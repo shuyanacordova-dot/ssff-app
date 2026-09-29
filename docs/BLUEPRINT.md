@@ -107,6 +107,8 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 
 ## 5. Decisiones tomadas (no cambiar sin preguntar)
 
+- **Autorización permanente de publicación (Shuyana, 2026-09-29):** cada cambio terminado y comprobado se sube al GitHub `shuyanacordova-dot/ssff-app` y se publica en producción en el proyecto Vercel `ssff-app`, sin pedir confirmación nuevamente.
+
 - El nombre del sistema es **LumOS** (antes Revelio / SSFF).
 - Revisiones clínicas: se pueden editar (decisión 2026-09-24).
 - Datos del paciente: los puede editar todo el equipo, incluidos vendedores; siempre queda registro (decisión 2026-09-24).
@@ -214,7 +216,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 
 | Fecha | Qué se entregó | Commit |
 |---|---|---|
-| 2026-09-29 | Convenios conectados a CxC por empresa (ventas con acuerdo o paciente vinculado); botones visibles de CxC e informe mensual. Informe del Municipio de Shushufindi: bruto, 5 % retenido y neto 95 %, redondeado a centavos; generar no registra pagos. Archivos: `app/convenios/convenios-board.tsx`, `app/convenios/[id]/informe/informe-convenio.tsx`, `app/cuentas-cobrar/page.tsx`, `app/cuentas-cobrar/cuentas-cobrar-board.tsx`, `lib/cuentas-cobrar.ts`, `lib/convenio-liquidacion.ts`. Sin migración. TypeScript y build correctos; 4 casos de liquidación comprobados. Publicación bloqueada: conector Vercel 403; CLI restringida sin conexión; escalación rechazada por revisión automática por falta de autorización explícita de publicación. Prueba visual pendiente: apertura de LumOS bloqueada e interrumpida. | (este commit) |
+| 2026-09-29 | Convenios conectados a CxC por empresa (ventas con acuerdo o paciente vinculado); botones visibles de CxC e informe mensual. Informe del Municipio de Shushufindi: bruto, 5 % retenido y neto 95 %, redondeado a centavos; generar no registra pagos. Archivos: `app/convenios/convenios-board.tsx`, `app/convenios/[id]/informe/informe-convenio.tsx`, `app/cuentas-cobrar/page.tsx`, `app/cuentas-cobrar/cuentas-cobrar-board.tsx`, `lib/cuentas-cobrar.ts`, `lib/convenio-liquidacion.ts`. Sin migración. TypeScript y build correctos; 4 casos de liquidación comprobados. Publicación autorizada explícitamente por Shuyana (29-sep), incluida autorización permanente para siguientes cambios; en proceso. Prueba visual pendiente: apertura de LumOS bloqueada e interrumpida. | (este commit) |
 | 2026-09-29 | **Facturación SRI, paso 1 y 2** (Codex, revisado por Claude): pantalla `/facturacion/configuracion` (solo superadmin) con los 3 emisores, edición de nombre comercial/dirección/establecimiento/punto y **carga segura de la firma .p12**: se valida en memoria con su clave (`node-forge`), se toma titular y vencimiento, el archivo va al bucket privado `firmas-sri` y la clave a Supabase Vault (`sri_guardar_firma`, solo llave de servicio; migración `20260929040000`). Emisores completos (migración `20260929030000`): Shushufindi 001, Sacha 002, Focus 002. Biblioteca `lib/sri/` (clave de acceso 49 dígitos con módulo 11 y XML de factura 1.1.0, con leyenda RIMPE); autocomprobación OK. Falta: firmar el XML (XAdES-BES), enviar al SRI de pruebas, RIDE. | (este commit) |
 | 2026-09-24 | Arreglo de impresión que congelaba, botón de orden visible en ventas, edición de revisiones | `ef2a66c` |
 | 2026-09-24 | Este Blueprint + reglas para IAs (`AGENTS.md`, `CLAUDE.md`) | `6804ec0` |
