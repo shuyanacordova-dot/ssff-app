@@ -283,6 +283,14 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 
 ## 11. Pendientes abiertos (2026-09-24)
 
+**Próxima sesión (pedido de Shuyana, 2026-09-28), en este orden:**
+1. **Cuadrar Sacha:** saldos del día de Pichincha, Guayaquil e Internacional + efectivo real; revisar cuadre de caja (no cuadra en LumOS desde el 22-09; ojo L34 con la apertura) y fijar punto de partida como Shushufindi ($2.142,93) y Focus ($830,94).
+2. **Acumulado (dinero disponible) en el inicio**, por sucursal: saldo de bancos desde el último cuadre + efectivo de la caja, junto al "Resultado del mes" (con Codex).
+3. **Metas de octubre** por sucursal (Shuyana define montos; septiembre: Shushufindi $8.000, Sacha $4.000, Focus $3.000).
+4. **Control de los números** en el inicio (con Codex): avisos de días sin cuadre de caja, ventas con pagado ≠ abonos, transferencias sin banco, cuadre de bancos del sábado pendiente, metas sin definir, egresos sin sucursal; y aviso si una apertura de caja no coincide con la caja calculada (L34).
+5. **Editar la interfaz del sistema** (pedido de Shuyana): preguntarle qué pantallas y qué cambios quiere (orden del menú, colores, textos, tamaños) antes de empezar.
+6. Luego: facturación electrónica SRI (necesita RUC de Sacha y Focus).
+
 
 10. **Mis deudas — datos por confirmar (Shuyana):** saldo real del Crédito Jassy (hoy $25,200 provisional), cuotas restantes y día de pago de BanEcuador Shu ($35) y Joi ($45), confirmar que "American Gold" = American Business (pago 13). Después: apartados de pagos de Focus (Erick) y Sacha (Jassy), usando `deudas_negocio.ambito`.
 1. ✅ **Depuración julio–septiembre 2026 aplicada** (2026-09-24, autorizada por Shuyana): 332 ventas anuladas a su nombre, respaldadas en `depuracion_ventas_duplicadas` (migración `20260925001427`). Julio y agosto idénticos a Optox en las 3 sucursales. Cuentas por cobrar: 110 ventas con saldo, $17,590.
