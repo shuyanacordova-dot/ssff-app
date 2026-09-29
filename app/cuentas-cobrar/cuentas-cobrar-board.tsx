@@ -50,7 +50,7 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
   const [canjeDeuda, setCanjeDeuda] = useState<DeudaPaciente | null>(null);
   const [apartadoDeuda, setApartadoDeuda] = useState<DeudaPaciente | null>(null);
   const esSuperadmin = props.profile?.rol === "superadmin";
-  const [tab, setTab] = useState<Pestana>("urgentes");
+  const [tab, setTab] = useState<Pestana>(props.convenioFiltro ? "todas" : "urgentes");
   const [todas, setTodas] = useTodasSucursales();
 
   if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN COMERCIAL</p><h1>Cuentas por cobrar</h1><p className="subtitle">{props.message ?? "No se pudo abrir cuentas por cobrar."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/cuentas-cobrar">Iniciar sesión</Link>}</header></div></main>;
@@ -104,6 +104,7 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
 
   return <main className="page agenda-page"><div className="container agenda-shell">
     <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN COMERCIAL{props.empresaNombre ? ` · ${props.empresaNombre}` : ""}</p><h1>Cuentas por cobrar</h1><p className="subtitle">Pacientes con saldo pendiente, ordenados por prioridad.</p></div>{activa && <TodasSucursalesToggle todas={todas} onChange={setTodas} sucursalNombre={props.sucursalActivaNombre} />}</header>
+    {props.convenioFiltro && <div className="notice"><strong>{props.convenioFiltro.nombre}</strong><Link className="outline-action" href={`/convenios/${props.convenioFiltro.id}/informe`}>Generar informe mensual</Link><Link href="/convenios">Ver empresas</Link><Link href="/cuentas-cobrar">Quitar filtro</Link></div>}
     <section className="agenda-summary"><article><Wallet size={21} /><strong>{money(totalDeuda)}</strong><span>saldo total pendiente</span></article><article><CircleAlert size={21} /><strong>{deudas.length}</strong><span>pacientes con deuda</span></article></section>
     <div className="notice"><CircleAlert size={18} /><span>{notice || "El saldo se calcula solo desde las ventas completadas; los abonos lo actualizan automáticamente."}</span></div>
     <div className="make-status"><AlertTriangle size={18} /><span><strong>Automatización diaria con Make:</strong> {props.makeConfigured ? "el enlace técnico está configurado, pero el envío de datos permanece pausado hasta tu autorización final." : "pendiente de conectar. Los mensajes manuales por WhatsApp ya se pueden usar y revisar."}</span></div>

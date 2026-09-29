@@ -1,5 +1,6 @@
 "use client";
 
+import { liquidarConvenio } from "@/lib/convenio-liquidacion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -23,7 +24,7 @@ type Props = { convenioId: string } & (
 );
 type Edicion = { incluir: boolean; descuento: string };
 const money = new Intl.NumberFormat("es-EC", { style: "currency", currency: "USD" });
-const importe = (value: string) => Number.isFinite(Number(value)) ? Number(value) : 0;
+const importe = (value: string) => Number.isFinite(Number(value)) ? Math.round(Number(value) * 100) / 100 : 0;
 
 export default function InformeConvenio(props: Props) {
   const router = useRouter();
@@ -50,7 +51,8 @@ export default function InformeConvenio(props: Props) {
   const editar = (id: string, cambio: Partial<Edicion>) => setEdiciones((actual) => ({
     ...actual, [id]: { ...actual[id], ...cambio },
   }));
-  const total = filas.reduce((sum, fila) => sum + (ediciones[fila.venta_id].incluir ? importe(ediciones[fila.venta_id].descuento) : 0), 0);
+  const liquidacion = liquidarConvenio(convenio.id, filas.filter((fila) => ediciones[fila.venta_id].incluir).map((fila) => importe(ediciones[fila.venta_id].descuento)));
+  const total = liquidacion.bruto;
   const excedeSaldo = filas.some((fila) => ediciones[fila.venta_id].incluir && importe(ediciones[fila.venta_id].descuento) > Number(fila.saldo));
   const mesNombre = new Intl.DateTimeFormat("es-EC", { month: "long", year: "numeric", timeZone: "UTC" })
     .format(new Date(`${mes}-15T12:00:00Z`));
@@ -67,9 +69,10 @@ export default function InformeConvenio(props: Props) {
         {opticas.map((opcion) => <option key={opcion.id} value={opcion.id}>{opcion.nombre}</option>)}
       </select></label>}
       <button type="button" className="new-consultation" disabled={excedeSaldo} onClick={() => printDocumentById("informe-convenio-print")}>Imprimir / Guardar PDF</button>
+      <Link className="outline-action" href={`/cuentas-cobrar?convenio=${convenioId}`}>Ver cuentas por cobrar</Link>
       <p className="field-hint" style={{ flexBasis: "100%" }}>Revisa los valores antes de imprimir; puedes cambiar el valor a descontar o quitar a alguien.</p>
     </div>
-    <section id="informe-convenio-print" className="glass agenda-board">
+    <section id="informe-convenio-print" className="glass agenda-board print-area">
       <div className="letterhead" style={{ display: "flex", gap: 20, alignItems: "center", marginBottom: 24 }}>
         {optica.logo_url ? <img src={optica.logo_url} alt={`Logo de ${optica.nombre}`} style={{ maxHeight: 70, maxWidth: 180, objectFit: "contain" }} /> : <strong>{optica.nombre}</strong>}
         <div><strong>{optica.nombre}</strong>
@@ -105,6 +108,13 @@ export default function InformeConvenio(props: Props) {
         })}</tbody>
         <tfoot><tr className="total-row"><td className="no-print" /><td colSpan={4}>Total a descontar</td><td style={{ textAlign: "right" }}>{money.format(total)}</td><td /></tr></tfoot>
       </table>}
+      {liquidacion.porcentaje > 0 && <div style={{ marginTop: 24, breakInside: "avoid" }}>
+        <p>Total a descontar a los empleados: <strong>{money.format(total)}</strong></p>
+        <p>Descuento retenido por el sindicato (5 %): <strong>{money.format(liquidacion.retencion)}</strong></p>
+        <p>Neto a entregar a {optica.nombre}: <strong>{money.format(liquidacion.neto)}</strong></p>
+        <p className="field-hint">El sindicato conserva el 5 % del total del mes y entrega el 95 % a la óptica.</p>
+      </div>}
+      <p className="field-hint no-print">Este informe usa los saldos pendientes actuales. Generarlo no registra abonos ni modifica la deuda.</p>
       <footer style={{ marginTop: 32, breakInside: "avoid" }}><p>Atentamente,</p>
         <div style={{ borderTop: "1px solid", width: 260, maxWidth: "100%", marginTop: 48, paddingTop: 8 }}>{optica.nombre}</div>
       </footer>
