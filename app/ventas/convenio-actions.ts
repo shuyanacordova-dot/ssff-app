@@ -55,3 +55,15 @@ export async function crearAcuerdoPago(ventaId: string, empresaConvenioId: strin
   revalidatePath("/ventas"); revalidatePath("/pacientes"); revalidatePath("/cuentas-cobrar");
   return acuerdo;
 }
+
+export async function datosAutorizacionRol(ventaId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data: venta, error: ventaError } = await supabase.from("ventas").select("empresa_id,paciente_id,estado,saldo").eq("id", ventaId).maybeSingle();
+  if (ventaError || !venta || venta.estado !== "completada" || !venta.paciente_id) throw new Error("No se encontró una venta válida.");
+  const [empresas, acuerdo] = await Promise.all([
+    supabase.from("empresas_convenio").select("id,nombre").eq("activo", true).order("nombre"),
+    supabase.from("acuerdos_pago").select("empresa_convenio_id,cuotas").eq("venta_id", ventaId).maybeSingle(),
+  ]);
+  if (empresas.error || acuerdo.error) throw new Error("No se pudieron cargar los convenios.");
+  return { empresas: empresas.data ?? [], acuerdo: acuerdo.data };
+}

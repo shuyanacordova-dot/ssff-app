@@ -9,10 +9,10 @@ import type { CategoriaDeuda, CuentasCobrarData, DeudaPaciente, EmpresaConvenio,
 import { DIAS_APARTADO, DIAS_REZAGO, DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
 import { laboratorioLabels } from "@/lib/laboratorio";
 import { cambiarEstadoOrdenLaboratorio } from "@/app/ventas/lab-actions";
-import { construirMensajeContacto, plantillasContacto, type PlantillaContactoId } from "@/lib/mensajes";
+import { construirMensajeContacto, plantillasContacto, plantillaSugerida, type PlantillaContactoId } from "@/lib/mensajes";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import { crearAcuerdoPago, crearEmpresaConvenio, type AcuerdoPago } from "@/app/ventas/convenio-actions";
-import { activarCobroInsistente, actualizarFrecuenciaCobro, clasificarDeuda, marcarApartado, marcarMensajeCobro, registrarCanje } from "./actions";
+import { activarCobroInsistente, actualizarFrecuenciaCobro, clasificarDeuda, fijarFechaCobro, marcarApartado, marcarMensajeCobro, registrarCanje } from "./actions";
 import Letterhead from "../print-letterhead";
 import { TodasSucursalesToggle, useTodasSucursales } from "@/app/todas-sucursales-toggle";
 
@@ -50,6 +50,7 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
   const [canjeDeuda, setCanjeDeuda] = useState<DeudaPaciente | null>(null);
   const [apartadoDeuda, setApartadoDeuda] = useState<DeudaPaciente | null>(null);
   const esSuperadmin = props.profile?.rol === "superadmin";
+  const [mensajesLocales, setMensajesLocales] = useState<Record<string, { fecha: string; por: string }>>({});
   const [tab, setTab] = useState<Pestana>(props.convenioFiltro ? "todas" : props.colaHoy.length ? "hoy" : "urgentes");
   const [todas, setTodas] = useTodasSucursales();
 
@@ -114,7 +115,7 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
       {tab === "hoy" ? <ColaCobrosHoy cola={props.colaHoy} sucursalId={props.sucursalActivaId} sucursalNombre={props.sucursalActivaNombre} error={props.colaHoyError} /> : <>
       <p className="field-hint">{tab === "todas" ? "Todas las deudas, de la más antigua a la más reciente. Usa \"Clasificación\" en cada tarjeta para moverla a otra pestaña." : categorias.find((c) => c.id === tab)?.ayuda}</p>
       {tab === "rezagados" && rezagadosLab.length > 0 && <div className="task-list" style={{ marginBottom: 12 }}>{rezagadosLab.map((lente) => <RezagadoCard key={lente.orden_id} lente={lente} pending={pending} onEntregado={() => entregarLente(lente)} />)}</div>}
-      {tab === "rezagados" && !visibles.length && !rezagadosLab.length ? <section className="empty-state"><FlaskConical size={27} /><h3>No hay lentes rezagados</h3><p>{`Mueve aquí una deuda con "Clasificación", o espera a que una orden lleve ${DIAS_REZAGO} días lista sin retirarse.`}</p></section> : visibles.length ? <div className="task-list">{visibles.map((deuda) => <DeudaCard key={deuda.paciente_id} deuda={deuda} pending={pending} onCanje={esSuperadmin ? () => setCanjeDeuda(deuda) : undefined} mostrarCategoria={tab === "todas"} onClasificar={(c) => cambiarClasificacion(deuda, c)} onFrecuencia={(f) => cambiarFrecuencia(deuda.paciente_id, f)} onCobroInsistente={(activo) => cambiarCobroInsistente(deuda.paciente_id, activo)} onConvenio={() => setConvenioDeuda(deuda)} onApartado={() => apartadoInfo(deuda) ? quitarApartado(deuda) : setApartadoDeuda(deuda)} />)}</div> : <section className="empty-state"><Wallet size={27} /><h3>No hay saldos en esta pestaña</h3><p>Cuando una venta quede con saldo aparecerá en la pestaña que le corresponda.</p></section>}
+      {tab === "rezagados" && !visibles.length && !rezagadosLab.length ? <section className="empty-state"><FlaskConical size={27} /><h3>No hay lentes rezagados</h3><p>{`Mueve aquí una deuda con "Clasificación", o espera a que una orden lleve ${DIAS_REZAGO} días lista sin retirarse.`}</p></section> : visibles.length ? <div className="task-list">{visibles.map((deuda) => <DeudaCard key={deuda.paciente_id} deuda={{ ...deuda, ultimo_mensaje: mensajesLocales[deuda.paciente_id]?.fecha ?? deuda.ultimo_mensaje, ultimo_mensaje_por: mensajesLocales[deuda.paciente_id]?.por ?? deuda.ultimo_mensaje_por }} sucursalActivaId={props.sucursalActivaId} usuarioNombre={props.profile?.nombre ?? "Equipo"} onMensaje={() => setMensajesLocales((prev) => ({ ...prev, [deuda.paciente_id]: { fecha: new Date().toISOString(), por: props.profile?.nombre ?? "Equipo" } }))} pending={pending} onCanje={esSuperadmin ? () => setCanjeDeuda(deuda) : undefined} mostrarCategoria={tab === "todas"} onClasificar={(c) => cambiarClasificacion(deuda, c)} onFrecuencia={(f) => cambiarFrecuencia(deuda.paciente_id, f)} onCobroInsistente={(activo) => cambiarCobroInsistente(deuda.paciente_id, activo)} onConvenio={() => setConvenioDeuda(deuda)} onApartado={() => apartadoInfo(deuda) ? quitarApartado(deuda) : setApartadoDeuda(deuda)} />)}</div> : <section className="empty-state"><Wallet size={27} /><h3>No hay saldos en esta pestaña</h3><p>Cuando una venta quede con saldo aparecerá en la pestaña que le corresponda.</p></section>}
       </>}
     </section>
     {apartadoDeuda && <ApartadoModal deuda={apartadoDeuda} onClose={() => setApartadoDeuda(null)} onNotice={setNotice} />}
@@ -133,8 +134,8 @@ function ColaCobrosHoy({ cola, sucursalId, sucursalNombre, error }: { cola: Cobr
   const enviar = (row: CobroHoy, abrirWhatsapp: boolean) => {
     if (!sucursalId || procesando) return;
     if (abrirWhatsapp) {
-      const plantilla: PlantillaContactoId = /mensual/i.test(row.motivo) || row.cada_dias >= 28 ? "cobro_mensual" : "cobro_insistente";
-      const mensaje = construirMensajeContacto(plantilla, { nombre: row.nombres, empresa: row.empresa_nombre, saldo: Number(row.saldo) });
+      const plantilla = plantillaSugerida({ insistente: row.cobro_insistente, apartado: row.apartado, frecuencia: row.frecuencia, dias: row.dias_deuda });
+      const mensaje = construirMensajeContacto(plantilla, { nombre: row.nombres, empresa: row.empresa_nombre, saldo: Number(row.saldo), apartadoHasta: row.apartado_hasta, frecuencia: row.frecuencia, sucursal: sucursalNombre });
       const url = enlaceWhatsapp(row.telefono, mensaje);
       if (!url) return;
       const ventana = window.open(url, "_blank");
@@ -160,15 +161,19 @@ function ColaCobrosHoy({ cola, sucursalId, sucursalNombre, error }: { cola: Cobr
     {pendientes.length ? <div className="cob-list">{pendientes.map((row, index) => {
       const tieneWhatsapp = !!enlaceWhatsapp(row.telefono, "");
       const fecha = row.ultimo_mensaje ? new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "2-digit" }).format(new Date(row.ultimo_mensaje)) : null;
-      return <article className="cob-row" key={row.paciente_id}><div className="cob-row-main"><h3>{row.nombres} {row.apellidos}</h3><span className={/insistente/i.test(row.motivo) ? "cob-badge cob-badge-urgent" : "cob-badge"}>{row.motivo}</span><p>Último mensaje: {fecha ?? "Nunca"}</p></div><div className="cob-row-action"><strong>{money(Number(row.saldo))}</strong>{tieneWhatsapp ? <button className={`new-consultation${index === 0 ? " cob-next-button" : ""}`} type="button" disabled={!!procesando || !sucursalId} onClick={() => enviar(row, true)}><MessageCircle size={14} /> Enviar por WhatsApp</button> : <><span>Sin WhatsApp registrado</span><button className={`outline-action${index === 0 ? " cob-next-button" : ""}`} type="button" disabled={!!procesando || !sucursalId} onClick={() => enviar(row, false)}>Marcar como avisado</button></>}</div></article>;
+      return <article className="cob-row" key={row.paciente_id}><div className="cob-row-main"><h3>{row.nombres} {row.apellidos}</h3><span className={row.cobro_insistente ? "cob-badge cob-badge-urgent" : "cob-badge"}>{row.motivo}</span><span className="cob-badge">{row.apartado && !row.cobro_insistente ? "Apartado" : plantillaSugerida({ insistente: row.cobro_insistente, apartado: row.apartado, frecuencia: row.frecuencia, dias: row.dias_deuda }) === "cobro_insistente" ? "Firme" : "Recordatorio"}</span><p>Último mensaje: {fecha ?? "Nunca"}</p></div><div className="cob-row-action"><strong>{money(Number(row.saldo))}</strong>{tieneWhatsapp ? <button className={`new-consultation${index === 0 ? " cob-next-button" : ""}`} type="button" disabled={!!procesando || !sucursalId} onClick={() => enviar(row, true)}><MessageCircle size={14} /> Enviar por WhatsApp</button> : <><span>Sin WhatsApp registrado</span><button className={`outline-action${index === 0 ? " cob-next-button" : ""}`} type="button" disabled={!!procesando || !sucursalId} onClick={() => enviar(row, false)}>Marcar como avisado</button></>}</div></article>;
     })}</div> : <p className="cob-empty">No quedan mensajes de cobro para esta sucursal hoy.</p>}
   </section>;
 }
 
-function DeudaCard({ deuda, pending, onCanje, onApartado, mostrarCategoria, onClasificar, onFrecuencia, onCobroInsistente, onConvenio }: { deuda: DeudaPaciente; pending: boolean; onCanje?: () => void; onApartado: () => void; mostrarCategoria: boolean; onClasificar: (categoria: string) => void; onFrecuencia: (frecuencia: string) => void; onCobroInsistente: (activo: boolean) => void; onConvenio: () => void }) {
+function DeudaCard({ deuda, sucursalActivaId, usuarioNombre, onMensaje, pending, onCanje, onApartado, mostrarCategoria, onClasificar, onFrecuencia, onCobroInsistente, onConvenio }: { deuda: DeudaPaciente; sucursalActivaId?: string; usuarioNombre: string; onMensaje: () => void; pending: boolean; onCanje?: () => void; onApartado: () => void; mostrarCategoria: boolean; onClasificar: (categoria: string) => void; onFrecuencia: (frecuencia: string) => void; onCobroInsistente: (activo: boolean) => void; onConvenio: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [origin, setOrigin] = useState("");
-  const [plantilla, setPlantilla] = useState<PlantillaContactoId>(deuda.categoria === "rezagados" ? "listo_retiro" : deuda.frecuencia_cobro === "mensual" ? "cobro_mensual" : "cobro_insistente");
+  const [plantilla, setPlantilla] = useState<PlantillaContactoId>(() => plantillaSugerida({ rezagado: deuda.categoria === "rezagados", insistente: deuda.cobro_insistente, apartado: deuda.categoria === "apartados", frecuencia: deuda.frecuencia_cobro as "semanal" | "quincenal" | "mensual" | null, dias: deuda.dias_mas_antigua }));
+  const [verFecha, setVerFecha] = useState(false);
+  const [fechaCobro, setFechaCobro] = useState(deuda.fecha_cobro_acordada ?? "");
+  const [fechaError, setFechaError] = useState("");
+  const [fechaPending, startFecha] = useTransition();
   const [copied, setCopied] = useState(false);
   const [verMensaje, setVerMensaje] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -177,30 +182,33 @@ function DeudaCard({ deuda, pending, onCanje, onApartado, mostrarCategoria, onCl
   const token = deuda.ventas[0]?.recibo_token;
   const ticketUrl = origin && token ? `${origin}/recibo/${token}` : null;
   const fechaCompra = deuda.ventas[0]?.creado_en ?? null;
-  const mensaje = construirMensajeContacto(plantilla, { nombre: deuda.nombres, empresa: deuda.empresa_nombre, saldo: deuda.saldo_total, ticketUrl, fechaCompra });
+  const mensaje = construirMensajeContacto(plantilla, { nombre: deuda.nombres, empresa: deuda.empresa_nombre, saldo: deuda.saldo_total, ticketUrl, fechaCompra, apartadoHasta: apartado?.venta.apartado_hasta, frecuencia: deuda.frecuencia_cobro as "semanal" | "quincenal" | "mensual" | null, sucursal: deuda.sucursales[0] });
+  const registrar = () => { const sucursal = [...deuda.ventas].sort((a, b) => b.creado_en.localeCompare(a.creado_en))[0]?.sucursal_id ?? sucursalActivaId; if (!sucursal) return; onMensaje(); void marcarMensajeCobro(deuda.paciente_id, sucursal).catch(() => {}); };
+  const guardarFecha = (fecha: string | null) => startFecha(async () => { try { await fijarFechaCobro(deuda.paciente_id, fecha); setFechaCobro(fecha ?? ""); setVerFecha(false); } catch (err) { setFechaError(err instanceof Error ? err.message : "No se pudo guardar la fecha."); } });
   const wa = enlaceWhatsapp(deuda.telefono, mensaje);
   const closeMenu = () => setMenuOpen(false);
   const copiarMensaje = async () => {
-    try { await navigator.clipboard.writeText(mensaje); setCopied(true); window.setTimeout(() => setCopied(false), 1800); }
+    try { await navigator.clipboard.writeText(mensaje); registrar(); setCopied(true); window.setTimeout(() => setCopied(false), 1800); }
     catch { setCopied(false); }
   };
   useEffect(() => { setOrigin(window.location.origin); }, []);
   useEffect(() => { if (!menuOpen) return; const onClick = (event: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(event.target as Node)) closeMenu(); }; document.addEventListener("mousedown", onClick); return () => document.removeEventListener("mousedown", onClick); }, [menuOpen]);
 
   return <article className="task-card"><div className="task-status" /><div className="task-main">
-    <div className="task-meta"><span className="branch-meta" style={{ fontSize: 13 }}>{deuda.sucursales.join(" · ")}</span><span className={deuda.dias_mas_antigua > DIAS_URGENTE ? "urgente" : ""}>{deuda.dias_mas_antigua === 0 ? "Hoy" : deuda.dias_mas_antigua === 1 ? "Ayer" : `${deuda.dias_mas_antigua} días`}</span>{mostrarCategoria && <span>{categoriaLabel(deuda.categoria)}{deuda.categoria_manual ? " (manual)" : ""}</span>}{deuda.convenio && <span>Convenio {deuda.convenio.empresa} · {deuda.convenio.cuotas} cuotas de {money(deuda.convenio.monto_cuota)}</span>}{apartado && <span className={apartado.vencido ? "urgente" : ""}><Tag size={11} /> {apartado.texto}</span>}{deuda.cobro_insistente && <span className="urgente"><AlertTriangle size={11} /> Cobro insistente</span>}</div>
+    <div className="task-meta"><span className="branch-meta" style={{ fontSize: 13 }}>{deuda.sucursales.join(" · ")}</span><span className={deuda.dias_mas_antigua > DIAS_URGENTE ? "urgente" : ""}>{deuda.dias_mas_antigua === 0 ? "Hoy" : deuda.dias_mas_antigua === 1 ? "Ayer" : `${deuda.dias_mas_antigua} días`}</span>{mostrarCategoria && <span>{categoriaLabel(deuda.categoria)}{deuda.categoria_manual ? " (manual)" : ""}</span>}{deuda.convenio && <span>Convenio {deuda.convenio.empresa} · {deuda.convenio.cuotas} cuotas de {money(deuda.convenio.monto_cuota)}</span>}{apartado && <span className={apartado.vencido ? "urgente" : ""}><Tag size={11} /> {apartado.texto}</span>}{deuda.cobro_insistente && <span className="urgente"><AlertTriangle size={11} /> Cobro insistente</span>}{fechaCobro && <span className="state-pill">Cobrar el {new Intl.DateTimeFormat("es-EC", { day: "numeric", month: "short", timeZone: "America/Guayaquil" }).format(new Date(`${fechaCobro}T12:00:00-05:00`))}</span>}</div>
     <h2>{nombre}</h2>
-    <p>Saldo pendiente: <strong>{money(deuda.saldo_total)}</strong></p>
+    <p>Saldo pendiente: <strong>{money(deuda.saldo_total)}</strong></p><p>{deuda.ultimo_mensaje ? <>Último mensaje: {formatDate(deuda.ultimo_mensaje)}{deuda.ultimo_mensaje_por ? ` · ${deuda.ultimo_mensaje_por}` : ""}{new Intl.DateTimeFormat("en-CA", { timeZone: "America/Guayaquil", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(deuda.ultimo_mensaje)) === hoyEcuador() && <span className="state-pill aprobada" style={{ marginLeft: 8 }}>Contactado hoy</span>}</> : "Sin contactar"}</p>
     <div className="collection-controls">
       <label>Clasificación<select value={apartado ? "apartados" : deuda.categoria_manual ?? ""} disabled={pending} onChange={(event) => onClasificar(event.target.value)}><option value="">{deuda.categoria_auto === "apartados" ? "Automática" : `Automática (${categoriaLabel(deuda.categoria_auto)})`}</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
       <label>Frecuencia de cobro<select defaultValue={deuda.frecuencia_cobro ?? ""} disabled={pending} onChange={(event) => onFrecuencia(event.target.value)}><option value="">Sin definir</option>{Object.entries(frecuenciaLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
     </div>
+    {verFecha && <div className="modal-backdrop" onClick={() => setVerFecha(false)}><section className="new-patient-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setVerFecha(false)} aria-label="Cerrar"><X size={19} /></button><h2>Fecha de cobro</h2><label>Fecha acordada<input type="date" value={fechaCobro} onChange={(event) => setFechaCobro(event.target.value)} /></label><p className="field-hint">Ese día el paciente aparece en Cobros de hoy; antes de esa fecha no se le escribe.</p>{fechaError && <p className="notice">{fechaError}</p>}<div className="modal-actions"><button className="outline-action" disabled={fechaPending} onClick={() => guardarFecha(null)}>Quitar fecha</button><button className="new-consultation" disabled={fechaPending || !fechaCobro} onClick={() => guardarFecha(fechaCobro)}>Guardar</button></div></section></div>}
     {verMensaje && <div className="modal-backdrop" onClick={() => setVerMensaje(false)}><section className="new-patient-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
       <button className="modal-close" onClick={() => setVerMensaje(false)} aria-label="Cerrar"><X size={19} /></button>
       <p className="section-label">MENSAJE GUARDADO</p><h2>{nombre}</h2>
       <label className="task-description">Plantilla<select value={plantilla} onChange={(event) => setPlantilla(event.target.value as PlantillaContactoId)}>{plantillasContacto.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select></label>
       <div className="message-preview"><span>Mensaje</span><p>{mensaje}</p></div>
-      <div className="modal-actions"><button className="outline-action" type="button" onClick={copiarMensaje}><Copy size={13} /> {copied ? "Copiado" : "Copiar"}</button>{wa && <a className="new-consultation" href={wa} target="_blank" rel="noreferrer"><MessageCircle size={14} /> Enviar por WhatsApp</a>}</div>
+      <div className="modal-actions"><button className="outline-action" type="button" onClick={copiarMensaje}><Copy size={13} /> {copied ? "Copiado" : "Copiar"}</button>{wa && <a className="new-consultation" href={wa} target="_blank" rel="noreferrer" onClick={registrar}><MessageCircle size={14} /> Enviar por WhatsApp</a>}</div>
     </section></div>}
   </div><div className="task-actions">
     {wa ? <button className="new-consultation" type="button" onClick={() => setVerMensaje(true)}><MessageCircle size={14} /> Ver mensaje</button> : <span style={{ color: "#a24150", fontSize: 12, fontWeight: 700 }}>Sin WhatsApp registrado</span>}
@@ -210,6 +218,7 @@ function DeudaCard({ deuda, pending, onCanje, onApartado, mostrarCategoria, onCl
       <button className="outline-action" type="button" onClick={() => setMenuOpen((v) => !v)}><MoreVertical size={14} /> Más opciones</button>
       {menuOpen && <div className="menu-dropdown">
         <button type="button" onClick={() => { onApartado(); closeMenu(); }}><Tag size={14} /> {apartado ? "Quitar apartado" : "Marcar como apartado"}</button>
+        <button type="button" onClick={() => { setVerFecha(true); closeMenu(); }}>Fecha de cobro</button>
         <button type="button" onClick={() => { onConvenio(); closeMenu(); }}><FileText size={14} /> Convenio de pago</button>
         <button type="button" className={deuda.cobro_insistente ? "danger" : ""} onClick={() => { onCobroInsistente(!deuda.cobro_insistente); closeMenu(); }}><AlertTriangle size={14} /> {deuda.cobro_insistente ? "Quitar cobro insistente" : "Activar cobro insistente"}</button>
       </div>}
@@ -237,7 +246,7 @@ function ApartadoModal({ deuda, onClose, onNotice }: { deuda: DeudaPaciente; onC
 }
 
 function RezagadoCard({ lente, pending, onEntregado }: { lente: LenteRezagado; pending: boolean; onEntregado: () => void }) {
-  const mensaje = construirMensajeContacto("listo_retiro", { nombre: lente.paciente_nombre.split(" ")[0] ?? lente.paciente_nombre, empresa: lente.sucursal_nombre, saldo: lente.saldo, ticketUrl: null, fechaCompra: null });
+  const mensaje = construirMensajeContacto("lentes_rezagados", { nombre: lente.paciente_nombre.split(" ")[0] ?? lente.paciente_nombre, empresa: lente.sucursal_nombre, saldo: lente.saldo, ticketUrl: null, fechaCompra: null });
   const wa = enlaceWhatsapp(lente.telefono, mensaje);
   return <article className="task-card"><div className="task-status" /><div className="task-main">
     <div className="task-meta"><span className="branch-meta" style={{ fontSize: 13 }}>{lente.sucursal_nombre}</span><span className="urgente">Listo hace {lente.dias_listo} días</span><span>{(laboratorioLabels as Record<string, string>)[lente.laboratorio] ?? lente.laboratorio}</span></div>

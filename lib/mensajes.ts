@@ -1,5 +1,5 @@
 import { diasCalendarioGuayaquil } from "@/lib/record-date";
-export type PlantillaContactoId = "listo_retiro" | "cobro_insistente" | "cobro_mensual";
+export type PlantillaContactoId = "listo_retiro" | "cobro_insistente" | "cobro_mensual" | "cobro_apartado" | "lentes_rezagados";
 
 export type ContextoMensaje = {
   nombre: string;
@@ -7,12 +7,19 @@ export type ContextoMensaje = {
   saldo?: number;
   ticketUrl?: string | null;
   fechaCompra?: string | null;
+  // Fecha límite del apartado (AAAA-MM-DD).
+  apartadoHasta?: string | null;
+  // Frecuencia del recordatorio: cambia "este mes" por "esta semana" / "esta quincena".
+  frecuencia?: "semanal" | "quincenal" | "mensual" | null;
+  sucursal?: string | null;
 };
 
 export const plantillasContacto: Array<{ id: PlantillaContactoId; nombre: string; descripcion: string }> = [
+  { id: "cobro_mensual", nombre: "Recordatorio de pago", descripcion: "Tono amable: solo recordar el abono (mensual, quincenal o semanal)." },
+  { id: "cobro_insistente", nombre: "Cobro insistente", descripcion: "Tono firme para saldos vencidos." },
+  { id: "cobro_apartado", nombre: "Apartado (6 meses)", descripcion: "Recuerda el saldo y la fecha límite del apartado." },
+  { id: "lentes_rezagados", nombre: "Lentes rezagados", descripcion: "Lentes listos que el paciente no ha retirado." },
   { id: "listo_retiro", nombre: "Pedido listo", descripcion: "Avisa que sus lentes están listos para retirar." },
-  { id: "cobro_insistente", nombre: "Cobro insistente", descripcion: "Recordatorio firme para saldos vencidos." },
-  { id: "cobro_mensual", nombre: "Cobro mensual", descripcion: "Recordatorio amable para la cuota del mes." },
 ];
 
 const ticketLine = (ticketUrl?: string | null) => ticketUrl
@@ -53,17 +60,44 @@ export function mensajeLentesListos({ nombre, empresa, sucursal, saldo, ticketUr
   return `Hola ${saludo || "😊"} 👋, te saludamos de ${optica}.\n\n✨ ¡Tenemos buenas noticias! Tus lentes ya están listos y te esperan${lugarDesdeSucursal(sucursal)}. Cuando vengas a retirarlos, con gusto te los ajustamos para que te queden perfectos. 👓${saldoLine}\n\n¡Te esperamos con mucho cariño! 💙${ticketLine(ticketUrl)}`;
 }
 
+const fechaLarga = (ymd: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "numeric", month: "long", year: "numeric" }).format(new Date(`${ymd.slice(0, 10)}T12:00:00-05:00`));
+const periodoLabel = { semanal: "esta semana", quincenal: "esta quincena", mensual: "este mes" } as const;
+
+// Plantilla sugerida según el tipo de cobro (Cobros de hoy y Cuentas por cobrar usan la misma regla):
+// insistente = tono firme; apartado = plazo de 6 meses; rezagados = lentes sin retirar; con frecuencia (mensual,
+// quincenal, semanal) = recordatorio amable; sin plan y con más de 90 días = firme; el resto = recordatorio.
+export function plantillaSugerida(c: { insistente?: boolean; apartado?: boolean; rezagado?: boolean; frecuencia?: string | null; dias?: number | null }): PlantillaContactoId {
+  if (c.rezagado) return "lentes_rezagados";
+  if (c.insistente) return "cobro_insistente";
+  if (c.apartado) return "cobro_apartado";
+  if (c.frecuencia) return "cobro_mensual";
+  return (c.dias ?? 0) > 90 ? "cobro_insistente" : "cobro_mensual";
+}
+
 export function construirMensajeContacto(plantilla: PlantillaContactoId, contexto: ContextoMensaje) {
-  const saldo = `$${Number(contexto.saldo ?? 0).toFixed(2)}`;
+  const saldoNum = Number(contexto.saldo ?? 0);
+  const saldo = `$${saldoNum.toFixed(2)}`;
+  const saludo = primerNombre(contexto.nombre) || "😊";
+  const optica = opticaDesdeNombre(contexto.sucursal || contexto.empresa);
   if (plantilla === "listo_retiro") {
-    return mensajeLentesListos({ nombre: contexto.nombre, empresa: contexto.empresa, sucursal: contexto.empresa, saldo: contexto.saldo, ticketUrl: contexto.ticketUrl });
+    return mensajeLentesListos({ nombre: contexto.nombre, empresa: contexto.empresa, sucursal: contexto.sucursal ?? contexto.empresa, saldo: contexto.saldo, ticketUrl: contexto.ticketUrl });
   }
   if (plantilla === "cobro_mensual") {
-    return `Hola ${contexto.nombre}. Te enviamos tu recordatorio mensual de ${contexto.empresa}. Mantienes un saldo pendiente de ${saldo}. Por favor, indícanos cuándo podemos coordinar tu pago. Gracias.${ticketLine(contexto.ticketUrl)}`;
+    const periodo = contexto.frecuencia ? periodoLabel[contexto.frecuencia] : null;
+    return `Hola ${saludo} 👋, te saludamos de ${optica}.\n\nSolo pasamos a recordarte, con cariño, ${periodo ? `que ${periodo} corresponde tu abono` : "tu abono pendiente"}. Tu saldo actual es de ${saldo}.\n\nPuedes acercarte a la óptica o hacer una transferencia y enviarnos el comprobante por aquí. Si ya realizaste tu pago, ¡muchas gracias! Envíanos el comprobante para registrarlo. 💙${ticketLine(contexto.ticketUrl)}`;
   }
+  if (plantilla === "cobro_apartado") {
+    const hasta = contexto.apartadoHasta ? ` hasta el ${fechaLarga(contexto.apartadoHasta)}` : " durante 6 meses desde tu compra";
+    return `Hola ${saludo} 👋, te saludamos de ${optica}.\n\nTe recordamos que tienes tus lentes separados en nuestro sistema de apartado. El saldo pendiente es de ${saldo} y tienes plazo${hasta} para completar el pago y retirarlos. 👓\n\nPuedes abonar cuando gustes en la óptica o por transferencia. Pasada esa fecha el apartado vence, así que si necesitas más tiempo escríbenos antes para ayudarte.${ticketLine(contexto.ticketUrl)}`;
+  }
+  if (plantilla === "lentes_rezagados") {
+    const saldoLine = saldoNum > 0.004 ? ` Para retirarlos, el saldo pendiente es de ${saldo}.` : "";
+    return `Hola ${saludo} 👋, te saludamos de ${optica}.\n\nTus lentes están listos desde hace un tiempo y todavía te esperan${lugarDesdeSucursal(contexto.sucursal)}. 👓 Queremos que empieces a disfrutarlos y a ver mejor cuanto antes.${saldoLine}\n\nCuéntanos qué día puedes pasar por ellos y te los ajustamos al momento. ¡Te esperamos!${ticketLine(contexto.ticketUrl)}`;
+  }
+  // Cobro insistente: tono firme y respetuoso.
   const dias = diasVencidos(contexto.fechaCompra);
   const vencidoLine = contexto.fechaCompra && dias !== null
-    ? ` Tu compra fue el ${formatFecha(contexto.fechaCompra)}, hace ${dias} día${dias === 1 ? "" : "s"} sin registrar el pago completo.`
+    ? ` desde tu compra del ${formatFecha(contexto.fechaCompra)} (hace ${dias} día${dias === 1 ? "" : "s"})`
     : "";
-  return `Hola ${contexto.nombre}. Te recordamos que mantienes un saldo pendiente de ${saldo} en ${contexto.empresa}.${vencidoLine} Necesitamos coordinar tu pago lo antes posible. Por favor, respóndenos para confirmar la fecha de pago.${ticketLine(contexto.ticketUrl)}`;
+  return `Hola ${saludo}, te escribimos de ${optica}.\n\nTu cuenta mantiene un saldo vencido de ${saldo}${vencidoLine}. Necesitamos que regularices este pago a la brevedad.\n\nPor favor, acércate a la óptica o realiza hoy tu transferencia y envíanos el comprobante por este medio. Si ya pagaste, envíanos el comprobante para actualizar tu cuenta. Quedamos atentos a tu respuesta.${ticketLine(contexto.ticketUrl)}`;
 }

@@ -42,13 +42,22 @@ export async function getAgendaData(): Promise<AgendaData> {
     ]);
     if (activitiesResult.error || appointmentsResult.error || patientsResult.error || companiesResult.error || branchesResult.error || teamResult.error) return { status: "error", message: "No se pudo cargar la agenda. Revisa la conexión y los permisos.", ...empty };
 
+    // Pacientes de las citas que no vinieron en la lista inicial (solo trae 500): sin esto el calendario decía "Paciente".
+    const patients = (patientsResult.data ?? []) as AgendaPatient[];
+    const known = new Set(patients.map((patient) => patient.id));
+    const missing = [...new Set(((appointmentsResult.data ?? []) as Appointment[]).map((item) => item.paciente_id).filter((id) => id && !known.has(id)))];
+    for (let i = 0; i < missing.length; i += 200) {
+      const { data } = await supabase.from("pacientes_clinicos").select("id,nombres,apellidos,cedula,telefono").in("id", missing.slice(i, i + 200));
+      patients.push(...((data ?? []) as AgendaPatient[]));
+    }
+
     return {
       status: "ready",
       activities: activitiesResult.data,
       esSuperadmin: role === "superadmin",
       profile: { id: profile.id, nombre: profile.nombre, empresa_id: operationalContext?.activeCompany.id ?? profile.empresa_id, sucursal_id: operationalContext?.activeBranch.id ?? profile.sucursal_id, rol: role },
       appointments: (appointmentsResult.data ?? []) as Appointment[],
-      patients: (patientsResult.data ?? []) as AgendaPatient[],
+      patients,
       companies: (companiesResult.data ?? []) as AgendaCompany[],
       branches: (branchesResult.data ?? []) as AgendaBranch[],
       team: (teamResult.data ?? []) as AgendaTeamMember[],

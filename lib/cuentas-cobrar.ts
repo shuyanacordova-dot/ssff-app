@@ -7,14 +7,14 @@ import { diasCalendarioGuayaquil } from "@/lib/record-date";
 export type DeudaVenta = { id: string; sucursal_id: string | null; total: number; pagado: number; saldo: number; creado_en: string; fecha_entrega_estimada: string | null; recibo_token: string; folio: number | null; apartado: boolean; apartado_hasta: string | null };
 export type ConvenioDeuda = { empresa: string; cuotas: number; monto_cuota: number; fecha_primera_cuota: string | null };
 export type CategoriaDeuda = "urgentes" | "recientes" | "semanales" | "quincenales" | "mensuales" | "convenio" | "apartados" | "rezagados";
-export type DeudaPaciente = { paciente_id: string; nombres: string; apellidos: string; telefono: string | null; sucursales: string[]; frecuencia_cobro: string | null; cobro_insistente: boolean; empresa_nombre: string; saldo_total: number; ventas: DeudaVenta[]; convenio: ConvenioDeuda | null; dias_mas_antigua: number; categoria: CategoriaDeuda; categoria_auto: CategoriaDeuda; categoria_manual: CategoriaDeuda | null };
+export type DeudaPaciente = { paciente_id: string; nombres: string; apellidos: string; telefono: string | null; sucursales: string[]; frecuencia_cobro: string | null; cobro_insistente: boolean; empresa_nombre: string; saldo_total: number; ventas: DeudaVenta[]; convenio: ConvenioDeuda | null; dias_mas_antigua: number; categoria: CategoriaDeuda; categoria_auto: CategoriaDeuda; categoria_manual: CategoriaDeuda | null; ultimo_mensaje: string | null; ultimo_mensaje_por: string | null; fecha_cobro_acordada: string | null };
 
 export { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
 import { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
 export type EmpresaConvenio = { id: string; nombre: string };
 export type LenteRezagado = { orden_id: string; sucursal_id: string | null; paciente_id: string | null; paciente_nombre: string; telefono: string | null; sucursal_nombre: string; laboratorio: string; estado: string; listo_en: string; dias_listo: number; venta_id: string | null; folio: number | null; saldo: number };
-export type CuentasCobrarProfile = { id: string; empresa_id: string; rol: string };
-export type CobroHoy = { paciente_id: string; nombres: string; apellidos: string; telefono: string | null; empresa_id: string; empresa_nombre: string; saldo: number; ventas: number; dias_deuda: number; motivo: string; cada_dias: number; ultimo_mensaje: string | null };
+export type CuentasCobrarProfile = { id: string; empresa_id: string; rol: string; nombre: string };
+export type CobroHoy = { paciente_id: string; nombres: string; apellidos: string; telefono: string | null; empresa_id: string; empresa_nombre: string; saldo: number; ventas: number; dias_deuda: number; motivo: string; cada_dias: number; ultimo_mensaje: string | null; cobro_insistente: boolean; frecuencia: "semanal" | "quincenal" | "mensual" | null; apartado: boolean; apartado_hasta: string | null; fecha_cobro_acordada: string | null };
 export type CuentasCobrarData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: CuentasCobrarProfile; empresaNombre?: string; sucursalActivaId?: string; sucursalActivaNombre?: string; deudas: DeudaPaciente[]; rezagados: LenteRezagado[]; empresasConvenio: EmpresaConvenio[]; makeConfigured: boolean; colaHoy: CobroHoy[]; colaHoyError?: string; convenioFiltro?: EmpresaConvenio };
 
 const cobroRoles = new Set(["superadmin", "admin_sucursal", "vendedor", "caja", "optometra"]);
@@ -28,8 +28,8 @@ export async function getCuentasCobrarData(convenioId?: string): Promise<Cuentas
     const supabase = await createSupabaseServerClient();
     const auth = { user: await getCurrentUser() };
     if (!auth.user) return { status: "needs_login", message: "Inicia sesión para ver cuentas por cobrar.", ...empty };
-    const { data: rawProfile, error: profileError } = await supabase.from("usuarios").select("id,empresa_id,activo,roles(nombre)").eq("auth_user_id", auth.user.id).maybeSingle();
-    const profile = rawProfile as unknown as { id: string; empresa_id: string; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null } | null;
+    const { data: rawProfile, error: profileError } = await supabase.from("usuarios").select("id,nombre,empresa_id,activo,roles(nombre)").eq("auth_user_id", auth.user.id).maybeSingle();
+    const profile = rawProfile as unknown as { id: string; nombre: string; empresa_id: string; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null } | null;
     const role = roleName(profile?.roles ?? null);
     if (profileError || !profile?.activo || !role || !cobroRoles.has(role)) return { status: "forbidden", message: "Tu perfil no tiene permiso para ver cuentas por cobrar.", ...empty };
 
@@ -70,10 +70,17 @@ export async function getCuentasCobrarData(convenioId?: string): Promise<Cuentas
     const pacientesConConvenio = new Set(personasConvenio.data.map((p) => p.paciente_id));
 
     const pacienteIds = Array.from(new Set((ventas ?? []).map((v) => v.paciente_id as string)));
-    if (!pacienteIds.length) return { status: "ready", convenioFiltro: empty.convenioFiltro, profile: { id: profile.id, empresa_id: empresaActiva, rol: role }, empresaNombre: role === "superadmin" ? undefined : context?.activeCompany.nombre, sucursalActivaId: context?.activeBranch.id, sucursalActivaNombre: context?.activeBranch.nombre, deudas: [], rezagados: convenioId ? [] : rezagados, empresasConvenio, makeConfigured, colaHoy, colaHoyError };
+    if (!pacienteIds.length) return { status: "ready", convenioFiltro: empty.convenioFiltro, profile: { id: profile.id, empresa_id: empresaActiva, rol: role, nombre: profile.nombre }, empresaNombre: role === "superadmin" ? undefined : context?.activeCompany.nombre, sucursalActivaId: context?.activeBranch.id, sucursalActivaNombre: context?.activeBranch.nombre, deudas: [], rezagados: convenioId ? [] : rezagados, empresasConvenio, makeConfigured, colaHoy, colaHoyError };
 
-    const { data: pacientes, error: pacientesError } = await supabase.from("pacientes_clinicos").select("id,nombres,apellidos,telefono,frecuencia_cobro,cobro_insistente,categoria_cobro").in("id", pacienteIds);
+    const { data: pacientes, error: pacientesError } = await supabase.from("pacientes_clinicos").select("id,nombres,apellidos,telefono,frecuencia_cobro,cobro_insistente,categoria_cobro,fecha_cobro_acordada").in("id", pacienteIds);
     if (pacientesError) return { status: "error", message: "No se pudieron cargar los pacientes con saldo pendiente.", ...empty };
+    const mensajes = await fetchAll((from, to) => supabase.from("cobros_mensajes").select("paciente_id,enviado_en,enviado_por").in("paciente_id", pacienteIds).order("enviado_en", { ascending: false }).order("id").range(from, to));
+    if (mensajes.error) return { status: "error", message: "No se pudo cargar el historial de mensajes.", ...empty };
+    const ultimoPorPaciente = new Map<string, { enviado_en: string; enviado_por: string | null }>();
+    for (const item of mensajes.data) if (!ultimoPorPaciente.has(item.paciente_id)) ultimoPorPaciente.set(item.paciente_id, item);
+    const remitenteIds = [...new Set([...ultimoPorPaciente.values()].map((item) => item.enviado_por).filter(Boolean))] as string[];
+    const { data: remitentes } = remitenteIds.length ? await supabase.from("usuarios").select("id,nombre").in("id", remitenteIds) : { data: [] };
+    const nombreRemitente = new Map((remitentes ?? []).map((item) => [item.id, item.nombre]));
     const pacienteById = new Map((pacientes ?? []).map((p) => [p.id, p]));
     const ventaIds = (ventas ?? []).map((v) => v.id);
     const { data: acuerdos } = ventaIds.length ? await supabase.from("acuerdos_pago").select("venta_id,cuotas,monto_cuota,fecha_primera_cuota,empresas_convenio(nombre)").in("venta_id", ventaIds) : { data: [] };
@@ -94,7 +101,7 @@ export async function getCuentasCobrarData(convenioId?: string): Promise<Cuentas
       const suc = venta.sucursales as unknown as { nombre: string } | { nombre: string }[] | null;
       const sucursalNombre = (Array.isArray(suc) ? suc[0]?.nombre : suc?.nombre) ?? "Sin sucursal";
       if (existente) { existente.saldo_total += Number(venta.saldo); existente.ventas.push(ventaResumen); if (!existente.sucursales.includes(sucursalNombre)) existente.sucursales.push(sucursalNombre); }
-      else grupos.set(key, { paciente_id: paciente.id, nombres: paciente.nombres, apellidos: paciente.apellidos, telefono: paciente.telefono, sucursales: [sucursalNombre], frecuencia_cobro: paciente.frecuencia_cobro, cobro_insistente: paciente.cobro_insistente ?? false, empresa_nombre: nombreEmpresa ?? "Empresa", saldo_total: Number(venta.saldo), ventas: [ventaResumen], convenio: null, dias_mas_antigua: 0, categoria: "recientes", categoria_auto: "recientes", categoria_manual: (paciente.categoria_cobro as CategoriaDeuda | null) ?? null });
+      else grupos.set(key, { paciente_id: paciente.id, nombres: paciente.nombres, apellidos: paciente.apellidos, telefono: paciente.telefono, sucursales: [sucursalNombre], frecuencia_cobro: paciente.frecuencia_cobro, cobro_insistente: paciente.cobro_insistente ?? false, empresa_nombre: nombreEmpresa ?? "Empresa", saldo_total: Number(venta.saldo), ventas: [ventaResumen], convenio: null, dias_mas_antigua: 0, categoria: "recientes", categoria_auto: "recientes", categoria_manual: (paciente.categoria_cobro as CategoriaDeuda | null) ?? null, ultimo_mensaje: ultimoPorPaciente.get(key)?.enviado_en ?? null, ultimo_mensaje_por: nombreRemitente.get(ultimoPorPaciente.get(key)?.enviado_por ?? "") ?? null, fecha_cobro_acordada: paciente.fecha_cobro_acordada ?? null });
       const grupo = grupos.get(key)!;
       const acuerdo = acuerdoByVenta.get(venta.id);
       if (acuerdo && !grupo.convenio) grupo.convenio = acuerdo;
@@ -108,7 +115,7 @@ export async function getCuentasCobrarData(convenioId?: string): Promise<Cuentas
       // Un apartado siempre va a su pestaña: el producto no se entrega hasta pagar todo.
       return { ...d, dias_mas_antigua: dias, categoria_auto, categoria: tieneApartado ? "apartados" : d.categoria_manual ?? categoria_auto };
     });
-    return { status: "ready", convenioFiltro: empty.convenioFiltro, profile: { id: profile.id, empresa_id: empresaActiva, rol: role }, empresaNombre: role === "superadmin" ? undefined : context?.activeCompany.nombre, sucursalActivaId: context?.activeBranch.id, sucursalActivaNombre: context?.activeBranch.nombre, deudas, rezagados: convenioId ? [] : rezagados, empresasConvenio, makeConfigured, colaHoy, colaHoyError };
+    return { status: "ready", convenioFiltro: empty.convenioFiltro, profile: { id: profile.id, empresa_id: empresaActiva, rol: role, nombre: profile.nombre }, empresaNombre: role === "superadmin" ? undefined : context?.activeCompany.nombre, sucursalActivaId: context?.activeBranch.id, sucursalActivaNombre: context?.activeBranch.nombre, deudas, rezagados: convenioId ? [] : rezagados, empresasConvenio, makeConfigured, colaHoy, colaHoyError };
   } catch {
     return { status: "error", message: "La conexión de cuentas por cobrar no está disponible.", ...empty };
   }

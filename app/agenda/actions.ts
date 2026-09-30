@@ -106,3 +106,12 @@ export async function cambiarEstadoActividad(formData: FormData) {
   } catch (error) { return { error: error instanceof Error ? error.message : "No se pudo actualizar la actividad." }; }
   revalidatePath("/agenda"); return { success: true };
 }
+
+export async function buscarPacientesAgenda(query: string) {
+  const q = query.trim().replace(/[%,()]/g, " ");
+  if (q.length < 2) return [];
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.from("pacientes_clinicos").select("id,nombres,apellidos,cedula,telefono").or(`nombres.ilike.%${q}%,apellidos.ilike.%${q}%,cedula.ilike.%${q}%`).order("apellidos").limit(20);
+  if (error) throw new Error("No se pudo buscar pacientes.");
+  return data ?? [];
+}

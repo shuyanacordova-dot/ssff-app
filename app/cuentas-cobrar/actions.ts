@@ -53,3 +53,11 @@ export async function marcarMensajeCobro(pacienteId: string, sucursalId: string)
   if (error) throw new Error(error.message || "No se pudo registrar el aviso.");
   revalidatePath("/cuentas-cobrar");
 }
+
+export async function fijarFechaCobro(pacienteId: string, fecha: string | null) {
+  if (!pacienteId || (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha))) throw new Error("Indica una fecha válida.");
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("fijar_fecha_cobro", { p_paciente: pacienteId, p_fecha: fecha });
+  if (error) throw new Error(error.message || "No se pudo guardar la fecha de cobro.");
+  revalidatePath("/cuentas-cobrar"); revalidatePath("/");
+}

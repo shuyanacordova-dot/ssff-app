@@ -13,6 +13,8 @@ import LabOrderModal from "./lab-order-modal";
 import { useCatalogoVenta } from "./use-catalogo-venta";
 import { actualizarEntregaVenta, anularVenta, crearProducto, registrarAbono } from "./actions";
 import { crearGarantia } from "./garantia-actions";
+import { crearAcuerdoPago, datosAutorizacionRol, type AcuerdoPago } from "./convenio-actions";
+import AcuerdoPagoView from "./acuerdo-pago-view";
 import { branchLetterhead } from "@/lib/sucursales";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
@@ -94,6 +96,17 @@ export default function SalesBoard(props: VentasData) {
 }
 
 export function SaleCard({ sale, companyName, branchName, patient, lensItems, hasLabOrderItems, labOrders, canAnular, pending, onAbono, onRequestAnular, onCreateLabOrder, onViewOrder, onRecibo, onDetalle, onGarantia, autoAbono, saldoFavor = 0 }: { autoAbono?: boolean; saldoFavor?: number; sale: Sale; companyName: string; branchName?: string; patient?: { id: string; nombres: string; apellidos: string; telefono?: string | null }; lensItems: SaleItem[]; hasLabOrderItems: boolean; labOrders: SaleLabOrder[]; canAnular: boolean; pending: boolean; onAbono: (sale: Sale, data: FormData) => void; onRequestAnular: (sale: Sale) => void; onCreateLabOrder: () => void; onViewOrder: (orderId: string) => void; onRecibo: () => void; onDetalle: () => void; onGarantia: () => void }) {
+  const [verAutorizacion, setVerAutorizacion] = useState(false);
+  const [autorizacionExistente, setAutorizacionExistente] = useState(false);
+  const [empresasRol, setEmpresasRol] = useState<{ id: string; nombre: string }[]>([]);
+  const [empresaRol, setEmpresaRol] = useState("");
+  const [cuotasRol, setCuotasRol] = useState("");
+  const [acuerdoRol, setAcuerdoRol] = useState<AcuerdoPago | null>(null);
+  const [errorRol, setErrorRol] = useState("");
+  const [pendienteRol, startRol] = useTransition();
+  // Se consulta solo al abrir (no al mostrar cada tarjeta: con muchas ventas serían muchas consultas).
+  const abrirRol = () => { setVerAutorizacion(true); setErrorRol(""); void datosAutorizacionRol(sale.id).then(({ empresas, acuerdo }) => { setEmpresasRol(empresas); setEmpresaRol(acuerdo?.empresa_convenio_id ?? ""); setCuotasRol(acuerdo ? String(acuerdo.cuotas) : ""); setAutorizacionExistente(!!acuerdo); }).catch((err) => setErrorRol(err instanceof Error ? err.message : "No se pudieron cargar los convenios.")); };
+  const generarRol = () => startRol(async () => { try { const acuerdo = await crearAcuerdoPago(sale.id, empresaRol, Number(cuotasRol)); setAcuerdoRol(acuerdo); setAutorizacionExistente(true); } catch (err) { setErrorRol(err instanceof Error ? err.message : "No se pudo generar la autorización."); } });
   const [showAbono, setShowAbono] = useState(!!autoAbono); const [metodo, setMetodo] = useState("efectivo"); const [monto, setMonto] = useState("");
   const cardRef = useRef<HTMLElement>(null);
   useEffect(() => { if (autoAbono) cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }, [autoAbono]);
@@ -115,6 +128,7 @@ export function SaleCard({ sale, companyName, branchName, patient, lensItems, ha
     {sale.estado === "completada" && <div className="sale-primary-actions" onClick={(event) => event.stopPropagation()}>
       <button type="button" onClick={onRecibo}><ReceiptText size={14} /> Recibo</button>
       {patient && hasLabOrderItems && <button type="button" onClick={onCreateLabOrder}><FlaskConical size={14} /> Orden de laboratorio</button>}
+      {sale.saldo > 0 && patient && <button type="button" onClick={abrirRol}><ReceiptText size={14} /> Autorización descuento a rol</button>}
       {sale.saldo > 0 && <button type="button" onClick={() => setShowAbono((value) => !value)}><Wallet size={14} /> Registrar abono</button>}
     </div>}
     {showAbono && <div className="new-patient-form" style={{ marginTop: 10 }} onClick={(event) => event.stopPropagation()}><label>Método<select value={metodo} onChange={(event) => setMetodo(event.target.value)}>{paymentMethods.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}{saldoFavor > 0.004 && <option value="saldo_favor">Saldo a favor (disponible ${saldoFavor.toFixed(2)})</option>}</select></label><label>Monto<input type="text" inputMode="decimal" autoComplete="off" autoFocus={!!autoAbono} placeholder={`Saldo: $${sale.saldo.toFixed(2)}`} value={monto} onChange={(event) => setMonto(event.target.value.replace(/,/g, ".").replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1"))} /></label>{metodo === "transferencia" && <><label>Banco<select required value={banco} onChange={(event) => setBanco(event.target.value)}><option value="">Selecciona el banco</option>{bancos.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}</select></label><label>Referencia (opcional)<input value={referencia} onChange={(event) => setReferencia(event.target.value)} /></label></>}<button type="button" className="new-consultation" disabled={pending || !Number.isFinite(Number(monto)) || Number(monto) <= 0 || Number(monto) > sale.saldo || (metodo === "saldo_favor" && Number(monto) > saldoFavor + 0.004) || (metodo === "transferencia" && !banco)} onClick={submitAbono}>Confirmar abono</button></div>}
@@ -127,7 +141,7 @@ export function SaleCard({ sale, companyName, branchName, patient, lensItems, ha
         {canAnular && <button type="button" className="danger" disabled={pending} onClick={() => { onRequestAnular(sale); closeMenu(); }}>Cancelar venta</button>}
       </div>}
     </div>}
-  </div></article>;
+  </div>{verAutorizacion && <div className="modal-backdrop" onClick={(event) => event.stopPropagation()}><section className="new-patient-modal task-modal" role="dialog" aria-modal="true"><button className="modal-close" onClick={() => { setVerAutorizacion(false); setAcuerdoRol(null); }} aria-label="Cerrar"><X size={19} /></button>{acuerdoRol ? <AcuerdoPagoView acuerdo={acuerdoRol} onClose={() => { setVerAutorizacion(false); setAcuerdoRol(null); }} /> : <><p className="section-label">DESCUENTO A ROL</p><h2>Autorización descuento a rol</h2>{autorizacionExistente && <p className="field-hint">Esta venta ya tiene una autorización. Genérala de nuevo para reimprimirla o cambiar la empresa o las cuotas.</p>}<div className="new-patient-form"><label>Empresa del convenio<select value={empresaRol} onChange={(event) => setEmpresaRol(event.target.value)} required><option value="">Selecciona la empresa</option>{empresasRol.map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nombre}</option>)}</select></label><label>Número de cuotas<input type="number" min="1" max="36" required value={cuotasRol} onChange={(event) => setCuotasRol(event.target.value)} /></label></div>{Number(cuotasRol) >= 1 && Number(cuotasRol) <= 36 && <p>Cuota de {money(Math.round(sale.saldo / Number(cuotasRol) * 100) / 100)}</p>}{errorRol && <p className="notice" role="alert">{errorRol}</p>}<div className="modal-actions"><button className="outline-action" onClick={() => setVerAutorizacion(false)}>Cancelar</button><button className="new-consultation" disabled={pendienteRol || !empresaRol || !Number.isInteger(Number(cuotasRol)) || Number(cuotasRol) < 1 || Number(cuotasRol) > 36} onClick={generarRol}>{pendienteRol ? "Generando…" : "Generar autorización"}</button></div></>}</section></div>}</article>;
 }
 
 export function VentaDetailModal({ sale, companyName, patient, onClose }: { sale: Sale; companyName: string; patient?: { id: string; nombres: string; apellidos: string; telefono?: string | null }; onClose: () => void }) {
