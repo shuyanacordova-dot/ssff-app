@@ -55,7 +55,7 @@ const menuItems: NavItem[] = [
   { href: "/configuracion/sucursales", label: "Sucursales e identidad", detail: "Logo, contacto y presentación", icon: Settings, group: "Administración" },
 ];
 
-const hiddenPrefixes = ["/login", "/olvide-contrasena", "/actualizar-contrasena", "/auth", "/recibo/"];
+const hiddenPrefixes = ["/login", "/olvide-contrasena", "/actualizar-contrasena", "/auth", "/recibo/", "/privacidad"];
 const groups = ["Operación", "Finanzas", "Administración"] as const;
 
 export default function AppNavigation() {

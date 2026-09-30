@@ -41,12 +41,14 @@ export function BranchDirectory({ activeId, branches }: { activeId: string; bran
     });
   };
 
-  return <section className="branch-directory glass" aria-labelledby="branch-directory-title">
-    <div className="branch-directory-heading"><div><p className="section-label">SUCURSALES</p><h2 id="branch-directory-title">Tus sucursales</h2></div><span>La información operativa se mantiene separada por sede.</span></div>
+  return <section className="branch-directory" aria-label="Sucursales">
+    <p className="section-label">SUCURSALES</p>
     <div className="branch-directory-grid">{branches.map((branch) => {
       const active = branch.id === activeId;
-      return <article className={`branch-directory-card ${active ? "active" : ""}`} key={branch.id} onClick={() => { if (!pending) enter(branch.id); }} style={{ cursor: active ? "default" : "pointer" }}><div><span className="branch-company">{branch.empresaNombre}</span><h3>{branch.nombre}</h3><small>{active ? "Estás trabajando aquí" : "Toca para trabajar aquí"}</small></div><button type="button" disabled={pending || active} onClick={(event) => { event.stopPropagation(); enter(branch.id); }}>{active ? <><CheckCircle2 size={15} /> Aquí</> : pendingId === branch.id ? "Abriendo…" : "Entrar"}</button></article>;
+      return <button type="button" className={`branch-directory-card ${active ? "active" : ""}`} key={branch.id} disabled={pending || active} onClick={() => enter(branch.id)} aria-current={active ? "location" : undefined}>
+        <strong>{branch.nombre}</strong>{active && <small><CheckCircle2 size={13} /> Estás aquí</small>}{pendingId === branch.id && <small>Abriendo…</small>}
+      </button>;
     })}</div>
-    {error && <p className="field-hint">{error}</p>}
+    {error && <p className="field-hint" role="alert">{error}</p>}
   </section>;
 }

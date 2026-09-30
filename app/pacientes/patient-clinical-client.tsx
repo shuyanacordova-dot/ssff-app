@@ -301,7 +301,7 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
   const responsablesVisibles = buscarResponsable.trim().length >= 2 ? responsableResults.filter((patient) => patient.id !== editingPatient?.id) : [];
   const responsableElegido = allPatients.get(responsableId);
 
-  return <main className="page clinical-page pac-page"><div className="pac-iris" aria-hidden="true" /><div className="container clinical-shell pac-shell">
+  return <main className="page clinical-page pac-page"><div className="container clinical-shell pac-shell">
     <header className="clinical-header"><div><Link className="back-link" href="/"><ArrowLeft size={15} /> LUMOS</Link><p className="eyebrow">HISTORIAS CLÍNICAS</p><h1>Pacientes y consulta optométrica</h1><p className="subtitle">Una historia clínica central para SHUVISION y Focus, visible solo para personal clínico autorizado.</p></div><div className="clinical-security"><ShieldCheck size={20} /><span>Acceso clínico protegido</span></div></header>
     <div className="clinical-alert"><ShieldCheck size={17} /><span>{notice || (demoMode ? `${props.message} Se muestran ejemplos, nunca pacientes reales.` : `Sesión clínica de ${props.profile?.nombre}. Los datos se leen con tus permisos.`)}</span>{props.status === "needs_login" && <Link className="login-inline" href="/login?next=/pacientes">Iniciar sesión</Link>}</div>
     <section className="pac-search-panel" aria-label="Buscar pacientes">

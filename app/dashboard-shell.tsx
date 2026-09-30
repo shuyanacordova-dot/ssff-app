@@ -2,29 +2,14 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Banknote, CalendarDays, Coins, FlaskConical, Landmark, LockKeyhole, LogOut, Receipt, Target, UserPlus } from "lucide-react";
+import { Banknote, CalendarDays, Coins, Landmark, LogOut, Receipt, Target, UserPlus } from "lucide-react";
 import type { TaskData } from "@/lib/tasks";
 import type { InformeMensual } from "./informes/actions";
-import TaskBoard from "./tareas/task-board";
 import { cerrarSesion } from "./login/actions";
 import { BranchDirectory } from "./branch-selector";
 
 const money = (value: number) => new Intl.NumberFormat("es-EC", { style: "currency", currency: "USD" }).format(value);
 const pct = (actual: number, meta: number) => meta > 0 ? Math.round((actual / meta) * 100) : 0;
-
-export type DineroDisponible = {
-  sucursal_id: string;
-  sucursal_nombre: string;
-  fecha: string;
-  estado: "listo" | "pendiente";
-  cuentas_sin_cuadre: number;
-  bancos: number;
-  cuentas: { banco: "pichincha" | "guayaquil" | "internacional"; saldo: number | null; cuadre: string | null }[];
-  efectivo: number | null;
-  caja_desde: string | null;
-  caja_origen: "cierre" | "apertura" | null;
-  total: number | null;
-};
 
 export type ResumenHoy = { sucursal: string; ventas_brutas: number; cobro_efectivo: number; cobro_tarjeta: number; cobro_transferencia_pichincha: number; cobro_transferencia_guayaquil: number; cobro_transferencia_internacional: number; cobro_credito: number; cobro_otro: number; egresos_efectivo: number; caja_anterior: number; ya_existe: boolean };
 
@@ -32,24 +17,14 @@ function ResumenDelDia({ r }: { r: ResumenHoy }) {
   const transferencias = r.cobro_transferencia_pichincha + r.cobro_transferencia_guayaquil + r.cobro_transferencia_internacional;
   const cobrado = r.cobro_efectivo + r.cobro_tarjeta + transferencias + r.cobro_credito + r.cobro_otro;
   const cajaEsperada = r.caja_anterior + r.cobro_efectivo - r.egresos_efectivo;
-  return <section className="glass agenda-board" style={{ marginBottom: 18 }}>
-    <div className="agenda-toolbar"><div><p className="section-label">RESUMEN DEL DÍA · {r.sucursal.toUpperCase()}</p><h2>Hoy en caja</h2></div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <Link className="new-consultation" href="/caja?gasto=1"><Receipt size={16} /> Registrar egreso</Link>
-        <Link className="outline-action" href="/resumen-dia"><Landmark size={15} /> Ver resumen completo</Link>
-        <Link className="outline-action" href="/caja"><Coins size={15} /> Cuadre de caja</Link>
-      </div></div>
-    <div className="consultation-stats" style={{ marginTop: 8 }}>
+  return <section className="glass agenda-board dashboard-today">
+    <div className="dashboard-card-heading"><div><p className="section-label">HOY · {r.sucursal.toUpperCase()}</p><h2>Resumen del día</h2></div><div className="dashboard-card-links"><Link className="outline-action" href="/resumen-dia">Ver resumen</Link><Link className="outline-action" href="/caja">Cuadre de caja</Link></div></div>
+    <div className="consultation-stats dashboard-today-stats">
       <span><strong>Ventas del día</strong>{money(r.ventas_brutas)}</span>
       <span><strong>Cobrado hoy</strong>{money(cobrado)}</span>
-      <span><strong>Efectivo</strong>{money(r.cobro_efectivo)}</span>
-      <span><strong>Tarjetas</strong>{money(r.cobro_tarjeta)}</span>
-      <span><strong>Transferencias</strong>{money(transferencias)}</span>
-      <span><strong>Egresos</strong>{money(r.egresos_efectivo)}</span>
-      <span><strong>Caja de partida</strong>{money(r.caja_anterior)}</span>
-      <span><strong>Efectivo esperado</strong>{money(cajaEsperada)}</span>
+      <span><strong>Efectivo esperado en caja</strong>{money(cajaEsperada)}</span>
     </div>
-    <p className="field-hint" style={{ marginTop: 8 }}>{r.ya_existe ? "La caja de hoy ya está cerrada." : "La caja de hoy todavía no se ha cerrado."}</p>
+    <p className="field-hint">{r.ya_existe ? "Caja cerrada" : "Caja abierta"}</p>
   </section>;
 }
 
@@ -65,23 +40,33 @@ export default function DashboardShell({ taskData, informeMensual, metasMessage,
 
     {taskData.profile && <BranchDirectory activeId={taskData.profile.sucursalId} branches={taskData.profile.accessibleBranches} />}
 
-    <section className="operations-quick-grid" aria-label="Acciones frecuentes">
+    <section className="operations-quick-grid" aria-label="Acciones rápidas">
       <Link href="/pacientes?new=1"><span className="quick-icon teal"><UserPlus size={21} /></span><span><strong>Nuevo paciente</strong><small>Crear ficha clínica</small></span></Link>
       <Link href="/ventas"><span className="quick-icon blue"><Banknote size={21} /></span><span><strong>Nueva venta</strong><small>Cobrar o registrar pedido</small></span></Link>
-      <Link href="/laboratorio"><span className="quick-icon amber"><FlaskConical size={21} /></span><span><strong>Laboratorio</strong><small>Revisar órdenes pendientes</small></span></Link>
-      <Link href="/agenda"><span className="quick-icon lilac"><CalendarDays size={21} /></span><span><strong>Agenda</strong><small>Ver citas de hoy</small></span></Link>
-      <Link href="/caja?gasto=1"><span className="quick-icon amber"><Receipt size={21} /></span><span><strong>Registrar egreso</strong><small>Gasto o pago de caja</small></span></Link>
-      {role === "superadmin" && <Link href="/mi-espacio"><span className="quick-icon blue"><LockKeyhole size={21} /></span><span><strong>Mi espacio</strong><small>Deudas privadas por sucursal</small></span></Link>}
-      {role === "superadmin" && <Link href="/mi-espacio/bancos"><span className="quick-icon teal"><Landmark size={21} /></span><span><strong>Cuadre de bancos</strong><small>Saldo real de cada cuenta</small></span></Link>}
+      <Link href="/caja?gasto=1"><span className="quick-icon teal"><Receipt size={21} /></span><span><strong>Registrar egreso</strong><small>Gasto o pago de caja</small></span></Link>
+      <Link href="/cuentas-cobrar"><span className="quick-icon teal"><Coins size={21} /></span><span><strong>Cobros de hoy</strong><small>Mensajes por enviar</small></span></Link>
+      <Link href="/agenda"><span className="quick-icon teal"><CalendarDays size={21} /></span><span><strong>Agenda</strong><small>Ver citas de hoy</small></span></Link>
     </section>
 
     {cobrosHoy.cantidad > 0 && <section className="glass cob-dashboard-banner"><span>Hoy hay <strong>{cobrosHoy.cantidad}</strong> mensajes de cobro por enviar ({money(cobrosHoy.total)})</span><Link className="outline-action" href="/cuentas-cobrar">Ver cobros de hoy</Link></section>}
     {resumenHoy && <ResumenDelDia r={resumenHoy} />}
     <section className="dashboard-main dashboard-main-wide">
       {canVerInformes && <MetasDashboard informe={informeMensual} message={metasMessage} />}
-      <TaskBoard {...taskData} embedded />
+      <PendingTasks taskData={taskData} />
     </section>
   </div></main>;
+}
+
+
+function PendingTasks({ taskData }: { taskData: TaskData }) {
+  // Pendientes = mías por hacer (pendiente, en proceso, devuelta) + las que superviso y esperan mi revisión.
+  const mias = taskData.tasks.filter((task) => task.asignada_a === taskData.profile?.id && ["pendiente", "en_proceso", "devuelta"].includes(task.estado));
+  const porRevisar = taskData.tasks.filter((task) => taskData.supervisorTaskIds.includes(task.id) && ["completada", "en_revision"].includes(task.estado));
+  const ownTasks = [...porRevisar.map((task) => ({ ...task, revisar: true })), ...mias.map((task) => ({ ...task, revisar: false }))].slice(0, 5);
+  const formatDue = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "numeric", month: "short", year: "numeric", timeZone: "America/Guayaquil" }).format(new Date(`${value.slice(0, 10)}T12:00:00Z`));
+  return <section className="glass dashboard-tasks"><div className="dashboard-card-heading"><div><p className="section-label">TAREAS</p><h2>Tareas pendientes</h2></div><Link className="outline-action" href="/tareas">Ver todas</Link></div>
+    {ownTasks.length ? <ul>{ownTasks.map((task) => <li key={task.id}><span>{task.revisar && <strong>Por revisar · </strong>}{task.titulo}</span>{task.fecha_limite && <small>{formatDue(task.fecha_limite)}</small>}</li>)}</ul> : <p className="field-hint">Sin tareas pendientes</p>}
+  </section>;
 }
 
 function MetasDashboard({ informe, message }: { informe: InformeMensual | null; message?: string }) {

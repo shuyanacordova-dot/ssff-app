@@ -468,3 +468,54 @@ body { font-family: var(--font-body), Arial, sans-serif; background: radial-grad
 .cob-feedback { margin: 0; color: #24684f; font-weight: 700; }
 .cob-empty { margin: 0; padding: 24px 16px; text-align: center; }
 @media (max-width: 640px) { .cob-dashboard-banner, .cob-heading, .cob-row { flex-direction: column; align-items: stretch; } .cob-row-action { justify-items: stretch; text-align: left; } .cob-queue { margin-inline: 0; } }
+
+/* Estilo unificado (igual a Pacientes) 2026-09-30 */
+body { background: #fff; }
+/* El iris va detrás de todo (z-index -1) sin crear capas en .page: así los modales siguen por encima de la barra superior. */
+.app-iris { z-index: -1; pointer-events: none; }
+.page { overflow-x: clip; }
+.dashboard-page, .pac-page { background: transparent; }
+.glass { background: #fff; border: 1px solid #e2e9eb; box-shadow: 0 12px 35px rgba(22,35,58,.065); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.tasks-header h1, .agenda-header h1, .clinical-header h1, .dashboard-header h1 { color: #16233a; }
+.eyebrow, .section-label, .back-link { color: #285f61; }
+.new-consultation, .new-task { background: #16233a; }
+.outline-action { border-color: #cbdcda; color: #285f61; background: #fff; }
+.branch-filter-buttons button.active, .tabs button.active, .segmented button.active { border-color: #4f8a8b; background: #4f8a8b; color: #fff; }
+.clinical-tabs button.active { border-bottom-color: #4f8a8b; color: #285f61; }
+.page input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), .page select, .page textarea { border-color: #cbdcda; border-radius: 10px; outline-color: #4f8a8b; }
+.page input:focus-visible, .page select:focus-visible, .page textarea:focus-visible { outline: 2px solid #4f8a8b; outline-offset: 2px; }
+.pac-search-field input { border: 0 !important; outline: 0 !important; }
+.modal-backdrop { z-index: 100; }
+.new-patient-modal { position: relative; z-index: 101; }
+.dashboard-shell { position: relative; }
+.branch-directory { margin: 0 0 20px; padding: 0; }
+.branch-directory > .section-label { margin-bottom: 8px; }
+.branch-directory-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.branch-directory-card { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 39px; border: 1px solid #cbdcda; border-radius: 999px; padding: 8px 14px; color: #285f61; background: #fff; cursor: pointer; font: inherit; font-size: 12px; }
+.branch-directory-card strong { font-size: 12px; }
+.branch-directory-card small { display: inline-flex; align-items: center; gap: 4px; color: inherit; font-size: 10px; }
+.branch-directory-card.active, .branch-directory-card:disabled.active { border-color: #4f8a8b; color: #fff; background: #4f8a8b; cursor: default; }
+.branch-directory-card:focus-visible { outline: 2px solid #4f8a8b; outline-offset: 2px; }
+.operations-quick-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 0 0 18px; }
+.operations-quick-grid > a { border-color: #e2e9eb; border-radius: 13px; color: #16233a; background: #fff; box-shadow: 0 12px 35px rgba(22,35,58,.065); }
+.operations-quick-grid > a:hover, .operations-quick-grid > a:focus-visible { border-color: #4f8a8b; background: #f4faf9; }
+.operations-quick-grid .quick-icon { width: 40px; height: 40px; border-radius: 50%; color: #285f61; background: #e4f0ee; }
+.operations-quick-grid small { color: #526474; }
+.cob-dashboard-banner { border-left: 4px solid #4f8a8b; border-radius: 13px; padding: 11px 15px; }
+.dashboard-today, .dashboard-tasks { border-radius: 18px; padding: 18px; margin-bottom: 18px; }
+.dashboard-card-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.dashboard-card-heading h2 { margin: 3px 0 0; color: #16233a; font-size: 20px; }
+.dashboard-card-links { display: flex; flex-wrap: wrap; gap: 7px; }
+.dashboard-today-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 0; }
+.dashboard-today-stats span { min-width: 0; }
+.dashboard-today > .field-hint { margin: 11px 0 0; color: #285f61; }
+.goal-overview { border-radius: 18px; }
+.goal-overview-heading h2, .goal-card-top h3 { color: #16233a; }
+.goal-card { background: #fff; border-color: #e2e9eb; box-shadow: 0 12px 35px rgba(22,35,58,.045); }
+.goal-progress span { background: #4f8a8b; }
+.dashboard-tasks ul { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.dashboard-tasks li { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 5px 12px; border-top: 1px solid #e2e9eb; padding: 10px 0; color: #16233a; font-size: 13px; }
+.dashboard-tasks li small { color: #526474; }
+@media (max-width: 900px) { .operations-quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .page { padding-left: 16px; padding-right: 16px; } .operations-quick-grid { grid-template-columns: 1fr; } .dashboard-today-stats { grid-template-columns: 1fr; } .dashboard-card-links { width: 100%; } .branch-directory-card { max-width: 100%; } }
+@media print { .app-iris { display: none !important; } }

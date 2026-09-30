@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="es" className={`${fraunces.variable} ${manrope.variable}`}>
-      <body><AppNavigation />{children}</body>
+      <body><AppNavigation /><div className="pac-iris app-iris" aria-hidden="true" />{children}</body>
     </html>
   );
 }
