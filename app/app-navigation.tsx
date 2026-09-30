@@ -24,7 +24,7 @@ import {
   Sparkles,
   Users,
   Wallet,
-  X, HeartHandshake, LockKeyhole } from "lucide-react";
+  X, HeartHandshake, LockKeyhole, ListChecks } from "lucide-react";
 import { esSuperadminActual } from "./nav-actions";
 
 type NavItem = { href: string; label: string; detail: string; icon: typeof Home; group: "Operación" | "Finanzas" | "Administración"; soloSuperadmin?: boolean };
@@ -35,11 +35,12 @@ const primaryItems: NavItem[] = [
   { href: "/ventas", label: "Ventas", detail: "Cobros y pedidos", icon: Banknote, group: "Operación" },
   { href: "/resumen-dia", label: "Resumen del día", detail: "Cierre operativo", icon: Landmark, group: "Finanzas" },
   { href: "/caja", label: "Cuadre de caja", detail: "Apertura, gastos y cierre diario", icon: Coins, group: "Finanzas" },
-  { href: "/agenda", label: "Agenda", detail: "Citas del equipo", icon: CalendarDays, group: "Operación" },
+  { href: "/agenda", label: "Agenda", detail: "Citas de pacientes", icon: CalendarDays, group: "Operación" },
 ];
 
 const menuItems: NavItem[] = [
   ...primaryItems,
+  { href: "/agenda/actividades", label: "Actividades", detail: "Agenda de actividades de la óptica", icon: ListChecks, group: "Operación" },
   { href: "/laboratorio", label: "Laboratorio", detail: "Órdenes y entregas", icon: FlaskConical, group: "Operación" },
   { href: "/inventario", label: "Inventario", detail: "Monturas, lunas y stock", icon: Package, group: "Operación" },
   { href: "/crm", label: "CRM", detail: "A quién contactar hoy", icon: HeartHandshake, group: "Operación" },
@@ -93,7 +94,7 @@ export default function AppNavigation() {
   }, []);
 
   if (hidden) return null;
-  const isActive = (href: string) => href === "/" ? pathname === "/" : pathname.startsWith(href);
+  const isActive = (href: string) => href === "/" ? pathname === "/" : href === "/agenda" ? pathname === "/agenda" : pathname.startsWith(href);
 
   return <>
     <header className="app-topbar no-print">

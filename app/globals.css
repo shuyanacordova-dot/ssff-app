@@ -555,3 +555,7 @@ body { background: #fff; }
 }
 .convenio-cuotas { display: inline-flex; align-items: center; gap: 8px; margin: 6px 0; color: #285f61; font-size: 13px; font-weight: 700; }
 .convenio-cuotas input { width: 64px; padding: 6px 8px; border: 1px solid #cbdcda; border-radius: 8px; font: inherit; }
+/* Cambio entre agenda de citas y agenda de actividades */
+.agenda-switch { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; padding: 4px; border: 1px solid #e2e9eb; border-radius: 999px; background: #fff; }
+.agenda-switch a { padding: 8px 14px; border-radius: 999px; color: #285f61; font-size: 13px; font-weight: 750; }
+.agenda-switch a.active { background: #4f8a8b; color: #fff; }
