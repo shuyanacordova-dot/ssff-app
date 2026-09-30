@@ -238,7 +238,8 @@ function CanjeModal({ deuda, onClose, onNotice }: { deuda: DeudaPaciente; onClos
 function ConvenioModal({ deuda, empresasConvenio, onClose, onNotice }: { deuda: DeudaPaciente; empresasConvenio: EmpresaConvenio[]; onClose: () => void; onNotice: (message: string) => void }) {
   const [pending, start] = useTransition();
   const [ventaId, setVentaId] = useState(deuda.ventas[0]?.id ?? "");
-  const [empresaConvenioId, setEmpresaConvenioId] = useState(empresasConvenio[0]?.id ?? "");
+  // Sin empresa preseleccionada: antes se elegía sola la primera (Municipio) y una deuda directa quedó como convenio.
+  const [empresaConvenioId, setEmpresaConvenioId] = useState("");
   const [nuevaEmpresa, setNuevaEmpresa] = useState("");
   const [cuotas, setCuotas] = useState(3);
   const [error, setError] = useState("");
@@ -301,7 +302,7 @@ function ConvenioModal({ deuda, empresasConvenio, onClose, onNotice }: { deuda: 
     <p>Genera un acuerdo de pago por descuento a rol de pagos a través de una empresa convenio.</p>
     <div className="new-patient-form">
       <label className="task-description">Venta<select value={ventaId} onChange={(event) => setVentaId(event.target.value)}>{deuda.ventas.map((v) => <option key={v.id} value={v.id}>{formatDate(v.creado_en)} · Saldo {money(v.saldo)}</option>)}</select></label>
-      <label className="task-description">Empresa convenio{empresasConvenio.length ? <select value={empresaConvenioId} onChange={(event) => setEmpresaConvenioId(event.target.value)}>{empresasConvenio.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}</select> : <span className="field-hint">Todavía no hay empresas de convenio registradas.</span>}</label>
+      <label className="task-description">Empresa convenio{empresasConvenio.length ? <select value={empresaConvenioId} onChange={(event) => setEmpresaConvenioId(event.target.value)}><option value="">Selecciona la empresa del convenio</option>{empresasConvenio.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}</select> : <span className="field-hint">Todavía no hay empresas de convenio registradas.</span>}</label>
       <label className="task-description">Nueva empresa de convenio (opcional)<span style={{ display: "flex", gap: 6 }}><input value={nuevaEmpresa} onChange={(event) => setNuevaEmpresa(event.target.value)} placeholder="Ej.: Municipio de Shushufindi" style={{ flex: 1 }} /><button type="button" className="outline-action" disabled={pending || !nuevaEmpresa.trim()} onClick={crearEmpresa}>Agregar</button></span></label>
       <label>Número de cuotas<input type="number" min={1} value={cuotas} onChange={(event) => setCuotas(Number(event.target.value) || 1)} /></label>
       {ventaSeleccionada && cuotas > 0 && <p className="field-hint">Cuota estimada: {money(ventaSeleccionada.saldo / cuotas)} c/u</p>}

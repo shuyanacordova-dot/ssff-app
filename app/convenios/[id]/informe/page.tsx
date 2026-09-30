@@ -33,6 +33,8 @@ export default async function InformeConvenioPage({ params, searchParams }: {
   });
   if (error) return <InformeConvenio status="error" message={error.message} convenioId={id} />;
   if (!data) return <InformeConvenio status="error" message="No se pudo cargar el informe." convenioId={id} />;
+  // Comisión que se queda la empresa/sindicato del convenio (ej. Municipio: 5%).
+  const { data: convenio } = await supabase.from("empresas_convenio").select("comision_pct").eq("id", id).maybeSingle();
   return <InformeConvenio key={`${id}:${mes}:${optica}`} status="ready" data={data as InformeData}
-    mes={mes} opticaId={optica} opticas={opticas} convenioId={id} />;
+    mes={mes} opticaId={optica} opticas={opticas} convenioId={id} comisionPct={Number(convenio?.comision_pct ?? 0)} />;
 }

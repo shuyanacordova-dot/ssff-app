@@ -19,7 +19,7 @@ export type InformeData = {
   mes: string; filas: Fila[];
 };
 type Props = { convenioId: string } & (
-  | { status: "ready"; data: InformeData; mes: string; opticaId: string; opticas: { id: string; nombre: string }[] }
+  | { status: "ready"; data: InformeData; mes: string; opticaId: string; opticas: { id: string; nombre: string }[]; comisionPct?: number }
   | { status: "needs_login" | "forbidden" | "error"; message?: string }
 );
 type Edicion = { incluir: boolean; descuento: string };
@@ -45,6 +45,7 @@ export default function InformeConvenio(props: Props) {
   </div></main>;
 
   const { data: { convenio, optica, filas }, mes, opticaId, opticas, convenioId } = props;
+  const comisionPct = props.comisionPct ?? 0;
   const cambiarFiltro = (m: string, o: string) => {
     if (m) router.push(`/convenios/${convenioId}/informe?mes=${encodeURIComponent(m)}&optica=${encodeURIComponent(o)}`);
   };
@@ -107,7 +108,12 @@ export default function InformeConvenio(props: Props) {
             </td><td style={{ textAlign: "right" }}>{money.format(saldo - valor)}</td>
           </tr>;
         })}</tbody>
-        <tfoot><tr className="total-row"><td className="no-print" /><td colSpan={5}>Total a descontar</td><td style={{ textAlign: "right" }}>{money.format(total)}</td><td /></tr></tfoot>
+        <tfoot><tr className="total-row"><td className="no-print" /><td colSpan={5}>Total a descontar</td><td style={{ textAlign: "right" }}>{money.format(total)}</td><td /></tr>
+          {comisionPct > 0 && <>
+            <tr><td className="no-print" /><td colSpan={5}>Comisión del convenio ({comisionPct}%)</td><td style={{ textAlign: "right" }}>−{money.format(Math.round(total * comisionPct) / 100)}</td><td /></tr>
+            <tr className="total-row"><td className="no-print" /><td colSpan={5}>Neto para la óptica</td><td style={{ textAlign: "right" }}>{money.format(total - Math.round(total * comisionPct) / 100)}</td><td /></tr>
+          </>}
+        </tfoot>
       </table>}
       {liquidacion.porcentaje > 0 && <div style={{ marginTop: 24, breakInside: "avoid" }}>
         <p>Total a descontar a los empleados: <strong>{money.format(total)}</strong></p>
