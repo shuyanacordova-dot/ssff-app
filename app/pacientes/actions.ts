@@ -309,7 +309,7 @@ export async function obtenerProteccionPaciente(pacienteId: string): Promise<{ c
   return { consentimiento: consentimiento as ConsentimientoPaciente | null, accesos: (accesses ?? []).map((item) => ({ id: item.id, creado_en: item.creado_en, nombre: names.get(item.usuario_id) ?? "Usuario" })) };
 }
 
-export async function registrarConsentimientoPaciente(input: { pacienteId: string; estado: "otorgado" | "revocado"; metodo: "firma_papel" | "aceptado_en_pantalla" | "verbal_con_testigo"; firmadoPor: string; esRepresentante: boolean; notas?: string }) {
+export async function registrarConsentimientoPaciente(input: { pacienteId: string; estado: "otorgado" | "revocado"; metodo: "verbal"; firmadoPor: string; esRepresentante: boolean; notas?: string }) {
   const { supabase } = await currentClinicalProfile(patientEditRoles);
   if (!input.pacienteId || !input.firmadoPor.trim()) return { ok: false, error: "Indica quién autoriza o revoca el consentimiento." };
   const { CONSENTIMIENTO_VERSION } = await import("@/lib/privacidad");
