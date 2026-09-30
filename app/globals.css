@@ -530,3 +530,26 @@ body { background: #fff; }
 .titular-rol-buscar > button:not(.text-action):hover { border-color: #4f8a8b; background: #f4faf9; }
 .acuerdo-firmas { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 48px; font-size: 12px; text-align: center; }
 .acuerdo-firmas span { display: block; border-top: 1px solid #16233a; margin-bottom: 6px; }
+
+/* Orden de laboratorio en media hoja A4 (Shuyana 2026-09-30): todo compacto (~135 mm de alto) y línea punteada para cortar. */
+@media print {
+  .print-context .lab-order-print { padding: 0 0 4mm !important; border-bottom: 1px dashed #9aa0a6; font-size: 9pt; line-height: 1.25; break-inside: avoid; }
+  .print-context .lab-print-header { grid-template-columns: 26mm minmax(0, 1fr); gap: 4mm; margin: 0 0 2mm; }
+  .print-context .lab-print-brand img { max-height: 13mm; max-width: 26mm; }
+  .print-context .lab-print-heading h1 { font-size: 12pt; }
+  .print-context .lab-print-heading p, .print-context .lab-print-heading span { font-size: 8.5pt; }
+  .print-context .lab-print-patient { margin: 1.5mm 0; gap: 1mm; }
+  .print-context .lab-print-patient h2 { font-size: 11pt; }
+  .print-context .lab-print-patient p { font-size: 8.5pt; }
+  .print-context .lab-print-product { margin: 1mm auto 2mm; font-size: 9.5pt; }
+  .print-context .lab-print-product svg, .print-context .lab-print-review svg, .print-context .lab-print-rx-row svg { width: 12px; height: 12px; }
+  .print-context .lab-print-rx { gap: 1mm; padding: 1mm 0 2mm; border-bottom-width: 1px; }
+  .print-context .lab-print-rx-row { min-height: 7mm; font-size: 11pt; }
+  .print-context .lab-print-rx-row > strong { font-size: 11pt; }
+  .print-context .lab-print-review { padding: 2mm 0; gap: 4mm; }
+  .print-context .lab-print-review p, .print-context .lab-print-footer { font-size: 9pt; }
+  .print-context .lab-print-notes { padding: 2mm 0 0; }
+  .print-context .lab-print-notes h3 { margin: 0 0 1mm; font-size: 9.5pt; }
+  .print-context .lab-print-notes p { margin: 1mm 0; font-size: 8.5pt; line-height: 1.3; }
+  .print-context .lab-print-footer { margin-top: 2mm; gap: 6mm; }
+}
