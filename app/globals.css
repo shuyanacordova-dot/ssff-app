@@ -431,10 +431,15 @@ body { font-family: var(--font-body), Arial, sans-serif; background: radial-grad
 .priv-consent-status.priv-granted { color: #20754c; }
 .priv-consent-status.priv-missing { color: #a26c17; }
 .priv-consent-status.priv-revoked { color: #b43a43; }
-.recibo-datos { display: grid; gap: 9px; margin-top: 12px; padding: 12px; border: 1px solid #d4e0ea; border-radius: 12px; background: #f7fafc; text-align: left; }
-.recibo-datos .priv-check, .recibo-datos .field-hint { font-size: 13px !important; line-height: 1.45; margin: 0; }
-.recibo-datos .new-consultation { justify-self: start; }
-.recibo-datos a { text-decoration: underline; font-weight: 700; color: inherit; }
+.recibo-aviso { display: grid; gap: 12px; text-align: left; }
+.recibo-aviso h1 { margin: 0; font-size: 22px; }
+.recibo-aviso p, .recibo-aviso .priv-check { margin: 0; font-size: 14px !important; line-height: 1.5; }
+.recibo-aviso a { text-decoration: underline; font-weight: 700; color: inherit; }
+.recibo-aviso-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: #e4f0ee; color: #285f61; }
+.recibo-aviso .new-consultation { justify-content: center; width: 100%; }
+.recibo-aviso .new-consultation:disabled { opacity: .5; cursor: not-allowed; }
+.recibo-aviso-error { color: #a33d36; }
+.recibo-aviso .text-action { justify-self: center; }
 .priv-consent-fields { display: grid; gap: 12px; margin: 16px 0; }
 .priv-consent-fields label { display: grid; gap: 5px; font-weight: 700; font-size: 13px; }
 .priv-consent-fields input, .priv-consent-fields select, .priv-consent-fields textarea { width: 100%; padding: 9px; border: 1px solid #d4e0ea; border-radius: 9px; }

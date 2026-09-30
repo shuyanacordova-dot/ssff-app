@@ -3,7 +3,7 @@ import { paymentMethodLabels } from "@/lib/payment-methods";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 import Letterhead from "../../print-letterhead";
 import PrintButton from "../print-button";
-import PreferenciasDatos from "../preferencias-datos";
+import AvisoDatosRecibo from "../preferencias-datos";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
 const formatDate = formatRecordDate;
@@ -42,11 +42,11 @@ export default async function ReciboPage({ params }: { params: Promise<{ token: 
 
   const recibo = data as Recibo;
   const { data: prefs } = await supabase.rpc("preferencias_datos_recibo", { p_token: token });
-  // null = venta de "Consumidor final": no se muestran las casillas de datos.
-  const preferencias = prefs as { datos_confirmado_en_linea: boolean; promociones: boolean | null } | null;
+  // null = venta de "Consumidor final": no se muestra el aviso. Si el paciente ya respondió una vez, tampoco.
+  const preferencias = prefs as { respondido: boolean } | null;
   const company = { nombre: recibo.empresa_nombre ?? "LUMOS", direccion: recibo.empresa_direccion, telefono: recibo.empresa_telefono, email: recibo.empresa_email, logo_url: recibo.empresa_logo_url };
 
-  return <main className="login-page"><section id="receipt-print" className="glass login-card print-area receipt-document" style={{ width: "min(400px, 100%)" }}>
+  const reciboView = <main className="login-page"><section id="receipt-print" className="glass login-card print-area receipt-document" style={{ width: "min(400px, 100%)" }}>
     <Letterhead company={company} subtitle={recibo.sucursal_nombre ?? undefined} />
     <p className="print-center" style={{ fontWeight: 800, fontSize: 15, margin: "6px 0" }}>Recibo virtual</p>
     <div className="print-dashed" />
@@ -75,7 +75,8 @@ export default async function ReciboPage({ params }: { params: Promise<{ token: 
     <div className="print-dashed" />
 
     <p className="print-center field-hint" style={{ fontSize: 11, lineHeight: 1.5 }}>Cuidemos el medio ambiente. Este recibo siempre muestra el estado más reciente de tu compra; puedes volver a abrirlo cuando quieras.</p>
-    {preferencias && <PreferenciasDatos token={token} confirmado={preferencias.datos_confirmado_en_linea} promociones={preferencias.promociones} />}
     <div className="modal-actions no-print" style={{ marginTop: 10, justifyContent: "center" }}><PrintButton /></div>
   </section></main>;
+
+  return preferencias && !preferencias.respondido ? <AvisoDatosRecibo token={token}>{reciboView}</AvisoDatosRecibo> : reciboView;
 }
