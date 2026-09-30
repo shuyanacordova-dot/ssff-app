@@ -30,7 +30,7 @@ const primerNombre = (nombre: string) => { const n = nombre.trim().split(/\s+/)[
 export function mensajeTicketVirtual({ nombre, ticketUrl, empresaId }: Pick<ContextoMensaje, "nombre" | "ticketUrl"> & { empresaId?: string | null }) {
   const optica = (empresaId && nombreOptica[empresaId]) || "ShuVision Óptica";
   const saludo = primerNombre(nombre);
-  return `Hola ${saludo || "😊"} 👋, te saludamos de ${optica}. ¡Gracias por confiar en nosotros!\n\n🌿 Cuidemos el medio ambiente: en lugar de un recibo impreso, aquí tienes tu ticket virtual. Ahí puedes ver el detalle de tu compra, tus abonos y tu saldo, siempre actualizado:\n${ticketUrl ?? ""}\n\nCualquier duda, escríbenos por aquí. ¡Que tengas un lindo día!`;
+  return `Hola ${saludo || "😊"} 👋, te saludamos de ${optica}. ¡Gracias por confiar en nosotros!\n\n🌿 Cuidemos el medio ambiente: en lugar de un recibo impreso, aquí tienes tu ticket virtual. Ahí puedes ver el detalle de tu compra, tus abonos y tu saldo, siempre actualizado:\n${ticketUrl ?? ""}\n\n🔒 En el mismo enlace puedes autorizar el uso de tus datos y, si deseas, recibir nuestras promociones.\n\nCualquier duda, escríbenos por aquí. ¡Que tengas un lindo día!`;
 }
 
 const formatFecha = (iso: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "long", year: "numeric" }).format(new Date(iso));

@@ -3,6 +3,7 @@ import { paymentMethodLabels } from "@/lib/payment-methods";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 import Letterhead from "../../print-letterhead";
 import PrintButton from "../print-button";
+import PreferenciasDatos from "../preferencias-datos";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
 const formatDate = formatRecordDate;
@@ -40,6 +41,9 @@ export default async function ReciboPage({ params }: { params: Promise<{ token: 
   if (error || !data) return <main className="login-page"><section className="glass login-card"><p className="eyebrow">LUMOS</p><h1>Recibo no encontrado</h1><p className="login-copy">Este enlace no es válido. Pide a la óptica que te comparta el recibo nuevamente.</p></section></main>;
 
   const recibo = data as Recibo;
+  const { data: prefs } = await supabase.rpc("preferencias_datos_recibo", { p_token: token });
+  // null = venta de "Consumidor final": no se muestran las casillas de datos.
+  const preferencias = prefs as { datos_confirmado_en_linea: boolean; promociones: boolean | null } | null;
   const company = { nombre: recibo.empresa_nombre ?? "LUMOS", direccion: recibo.empresa_direccion, telefono: recibo.empresa_telefono, email: recibo.empresa_email, logo_url: recibo.empresa_logo_url };
 
   return <main className="login-page"><section id="receipt-print" className="glass login-card print-area receipt-document" style={{ width: "min(400px, 100%)" }}>
@@ -71,6 +75,7 @@ export default async function ReciboPage({ params }: { params: Promise<{ token: 
     <div className="print-dashed" />
 
     <p className="print-center field-hint" style={{ fontSize: 11, lineHeight: 1.5 }}>Cuidemos el medio ambiente. Este recibo siempre muestra el estado más reciente de tu compra; puedes volver a abrirlo cuando quieras.</p>
+    {preferencias && <PreferenciasDatos token={token} confirmado={preferencias.datos_confirmado_en_linea} promociones={preferencias.promociones} />}
     <div className="modal-actions no-print" style={{ marginTop: 10, justifyContent: "center" }}><PrintButton /></div>
   </section></main>;
 }

@@ -294,19 +294,29 @@ export async function actualizarConsulta(data: FormData): Promise<{ ok: true } |
 export type ConsentimientoPaciente = { id: string; estado: "otorgado" | "revocado"; registrado_en: string; firmado_por: string | null; metodo: string };
 export type AccesoHistoria = { id: number; creado_en: string; nombre: string };
 
-export async function obtenerProteccionPaciente(pacienteId: string): Promise<{ consentimiento: ConsentimientoPaciente | null; accesos: AccesoHistoria[] }> {
+export async function obtenerProteccionPaciente(pacienteId: string): Promise<{ consentimiento: ConsentimientoPaciente | null; accesos: AccesoHistoria[]; promociones: boolean | null }> {
   const { supabase, role } = await currentClinicalProfile(patientEditRoles);
   const { data: consentimiento, error } = await supabase.from("consentimientos_paciente")
     .select("id,estado,registrado_en,firmado_por,metodo").eq("paciente_id", pacienteId).order("registrado_en", { ascending: false }).limit(1).maybeSingle();
   if (error) throw new Error("No se pudo consultar el consentimiento.");
-  if (role !== "superadmin") return { consentimiento: consentimiento as ConsentimientoPaciente | null, accesos: [] };
+  const { data: promo } = await supabase.from("preferencias_promociones")
+    .select("acepta").eq("paciente_id", pacienteId).order("registrado_en", { ascending: false }).limit(1).maybeSingle();
+  const promociones = promo ? Boolean(promo.acepta) : null;
+  if (role !== "superadmin") return { consentimiento: consentimiento as ConsentimientoPaciente | null, accesos: [], promociones };
   const { data: accesses, error: accessError } = await supabase.from("accesos_historia")
     .select("id,creado_en,usuario_id").eq("paciente_id", pacienteId).order("creado_en", { ascending: false }).limit(20);
   if (accessError) throw new Error("No se pudo consultar el historial de accesos.");
   const ids = [...new Set((accesses ?? []).map((item) => item.usuario_id))];
   const { data: users } = ids.length ? await supabase.from("usuarios").select("id,nombre").in("id", ids) : { data: [] as { id: string; nombre: string }[] };
   const names = new Map((users ?? []).map((item) => [item.id, item.nombre]));
-  return { consentimiento: consentimiento as ConsentimientoPaciente | null, accesos: (accesses ?? []).map((item) => ({ id: item.id, creado_en: item.creado_en, nombre: names.get(item.usuario_id) ?? "Usuario" })) };
+  return { consentimiento: consentimiento as ConsentimientoPaciente | null, accesos: (accesses ?? []).map((item) => ({ id: item.id, creado_en: item.creado_en, nombre: names.get(item.usuario_id) ?? "Usuario" })), promociones };
+}
+
+// Promociones: autorización aparte y opcional; el paciente lo dice en la óptica.
+export async function registrarPromocionesPaciente(pacienteId: string, acepta: boolean) {
+  const { supabase } = await currentClinicalProfile(patientEditRoles);
+  const { error } = await supabase.rpc("registrar_preferencia_promociones", { p_paciente: pacienteId, p_acepta: acepta });
+  return error ? { ok: false, error: error.message || "No se pudo guardar la preferencia." } : { ok: true, error: null };
 }
 
 export async function registrarConsentimientoPaciente(input: { pacienteId: string; estado: "otorgado" | "revocado"; metodo: "verbal"; firmadoPor: string; esRepresentante: boolean; notas?: string }) {
