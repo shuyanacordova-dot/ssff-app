@@ -13,7 +13,8 @@ const formatDate = formatRecordDate;
 const prettyKey = (key: string) => key.replaceAll("_", " ").replace(/^./, (character) => character.toUpperCase());
 const sexoLabel: Record<string, string> = { femenino: "Femenino", masculino: "Masculino", otro: "Otro" };
 const RX_COLUMNS = [{ key: "esfera", label: "ESF" }, { key: "cilindro", label: "CIL" }, { key: "eje", label: "EJE" }, { key: "add", label: "ADD" }, { key: "av_lejos", label: "AV LEJOS" }, { key: "av_cerca", label: "AV CERCA" }, { key: "dnp", label: "DNP" }];
-const AUTO_COLUMNS = RX_COLUMNS.filter((column) => ["esfera", "cilindro", "eje", "add"].includes(column.key));
+// Autorrefractor: solo esfera, cilindro y eje (sin ADD ni agudezas visuales).
+const AUTO_COLUMNS = RX_COLUMNS.filter((column) => ["esfera", "cilindro", "eje"].includes(column.key));
 const QUERA_COLUMNS = [{ key: "k1", label: "K1" }, { key: "k2", label: "K2" }, { key: "eje", label: "EJE" }, { key: "astigmatismo", label: "ASTIG." }];
 
 function calcularEdad(fechaISO: string | null) {

@@ -1,6 +1,6 @@
 import { formatRecordDate } from "@/lib/record-date";
 import { Binoculars, Eye, Phone, UserRound } from "lucide-react";
-import { alturaMontaje, resumenDiametroMinimo, diametroMinimoLuna, avisoAnisometropia } from "@/lib/laboratorio";
+import { alturaMontaje, avisoAnisometropia } from "@/lib/laboratorio";
 import type { OrdenLaboratorioMedidas, OrdenLaboratorioRx, RxEye } from "@/lib/laboratorio";
 
 type PrintCompany = {
@@ -63,7 +63,6 @@ const formatDelivery = (dateValue?: string | null) => {
 
 export default function LabOrderPrint(props: LabOrderPrintProps) {
   const code = labOrderCode(props.orderId, props.createdAt, props.saleFolio);
-  const diametro = resumenDiametroMinimo(props.medidas, props.rx);
   const anisometropia = avisoAnisometropia(props.rx);
   const compensada = (["od", "oi"] as const).filter((eye) => props.rx[eye].procesar && props.rx.compensacion_vertice?.[eye]);
   const measures = [
@@ -111,18 +110,13 @@ export default function LabOrderPrint(props: LabOrderPrintProps) {
     <section className="lab-print-notes">
       <h3>Observaciones</h3>
       {measures && <p>{measures}</p>}
-      {diametro && <p>{diametro}</p>}
-      {(["od", "oi"] as const).map((eye) => {
-        const result = diametroMinimoLuna(props.medidas, props.rx[eye]);
-        return result && <p key={eye}>{eye.toUpperCase()} · Diámetro estándar sugerido: {result.estandar === null ? "supera 80 mm; consultar laboratorio" : `${result.estandar} mm`}</p>;
-      })}
       {compensada.length > 0 && <p>Potencia compensada por distancia al vértice: {compensada.map((eye) => {
         const data = props.rx.compensacion_vertice![eye]!;
         return `${eye.toUpperCase()} (${data.refraccion_mm} mm → ${data.montaje_mm} mm)`;
       }).join(" · ")}</p>}
       {anisometropia && <p>{anisometropia}</p>}
       {props.notes && <p>{props.notes}</p>}
-      {!measures && !props.notes && !diametro && !anisometropia && !compensada.length && <p>Sin observaciones.</p>}
+      {!measures && !props.notes && !anisometropia && !compensada.length && <p>Sin observaciones.</p>}
     </section>
 
     <footer className="lab-print-footer">

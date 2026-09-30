@@ -30,9 +30,9 @@ function rxLine(data: Record<string, string> | null | undefined, eye: "od" | "oi
   ].filter(Boolean).join("  ");
 }
 
-function compactValues(data: Record<string, string> | null | undefined, eye: "od" | "oi") {
+function compactValues(data: Record<string, string> | null | undefined, eye: "od" | "oi", conAdd = true) {
   const get = (key: string) => shown(data?.[`${eye}_${key}`]);
-  return [get("esfera"), get("cilindro"), get("eje") && `X ${get("eje")}`, get("add") && `Add ${get("add")}`].filter(Boolean).join("  ");
+  return [get("esfera"), get("cilindro"), get("eje") && `X ${get("eje")}`, conAdd && get("add") && `Add ${get("add")}`].filter(Boolean).join("  ");
 }
 
 function ReviewFinding({ title, text }: { title: string; text?: string | null }) {
@@ -79,7 +79,7 @@ export default function ClinicalReviewPrint({ consultation, patient, company, br
       <ReviewFinding title="Derecho/CÓRNEA" text={shown(consultation.queratometria?.od_k1) || shown(consultation.queratometria?.od_k2) ? `QUERATOMETRÍA: ${display(consultation.queratometria?.od_k1)}/${display(consultation.queratometria?.od_k2)} X ${display(consultation.queratometria?.od_eje)}` : ""} />
       <ReviewFinding title="Izquierdo/CÓRNEA" text={shown(consultation.queratometria?.oi_k1) || shown(consultation.queratometria?.oi_k2) ? `QUERATOMETRÍA: ${display(consultation.queratometria?.oi_k1)}/${display(consultation.queratometria?.oi_k2)} X ${display(consultation.queratometria?.oi_eje)}` : ""} />
       <ReviewFinding title="Derecho/BIOMICROSCOPÍA" text={consultation.biomicroscopia?.od} /><ReviewFinding title="Izquierdo/BIOMICROSCOPÍA" text={consultation.biomicroscopia?.oi} /><ReviewFinding title="Otros detalles/BIOMICROSCOPÍA" text={consultation.biomicroscopia?.otros_detalles} />
-      <ReviewFinding title="Derecho/AUTORREFRACTOR" text={compactValues(consultation.autorefractor, "od")} /><ReviewFinding title="Izquierdo/AUTORREFRACTOR" text={compactValues(consultation.autorefractor, "oi")} />
+      <ReviewFinding title="Derecho/AUTORREFRACTOR" text={compactValues(consultation.autorefractor, "od", false)} /><ReviewFinding title="Izquierdo/AUTORREFRACTOR" text={compactValues(consultation.autorefractor, "oi", false)} />
       <ReviewFinding title="Visión binocular" text={Object.entries(consultation.examen_binocular ?? {}).filter(([key, val]) => key !== "complementarios" && shown(val)).map(([key, val]) => `${key.replaceAll("_", " ")}: ${val}`).join(" · ")} />
       {complementaryExams.length > 0 && <ReviewFinding title="Exámenes complementarios" text={complementaryExams.map((exam) => `${exam.name || "Examen"}: ${exam.result || "sin resultado"}`).join(" · ")} />}
     </section>

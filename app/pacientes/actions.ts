@@ -42,7 +42,7 @@ export async function crearPacienteClinico(data: FormData) {
   if (error) throw new Error(error.message || "No se pudo registrar el paciente.");
   const saved = result as { paciente_id: string; ya_existia: boolean };
   const { data: patientRow, error: patientError } = await supabase.from("pacientes_clinicos")
-    .select("id,nombres,apellidos,cedula,telefono,email,direccion,sexo,ocupacion,responsable_id,fecha_nacimiento,frecuencia_cobro,empresa_origen_id,actualizado_en")
+    .select("id,nombres,apellidos,cedula,telefono,email,direccion,sexo,ocupacion,responsable_id,fecha_nacimiento,fecha_registro,frecuencia_cobro,empresa_origen_id,actualizado_en")
     .eq("id", saved.paciente_id).single();
   if (patientError || !patientRow) throw new Error("La ficha se guardó, pero no se pudo volver a cargar.");
   const [patient] = await enrichPatientRecords(supabase, [patientRow]);
@@ -65,7 +65,7 @@ export async function actualizarPacienteClinico(data: FormData) {
   if (error) throw new Error(error.message || "No se pudo actualizar el paciente.");
   const saved = result as { paciente_id: string };
   const { data: patientRow, error: patientError } = await supabase.from("pacientes_clinicos")
-    .select("id,nombres,apellidos,cedula,telefono,email,direccion,sexo,ocupacion,responsable_id,fecha_nacimiento,frecuencia_cobro,empresa_origen_id,actualizado_en")
+    .select("id,nombres,apellidos,cedula,telefono,email,direccion,sexo,ocupacion,responsable_id,fecha_nacimiento,fecha_registro,frecuencia_cobro,empresa_origen_id,actualizado_en")
     .eq("id", saved.paciente_id).single();
   if (patientError || !patientRow) throw new Error("La ficha se guardó, pero no se pudo volver a cargar.");
   const [patient] = await enrichPatientRecords(supabase, [patientRow]);
@@ -195,7 +195,7 @@ export async function buscarPacientesClinicos(query: string): Promise<PatientRec
     : `and(${tokens.map((t) => `or(nombres.ilike.%${t}%,apellidos.ilike.%${t}%)`).join(",")})`;
   const cedulaFilter = `cedula.ilike.%${esc(q)}%`;
   const { data, error } = await supabase.from("pacientes_clinicos")
-    .select("id,nombres,apellidos,cedula,telefono,email,direccion,sexo,ocupacion,responsable_id,fecha_nacimiento,frecuencia_cobro,empresa_origen_id,actualizado_en")
+    .select("id,nombres,apellidos,cedula,telefono,email,direccion,sexo,ocupacion,responsable_id,fecha_nacimiento,fecha_registro,frecuencia_cobro,empresa_origen_id,actualizado_en")
     .or(`${nameFilter},${cedulaFilter}`).order("actualizado_en", { ascending: false }).limit(30);
   if (error) throw new Error("No se pudo buscar pacientes.");
   return enrichPatientRecords(supabase, data ?? []);
@@ -205,7 +205,7 @@ export async function obtenerPacienteClinico(pacienteId: string): Promise<Patien
   const { supabase } = await currentClinicalProfile(folderRoles);
   if (!pacienteId) return null;
   const { data, error } = await supabase.from("pacientes_clinicos")
-    .select("id,nombres,apellidos,cedula,telefono,email,direccion,sexo,ocupacion,responsable_id,fecha_nacimiento,frecuencia_cobro,empresa_origen_id,actualizado_en")
+    .select("id,nombres,apellidos,cedula,telefono,email,direccion,sexo,ocupacion,responsable_id,fecha_nacimiento,fecha_registro,frecuencia_cobro,empresa_origen_id,actualizado_en")
     .eq("id", pacienteId).limit(1);
   if (error) throw new Error("No se pudo abrir la carpeta del paciente.");
   const [record] = await enrichPatientRecords(supabase, data ?? []);

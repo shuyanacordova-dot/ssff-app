@@ -3,7 +3,7 @@ import { Pencil, Printer, X } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import LunasStockAlert from "./lunas-stock-alert";
 import type { Sale, SaleCompany, SaleItem, SaleProduct } from "@/lib/ventas";
-import { calcularUso, emptyMedidas, emptyRx, estadoOrdenLabels, laboratorioLabels, rxFromRefraccion, tipoLenteLabels, tipoLenteSugerido, rxCerca, rxIntermedia, dnpCerca, transponer, normalizarRx, compensacionVertice, aplicarCompensacionVertice, editarRxLaboratorio, deshacerCompensacionVertice, diametroMinimoLuna, resumenDiametroMinimo, validarAlturaMontaje, avisoAnisometropia } from "@/lib/laboratorio";
+import { calcularUso, emptyMedidas, emptyRx, estadoOrdenLabels, laboratorioLabels, rxFromRefraccion, tipoLenteLabels, tipoLenteSugerido, rxCerca, rxIntermedia, dnpCerca, transponer, normalizarRx, compensacionVertice, aplicarCompensacionVertice, editarRxLaboratorio, deshacerCompensacionVertice, validarAlturaMontaje, avisoAnisometropia } from "@/lib/laboratorio";
 import type { EstadoOrdenLaboratorio, LaboratorioProveedor, OrdenLaboratorioMedidas, OrdenLaboratorioRx, RefraccionOption, RxEye, TipoLente, UsoCalculado } from "@/lib/laboratorio";
 import { actualizarOrdenLaboratorio, cambiarEstadoOrdenLaboratorio, crearOrdenLaboratorio, getOrdenLaboratorio, getRefraccionesPaciente } from "./lab-actions";
 import LabOrderPrint from "../lab-order-print";
@@ -134,7 +134,6 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
     setRx(deshacerCompensacionVertice(rx));
     setMedidas({ ...medidas, [key]: value });
   };
-  const diametroResumen = resumenDiametroMinimo(medidas, rx);
   const anisometropiaAviso = avisoAnisometropia(rx);
 
   const submit = () => {
@@ -253,13 +252,6 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
         </div>
 
         {(tipoLente === "progresivo" || tipoLente === "bifocal") && <p className="field-hint">Altura de montaje obligatoria: ingresa la altura común o una altura para cada ojo a procesar.</p>}
-        {diametroResumen && <div className="glass" style={{ padding: 14, marginTop: 10 }} role="status">
-          <p>{diametroResumen}</p>
-          {(["od", "oi"] as const).map((eye) => {
-            const result = diametroMinimoLuna(medidas, rx[eye]);
-            return result && <p className="field-hint" key={eye}>{eye.toUpperCase()} · Diámetro estándar sugerido: {result.estandar === null ? "supera 80 mm; consultar laboratorio" : `${result.estandar} mm`}</p>;
-          })}
-        </div>}
 
         <div className="new-patient-form" style={{ marginTop: 10 }}><label className="task-description">Observaciones<textarea value={notas} onChange={(event) => setNotas(event.target.value)} placeholder="Indicaciones para el laboratorio" /></label></div>
 

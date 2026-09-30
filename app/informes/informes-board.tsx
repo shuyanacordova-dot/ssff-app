@@ -39,7 +39,7 @@ export default function InformesBoard(props: InformesData) {
     catch (err) { setError(err instanceof Error ? err.message : "No se pudo guardar la meta."); }
   });
 
-  const cumplimientoTotal = informe ? pct(informe.totales.cobrado_total ?? 0, informe.totales.meta_total) : 0;
+  const cumplimientoTotal = informe ? pct(informe.totales.ingresos_total ?? informe.totales.cobrado_total ?? 0, informe.totales.meta_total) : 0;
 
   return <main className="page agenda-page"><div className="container agenda-shell">
     <header className="agenda-header no-print"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">DIRECCIÓN</p><h1>Informes</h1><p className="subtitle">Metas, ventas por sucursal e informe mensual del negocio.</p></div>
@@ -67,6 +67,26 @@ export default function InformesBoard(props: InformesData) {
         {informe.por_sucursal.length ? <div className="task-list">{informe.por_sucursal.map((row) => <SucursalRow key={row.sucursal_id} row={row} showEmpresa={todoElNegocio} onGuardarMeta={(monto) => guardarMeta(row, monto)} />)}</div> : <p className="field-hint">No hay sucursales activas.</p>}
       </section>
 
+      {isSuperadmin && <section className="glass agenda-board" style={{ marginBottom: 18 }}>
+        <p className="section-label">DESGLOSE POR SUCURSAL</p><h2>Resultado del mes y dinero disponible</h2>
+        <div className="task-list">{informe.por_sucursal.filter((row) => row.sucursal_id !== "sin_sucursal").map((row) => {
+          const aCuenta = Number(row.ingresos_total ?? 0);
+          const egresos = Number(row.gastos_total ?? 0);
+          const resultado = aCuenta - egresos;
+          const dinero = props.dineroDisponible?.find((d) => d.sucursal_id === row.sucursal_id);
+          return <article className="task-card" key={row.sucursal_id}><div className="task-main">
+            <h2>{row.sucursal_nombre}</h2>
+            <div className="consultation-stats">
+              <span><strong>A cuenta del mes</strong>{money(aCuenta)}</span>
+              <span><strong>Egresos del mes</strong>{money(egresos)}</span>
+              <span><strong>Resultado del mes</strong><b style={{ color: resultado < 0 ? "#a24150" : "#247658" }}>{resultado < 0 ? "−" : ""}{money(Math.abs(resultado))}</b></span>
+              <span><strong>Acumulado (dinero disponible)</strong>{!dinero ? "—" : dinero.estado === "listo" ? <>{money(Number(dinero.total))}<small style={{ display: "block" }}>Bancos {money(Number(dinero.bancos))} + efectivo {money(Number(dinero.efectivo))}</small></> : <>Por cuadrar <Link className="text-action no-print" href="/mi-espacio/bancos">Cuadrar</Link></>}</span>
+            </div>
+          </div></article>;
+        })}</div>
+        <p className="field-hint">El dinero disponible es de hoy (bancos desde su último cuadre + efectivo de la caja), no del mes elegido.</p>
+      </section>}
+
       <section className="glass agenda-board" style={{ marginBottom: 18 }}>
         <p className="section-label">GASTOS POR CLASIFICACIÓN</p><h2>Egresos del mes</h2>
         {informe.gastos_por_clasificacion.length ? <div className="consultation-stats">{informe.gastos_por_clasificacion.map((g) => <span key={g.clasificacion}><strong>{clasificacionLabel[g.clasificacion] ?? g.clasificacion}</strong>{money(g.monto)}</span>)}</div> : <p className="field-hint">Sin gastos registrados este mes.</p>}
@@ -91,7 +111,8 @@ export default function InformesBoard(props: InformesData) {
 function SucursalRow({ row, showEmpresa, onGuardarMeta }: { row: InformeSucursal; showEmpresa: boolean; onGuardarMeta: (monto: number) => void }) {
   const [editando, setEditando] = useState(false);
   const [valor, setValor] = useState(String(row.meta || ""));
-  const cobrado = row.cobrado_total ?? 0;
+  // Igual que en el inicio: "A cuenta" = todo el dinero que entró en el mes (ingresos_total).
+  const cobrado = Number(row.ingresos_total ?? row.cobrado_total ?? 0);
   const cumplimiento = pct(cobrado, row.meta);
   const restante = Math.max(0, row.meta - cobrado);
   const barWidth = Math.min(100, cumplimiento);

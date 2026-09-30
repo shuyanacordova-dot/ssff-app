@@ -67,7 +67,7 @@ function ComplementaryExams({ initialValue }: { initialValue?: string }) {
   </div>;
 }
 
-function EyeRxCard({ eye, prefix, showDnp, showAv = true, defaults, onRxChange }: { eye: "OD" | "OI"; prefix: string; showDnp?: boolean; showAv?: boolean; defaults?: Record<string, string>; onRxChange?: (field: "esfera" | "cilindro" | "add", value: string) => void }) {
+function EyeRxCard({ eye, prefix, showDnp, showAv = true, showAdd = true, defaults, onRxChange }: { eye: "OD" | "OI"; prefix: string; showDnp?: boolean; showAv?: boolean; showAdd?: boolean; defaults?: Record<string, string>; onRxChange?: (field: "esfera" | "cilindro" | "add", value: string) => void }) {
   const d = (key: string) => defaults?.[key] ?? "";
   const [rx, setRx] = useState({ esfera: d("esfera"), cilindro: d("cilindro"), eje: d("eje"), add: d("add") });
   const update = (field: keyof typeof rx, value: string) => {
@@ -84,7 +84,8 @@ function EyeRxCard({ eye, prefix, showDnp, showAv = true, defaults, onRxChange }
       }} />
       <RxNumberField label="Eje" kind="eje" name={`${prefix}_eje`} value={rx.eje} onChange={(v) => update("eje", v)} />
       {showAv && <label>Av lejos c/rx<input name={`${prefix}_av_lejos`} defaultValue={d("av_lejos")} placeholder="20/20" /></label>}
-      <RxNumberField label="Add" kind="add" name={`${prefix}_add`} value={rx.add} onChange={(v) => update("add", v)} />
+      {/* El autorrefractor no lleva ADD (Shuyana 2026-09-30); se conserva oculto el valor que ya tuviera. */}
+      {showAdd ? <RxNumberField label="Add" kind="add" name={`${prefix}_add`} value={rx.add} onChange={(v) => update("add", v)} /> : <input type="hidden" name={`${prefix}_add`} value={rx.add} />}
       {showAv && <label>Av cerca c/rx<input name={`${prefix}_av_cerca`} defaultValue={d("av_cerca")} placeholder="0.5M" /></label>}
       {showDnp && <label>DNP<input name={`${prefix}_dnp`} inputMode="decimal" defaultValue={d("dnp")} placeholder="mm" /></label>}
     </div>
@@ -152,7 +153,7 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
     <p className="astig-value">Astigmatismo corneal estimado — OD: {astig(k.odK1, k.odK2) || "—"} · OI: {astig(k.oiK1, k.oiK2) || "—"}</p>
 
     <p className="section-label">AUTORREFRACTOR</p>
-    <div className={rxStyles.cards}><EyeRxCard eye="OD" prefix="auto_od" showAv={false} defaults={initial?.autorefractor ? { esfera: initial.autorefractor.od_esfera, cilindro: initial.autorefractor.od_cilindro, eje: initial.autorefractor.od_eje, add: initial.autorefractor.od_add } : undefined} /><EyeRxCard eye="OI" prefix="auto_oi" showAv={false} defaults={initial?.autorefractor ? { esfera: initial.autorefractor.oi_esfera, cilindro: initial.autorefractor.oi_cilindro, eje: initial.autorefractor.oi_eje, add: initial.autorefractor.oi_add } : undefined} /></div>
+    <div className={rxStyles.cards}><EyeRxCard eye="OD" prefix="auto_od" showAv={false} showAdd={false}defaults={initial?.autorefractor ? { esfera: initial.autorefractor.od_esfera, cilindro: initial.autorefractor.od_cilindro, eje: initial.autorefractor.od_eje, add: initial.autorefractor.od_add } : undefined} /><EyeRxCard eye="OI" prefix="auto_oi" showAv={false} showAdd={false}defaults={initial?.autorefractor ? { esfera: initial.autorefractor.oi_esfera, cilindro: initial.autorefractor.oi_cilindro, eje: initial.autorefractor.oi_eje, add: initial.autorefractor.oi_add } : undefined} /></div>
 
     <p className="section-label">VISIÓN BINOCULAR</p>
     <div className="new-patient-form"><label>Cover test<input name="bino_cover_test" defaultValue={bino.cover_test ?? ""} /></label><label>Motilidad ocular<input name="bino_motilidad" defaultValue={bino.motilidad ?? ""} /></label><label>Estereopsis<input name="bino_estereopsis" defaultValue={bino.estereopsis ?? ""} /></label></div>

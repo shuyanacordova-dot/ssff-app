@@ -13,7 +13,8 @@ export type InformeMensual = {
 
 export type InformesCompany = { id: string; nombre: string };
 export type InformesProfile = { id: string; empresa_id: string; rol: string };
-export type InformesData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: InformesProfile; companies: InformesCompany[] };
+export type DineroDisponible = { sucursal_id: string; sucursal_nombre: string; estado: "listo" | "pendiente"; cuentas_sin_cuadre: number; bancos: number; efectivo: number | null; total: number | null };
+export type InformesData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: InformesProfile; companies: InformesCompany[]; dineroDisponible?: DineroDisponible[] };
 
 const informesRoles = new Set(["superadmin", "admin_sucursal"]);
 const roleName = (roles: { nombre: string } | { nombre: string }[] | null) => Array.isArray(roles) ? roles[0]?.nombre : roles?.nombre;
@@ -32,7 +33,14 @@ export async function getInformesData(): Promise<InformesData> {
     const { data: companies, error: companiesError } = await supabase.from("empresas").select("id,nombre").eq("activo", true).order("nombre");
     if (companiesError) return { status: "error", message: "No se pudieron cargar las empresas.", companies: [] };
 
-    return { status: "ready", profile: { id: profile.id, empresa_id: profile.empresa_id, rol: role }, companies: companies ?? [] };
+    // Dinero disponible (bancos desde el último cuadre + efectivo de caja): solo la superadmin.
+    let dineroDisponible: DineroDisponible[] = [];
+    if (role === "superadmin") {
+      const { data, error } = await supabase.rpc("dinero_disponible", { p_fecha: null });
+      if (!error && Array.isArray(data)) dineroDisponible = data as DineroDisponible[];
+    }
+
+    return { status: "ready", profile: { id: profile.id, empresa_id: profile.empresa_id, rol: role }, companies: companies ?? [], dineroDisponible };
   } catch {
     return { status: "error", message: "La conexión de informes no está disponible.", companies: [] };
   }

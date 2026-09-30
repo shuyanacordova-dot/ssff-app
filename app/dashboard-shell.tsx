@@ -53,7 +53,7 @@ function ResumenDelDia({ r }: { r: ResumenHoy }) {
   </section>;
 }
 
-export default function DashboardShell({ taskData, informeMensual, metasMessage, resumenHoy, dineroDisponible }: { taskData: TaskData; informeMensual: InformeMensual | null; metasMessage?: string; resumenHoy?: ResumenHoy | null; dineroDisponible?: DineroDisponible[] | null }) {
+export default function DashboardShell({ taskData, informeMensual, metasMessage, resumenHoy }: { taskData: TaskData; informeMensual: InformeMensual | null; metasMessage?: string; resumenHoy?: ResumenHoy | null }) {
   const role = taskData.profile?.rol;
   const canVerInformes = role === "superadmin" || role === "admin_sucursal";
 
@@ -77,13 +77,13 @@ export default function DashboardShell({ taskData, informeMensual, metasMessage,
 
     {resumenHoy && <ResumenDelDia r={resumenHoy} />}
     <section className="dashboard-main dashboard-main-wide">
-      {canVerInformes && <MetasDashboard informe={informeMensual} message={metasMessage} dineroDisponible={dineroDisponible} />}
+      {canVerInformes && <MetasDashboard informe={informeMensual} message={metasMessage} />}
       <TaskBoard {...taskData} embedded />
     </section>
   </div></main>;
 }
 
-function MetasDashboard({ informe, message, dineroDisponible }: { informe: InformeMensual | null; message?: string; dineroDisponible?: DineroDisponible[] | null }) {
+function MetasDashboard({ informe, message }: { informe: InformeMensual | null; message?: string }) {
   const mes = new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", month: "long", year: "numeric" }).format(new Date());
   return <section className="goal-overview glass">
     <div className="goal-overview-heading"><div><p className="section-label">METAS DEL MES</p><h2>Avance por sucursal</h2><p>{mes}</p></div><Link className="outline-action" href="/informes"><Target size={15} /> Configurar metas</Link></div>
@@ -93,25 +93,12 @@ function MetasDashboard({ informe, message, dineroDisponible }: { informe: Infor
       const cobrado = Number(row.ingresos_total ?? 0);
       const cumplimiento = pct(cobrado, row.meta);
       const restante = Math.max(0, row.meta - cobrado);
-      const egresos = Number(row.gastos_total ?? 0);
-      const acumulado = cobrado - egresos;
-      const dinero = dineroDisponible?.find((item) => item.sucursal_id === row.sucursal_id);
+      // En el inicio solo meta y a cuenta (Shuyana 2026-09-30); el desglose (egresos, resultado, dinero disponible) está en Informes.
       return <article className="goal-card" key={row.sucursal_id}>
         <div className="goal-card-top"><div><span>{row.empresa_nombre}</span><h3>{row.sucursal_nombre}</h3></div><strong>{row.meta > 0 ? `${cumplimiento}%` : "Sin meta"}</strong></div>
         <div className="goal-progress"><span style={{ width: `${Math.min(100, cumplimiento)}%` }} /></div>
         <p><strong>{money(cobrado)}</strong> A cuenta del mes</p>
         <small>{row.meta > 0 ? `Meta ${money(row.meta)} · Faltan ${money(restante)}` : "Configura la meta mensual de esta sucursal"}</small>
-        {/* Acumulado del mes: lo que entró a cuenta menos los egresos de la sucursal (caja y banco). */}
-        <p style={{ margin: "8px 0 0", paddingTop: 8, borderTop: "1px solid #e1e8ef" }}><strong style={{ color: acumulado < 0 ? "#a24150" : "#247658" }}>{acumulado < 0 ? "−" : ""}{money(Math.abs(acumulado))}</strong> Resultado del mes</p>
-        <small>A cuenta {money(cobrado)} − egresos {money(egresos)}</small>
-        {dinero && (dinero.estado === "listo" ? <>
-          <p style={{ margin: "8px 0 0", paddingTop: 8, borderTop: "1px solid #e1e8ef" }}><strong style={{ color: "#1f5f8b" }}>{money(Number(dinero.total))}</strong> Acumulado (dinero disponible)</p>
-          <small>Bancos {money(Number(dinero.bancos))} + efectivo {money(Number(dinero.efectivo))}</small>
-        </> : <>
-          <p style={{ margin: "8px 0 0", paddingTop: 8, borderTop: "1px solid #e1e8ef" }}><strong>Por cuadrar</strong> Acumulado (dinero disponible)</p>
-          <small>{Number(dinero.cuentas_sin_cuadre) > 0 ? `Falta el primer cuadre de bancos (${Number(dinero.cuentas_sin_cuadre)} cuenta(s))` : "Falta el cuadre de caja"}</small>
-          <Link href="/mi-espacio/bancos" className="text-action">Cuadrar</Link>
-        </>)}
       </article>;
     })}</div> : <div className="goal-empty"><Target size={22} /><p>Aún no hay metas de sucursales disponibles para este mes.</p></div>}
   </section>;

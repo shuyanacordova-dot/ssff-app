@@ -84,7 +84,7 @@ export default function InformeConvenio(props: Props) {
       <h2>Informe de descuentos por rol de pagos</h2>
       <p>Empresa: {convenio.nombre}<br />Mes: {mesNombre}<br />Fecha de emisión: {fechaEmision}</p>
       {filas.length === 0 ? <p>No hay empleados con saldo pendiente en esta óptica para este convenio.</p> : <table className="resumen-table">
-        <thead><tr><th scope="col" className="no-print">Incluir</th><th scope="col">N°</th><th scope="col">Empleado</th><th scope="col">Cédula</th><th scope="col">Detalle</th><th scope="col">Valor a descontar</th><th scope="col">Saldo después</th></tr></thead>
+        <thead><tr><th scope="col" className="no-print">Incluir</th><th scope="col">N°</th><th scope="col">Empleado</th><th scope="col">Cédula</th><th scope="col">Detalle</th><th scope="col">Cuotas</th><th scope="col">Valor a descontar</th><th scope="col">Saldo después</th></tr></thead>
         <tbody>{filas.map((fila) => {
           const { incluir, descuento } = ediciones[fila.venta_id];
           const saldo = Number(fila.saldo);
@@ -97,6 +97,7 @@ export default function InformeConvenio(props: Props) {
             <td className="no-print"><input type="checkbox" checked={incluir} aria-label={`Incluir a ${fila.empleado}, folio ${fila.folio}`} onChange={(e) => editar(fila.venta_id, { incluir: e.target.checked })} /></td>
             <td>{incluir ? ++numero : "—"}</td><td>{fila.empleado}</td><td>{fila.cedula}</td>
             <td>{detalle}<small style={{ display: "block", color: "#6b7280" }}>Folio {fila.folio} · {fila.sucursal}</small></td>
+            <td style={{ textAlign: "center" }}>{fila.con_acuerdo && cuotas > 0 ? cuotas : "—"}</td>
             <td style={{ textAlign: "right" }}><input inputMode="decimal" value={descuento} aria-label={`Valor a descontar a ${fila.empleado}, folio ${fila.folio}`}
               aria-invalid={valor > saldo} aria-describedby={valor > saldo ? `saldo-${fila.venta_id}` : undefined}
               style={{ width: 90, textAlign: "right" }}
@@ -106,7 +107,7 @@ export default function InformeConvenio(props: Props) {
             </td><td style={{ textAlign: "right" }}>{money.format(saldo - valor)}</td>
           </tr>;
         })}</tbody>
-        <tfoot><tr className="total-row"><td className="no-print" /><td colSpan={4}>Total a descontar</td><td style={{ textAlign: "right" }}>{money.format(total)}</td><td /></tr></tfoot>
+        <tfoot><tr className="total-row"><td className="no-print" /><td colSpan={5}>Total a descontar</td><td style={{ textAlign: "right" }}>{money.format(total)}</td><td /></tr></tfoot>
       </table>}
       {liquidacion.porcentaje > 0 && <div style={{ marginTop: 24, breakInside: "avoid" }}>
         <p>Total a descontar a los empleados: <strong>{money.format(total)}</strong></p>
