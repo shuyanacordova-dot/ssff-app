@@ -290,3 +290,38 @@ export async function actualizarConsulta(data: FormData): Promise<{ ok: true } |
   try { await actualizarConsultaInterna(data); return { ok: true }; }
   catch (err) { return { ok: false, error: err instanceof Error ? err.message : "No se pudo actualizar la consulta." }; }
 }
+
+export type ConsentimientoPaciente = { id: string; estado: "otorgado" | "revocado"; registrado_en: string; firmado_por: string | null; metodo: string };
+export type AccesoHistoria = { id: number; creado_en: string; nombre: string };
+
+export async function obtenerProteccionPaciente(pacienteId: string): Promise<{ consentimiento: ConsentimientoPaciente | null; accesos: AccesoHistoria[] }> {
+  const { supabase, role } = await currentClinicalProfile(patientEditRoles);
+  const { data: consentimiento, error } = await supabase.from("consentimientos_paciente")
+    .select("id,estado,registrado_en,firmado_por,metodo").eq("paciente_id", pacienteId).order("registrado_en", { ascending: false }).limit(1).maybeSingle();
+  if (error) throw new Error("No se pudo consultar el consentimiento.");
+  if (role !== "superadmin") return { consentimiento: consentimiento as ConsentimientoPaciente | null, accesos: [] };
+  const { data: accesses, error: accessError } = await supabase.from("accesos_historia")
+    .select("id,creado_en,usuario_id").eq("paciente_id", pacienteId).order("creado_en", { ascending: false }).limit(20);
+  if (accessError) throw new Error("No se pudo consultar el historial de accesos.");
+  const ids = [...new Set((accesses ?? []).map((item) => item.usuario_id))];
+  const { data: users } = ids.length ? await supabase.from("usuarios").select("id,nombre").in("id", ids) : { data: [] as { id: string; nombre: string }[] };
+  const names = new Map((users ?? []).map((item) => [item.id, item.nombre]));
+  return { consentimiento: consentimiento as ConsentimientoPaciente | null, accesos: (accesses ?? []).map((item) => ({ id: item.id, creado_en: item.creado_en, nombre: names.get(item.usuario_id) ?? "Usuario" })) };
+}
+
+export async function registrarConsentimientoPaciente(input: { pacienteId: string; estado: "otorgado" | "revocado"; metodo: "firma_papel" | "aceptado_en_pantalla" | "verbal_con_testigo"; firmadoPor: string; esRepresentante: boolean; notas?: string }) {
+  const { supabase } = await currentClinicalProfile(patientEditRoles);
+  if (!input.pacienteId || !input.firmadoPor.trim()) return { ok: false, error: "Indica quién autoriza o revoca el consentimiento." };
+  const { CONSENTIMIENTO_VERSION } = await import("@/lib/privacidad");
+  const { error } = await supabase.rpc("registrar_consentimiento", {
+    p_paciente: input.pacienteId, p_version: CONSENTIMIENTO_VERSION, p_estado: input.estado,
+    p_metodo: input.metodo, p_firmado_por: input.firmadoPor.trim(), p_es_representante: input.esRepresentante,
+    p_notas: input.notas?.trim() || null,
+  });
+  return error ? { ok: false, error: error.message || "No se pudo registrar el consentimiento." } : { ok: true, error: null };
+}
+
+export async function registrarAperturaCarpeta(pacienteId: string) {
+  const { supabase } = await currentClinicalProfile(patientEditRoles);
+  await supabase.rpc("registrar_acceso_historia", { p_paciente: pacienteId, p_accion: "abrir_carpeta" });
+}

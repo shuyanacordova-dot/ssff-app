@@ -45,3 +45,11 @@ export async function activarCobroInsistente(pacienteId: string, activo: boolean
   if (error) throw new Error(error.message || "No se pudo actualizar el cobro insistente.");
   revalidatePath("/cuentas-cobrar");
 }
+
+export async function marcarMensajeCobro(pacienteId: string, sucursalId: string) {
+  if (!pacienteId || !sucursalId) throw new Error("Falta identificar al paciente o la sucursal.");
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("registrar_mensaje_cobro", { p_paciente: pacienteId, p_sucursal: sucursalId });
+  if (error) throw new Error(error.message || "No se pudo registrar el aviso.");
+  revalidatePath("/cuentas-cobrar");
+}

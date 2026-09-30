@@ -23,14 +23,19 @@ export default async function Home() {
 
   // Resumen del día de la sucursal donde se trabaja (mismos cálculos que el cuadre de caja).
   let resumenHoy: ResumenHoy | null = null;
+  let cobrosHoy = { cantidad: 0, total: 0 };
   try {
     const context = await getOperationalContext();
     if (context) {
       const supabase = await createSupabaseServerClient();
+      try {
+        const { data: cola, error } = await supabase.rpc("cola_cobros_hoy", { p_sucursal: context.activeBranch.id });
+        if (!error && Array.isArray(cola)) cobrosHoy = { cantidad: cola.length, total: cola.reduce((sum: number, row: { saldo: number }) => sum + Number(row.saldo), 0) };
+      } catch { /* El inicio sigue disponible si falla la cola. */ }
       const { data } = await supabase.rpc("previsualizar_cierre_caja", { p_empresa: context.activeCompany.id, p_sucursal: context.activeBranch.id, p_fecha: null });
       if (data) resumenHoy = { ...(data as Omit<ResumenHoy, "sucursal">), sucursal: context.activeBranch.nombre };
     }
   } catch { resumenHoy = null; }
 
-  return <DashboardShell taskData={taskData} informeMensual={informeMensual} metasMessage={metasMessage} resumenHoy={resumenHoy} />;
+  return <DashboardShell taskData={taskData} informeMensual={informeMensual} metasMessage={metasMessage} resumenHoy={resumenHoy} cobrosHoy={cobrosHoy} />;
 }

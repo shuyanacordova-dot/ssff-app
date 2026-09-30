@@ -53,7 +53,7 @@ function ResumenDelDia({ r }: { r: ResumenHoy }) {
   </section>;
 }
 
-export default function DashboardShell({ taskData, informeMensual, metasMessage, resumenHoy }: { taskData: TaskData; informeMensual: InformeMensual | null; metasMessage?: string; resumenHoy?: ResumenHoy | null }) {
+export default function DashboardShell({ taskData, informeMensual, metasMessage, resumenHoy, cobrosHoy }: { taskData: TaskData; informeMensual: InformeMensual | null; metasMessage?: string; resumenHoy?: ResumenHoy | null; cobrosHoy: { cantidad: number; total: number } }) {
   const role = taskData.profile?.rol;
   const canVerInformes = role === "superadmin" || role === "admin_sucursal";
 
@@ -75,6 +75,7 @@ export default function DashboardShell({ taskData, informeMensual, metasMessage,
       {role === "superadmin" && <Link href="/mi-espacio/bancos"><span className="quick-icon teal"><Landmark size={21} /></span><span><strong>Cuadre de bancos</strong><small>Saldo real de cada cuenta</small></span></Link>}
     </section>
 
+    {cobrosHoy.cantidad > 0 && <section className="glass cob-dashboard-banner"><span>Hoy hay <strong>{cobrosHoy.cantidad}</strong> mensajes de cobro por enviar ({money(cobrosHoy.total)})</span><Link className="outline-action" href="/cuentas-cobrar">Ver cobros de hoy</Link></section>}
     {resumenHoy && <ResumenDelDia r={resumenHoy} />}
     <section className="dashboard-main dashboard-main-wide">
       {canVerInformes && <MetasDashboard informe={informeMensual} message={metasMessage} />}

@@ -14,14 +14,15 @@ import { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
 export type EmpresaConvenio = { id: string; nombre: string };
 export type LenteRezagado = { orden_id: string; sucursal_id: string | null; paciente_id: string | null; paciente_nombre: string; telefono: string | null; sucursal_nombre: string; laboratorio: string; estado: string; listo_en: string; dias_listo: number; venta_id: string | null; folio: number | null; saldo: number };
 export type CuentasCobrarProfile = { id: string; empresa_id: string; rol: string };
-export type CuentasCobrarData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: CuentasCobrarProfile; empresaNombre?: string; sucursalActivaId?: string; sucursalActivaNombre?: string; deudas: DeudaPaciente[]; rezagados: LenteRezagado[]; empresasConvenio: EmpresaConvenio[]; makeConfigured: boolean; convenioFiltro?: EmpresaConvenio };
+export type CobroHoy = { paciente_id: string; nombres: string; apellidos: string; telefono: string | null; empresa_id: string; empresa_nombre: string; saldo: number; ventas: number; dias_deuda: number; motivo: string; cada_dias: number; ultimo_mensaje: string | null };
+export type CuentasCobrarData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: CuentasCobrarProfile; empresaNombre?: string; sucursalActivaId?: string; sucursalActivaNombre?: string; deudas: DeudaPaciente[]; rezagados: LenteRezagado[]; empresasConvenio: EmpresaConvenio[]; makeConfigured: boolean; colaHoy: CobroHoy[]; colaHoyError?: string; convenioFiltro?: EmpresaConvenio };
 
 const cobroRoles = new Set(["superadmin", "admin_sucursal", "vendedor", "caja", "optometra"]);
 const roleName = (roles: { nombre: string } | { nombre: string }[] | null) => Array.isArray(roles) ? roles[0]?.nombre : roles?.nombre;
 
 export async function getCuentasCobrarData(convenioId?: string): Promise<CuentasCobrarData> {
   const makeConfigured = Boolean(process.env.MAKE_COBROS_WEBHOOK_URL);
-  const empty: Pick<CuentasCobrarData, "deudas" | "rezagados" | "empresasConvenio" | "makeConfigured" | "convenioFiltro"> = { deudas: [], rezagados: [], empresasConvenio: [], makeConfigured };
+  const empty: Pick<CuentasCobrarData, "deudas" | "rezagados" | "empresasConvenio" | "makeConfigured" | "colaHoy" | "convenioFiltro"> = { deudas: [], rezagados: [], empresasConvenio: [], makeConfigured, colaHoy: [] };
   if (!hasSupabaseConfiguration()) return { status: "needs_configuration", message: "Falta configurar la conexión segura de esta copia local.", ...empty };
   try {
     const supabase = await createSupabaseServerClient();
@@ -34,6 +35,15 @@ export async function getCuentasCobrarData(convenioId?: string): Promise<Cuentas
 
     const context = await getOperationalContext();
     const empresaActiva = context?.activeCompany.id ?? profile.empresa_id;
+    let colaHoy: CobroHoy[] = [];
+    let colaHoyError: string | undefined;
+    if (context?.activeBranch.id) {
+      try {
+        const result = await supabase.rpc("cola_cobros_hoy", { p_sucursal: context.activeBranch.id });
+        if (result.error) colaHoyError = "No se pudo cargar la cola de cobros de hoy.";
+        else colaHoy = (result.data ?? []).map((row: CobroHoy) => ({ ...row, saldo: Number(row.saldo) }));
+      } catch { colaHoyError = "No se pudo cargar la cola de cobros de hoy."; }
+    }
     const [ventasResult, empresasConvenioResult, rezagados] = await Promise.all([
       fetchAll((from, to) => { const q = supabase.from("ventas").select("id,empresa_id,sucursal_id,paciente_id,total,pagado,saldo,fecha_entrega_estimada,creado_en,recibo_token,folio,apartado,apartado_hasta,empresas(nombre),sucursales(nombre)").eq("estado", "completada").gt("saldo", 0).not("paciente_id", "is", null).order("creado_en", { ascending: true }).order("id").range(from, to); return role === "superadmin" ? q : q.eq("empresa_id", empresaActiva); }),
       supabase.from("empresas_convenio").select("id,nombre").eq("activo", true).order("nombre"),
@@ -60,7 +70,7 @@ export async function getCuentasCobrarData(convenioId?: string): Promise<Cuentas
     const pacientesConConvenio = new Set(personasConvenio.data.map((p) => p.paciente_id));
 
     const pacienteIds = Array.from(new Set((ventas ?? []).map((v) => v.paciente_id as string)));
-    if (!pacienteIds.length) return { status: "ready", convenioFiltro: empty.convenioFiltro, profile: { id: profile.id, empresa_id: empresaActiva, rol: role }, empresaNombre: role === "superadmin" ? undefined : context?.activeCompany.nombre, sucursalActivaId: context?.activeBranch.id, sucursalActivaNombre: context?.activeBranch.nombre, deudas: [], rezagados: convenioId ? [] : rezagados, empresasConvenio, makeConfigured };
+    if (!pacienteIds.length) return { status: "ready", convenioFiltro: empty.convenioFiltro, profile: { id: profile.id, empresa_id: empresaActiva, rol: role }, empresaNombre: role === "superadmin" ? undefined : context?.activeCompany.nombre, sucursalActivaId: context?.activeBranch.id, sucursalActivaNombre: context?.activeBranch.nombre, deudas: [], rezagados: convenioId ? [] : rezagados, empresasConvenio, makeConfigured, colaHoy, colaHoyError };
 
     const { data: pacientes, error: pacientesError } = await supabase.from("pacientes_clinicos").select("id,nombres,apellidos,telefono,frecuencia_cobro,cobro_insistente,categoria_cobro").in("id", pacienteIds);
     if (pacientesError) return { status: "error", message: "No se pudieron cargar los pacientes con saldo pendiente.", ...empty };
@@ -98,7 +108,7 @@ export async function getCuentasCobrarData(convenioId?: string): Promise<Cuentas
       // Un apartado siempre va a su pestaña: el producto no se entrega hasta pagar todo.
       return { ...d, dias_mas_antigua: dias, categoria_auto, categoria: tieneApartado ? "apartados" : d.categoria_manual ?? categoria_auto };
     });
-    return { status: "ready", convenioFiltro: empty.convenioFiltro, profile: { id: profile.id, empresa_id: empresaActiva, rol: role }, empresaNombre: role === "superadmin" ? undefined : context?.activeCompany.nombre, sucursalActivaId: context?.activeBranch.id, sucursalActivaNombre: context?.activeBranch.nombre, deudas, rezagados: convenioId ? [] : rezagados, empresasConvenio, makeConfigured };
+    return { status: "ready", convenioFiltro: empty.convenioFiltro, profile: { id: profile.id, empresa_id: empresaActiva, rol: role }, empresaNombre: role === "superadmin" ? undefined : context?.activeCompany.nombre, sucursalActivaId: context?.activeBranch.id, sucursalActivaNombre: context?.activeBranch.nombre, deudas, rezagados: convenioId ? [] : rezagados, empresasConvenio, makeConfigured, colaHoy, colaHoyError };
   } catch {
     return { status: "error", message: "La conexión de cuentas por cobrar no está disponible.", ...empty };
   }
