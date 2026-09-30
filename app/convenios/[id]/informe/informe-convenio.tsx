@@ -8,7 +8,7 @@ import { printDocumentById } from "@/lib/print-document";
 
 type Numeric = number | string;
 type Fila = {
-  venta_id: string; folio: Numeric; fecha_venta: string; empleado: string;
+  venta_id: string; folio: Numeric; fecha_venta: string; empleado: string; beneficiario?: string | null;
   cedula: string | null; sucursal: string | null;
   total: Numeric; pagado: Numeric; saldo: Numeric; con_acuerdo: boolean;
   cuotas: Numeric | null; monto_cuota: Numeric | null; cuota_numero: Numeric | null; cuota_mes: Numeric;
@@ -96,7 +96,7 @@ export default function InformeConvenio(props: Props) {
             : cuota > cuotas ? "Saldo final" : `Cuota ${cuota} de ${cuotas}`;
           return <tr key={fila.venta_id} className={incluir ? undefined : "no-print"} style={{ opacity: incluir ? 1 : 0.45 }}>
             <td className="no-print"><input type="checkbox" checked={incluir} aria-label={`Incluir a ${fila.empleado}, folio ${fila.folio}`} onChange={(e) => editar(fila.venta_id, { incluir: e.target.checked })} /></td>
-            <td>{incluir ? ++numero : "—"}</td><td>{fila.empleado}</td><td>{fila.cedula}</td>
+            <td>{incluir ? ++numero : "—"}</td><td>{fila.empleado}{fila.beneficiario && <><br /><small>Beneficiario: {fila.beneficiario}</small></>}</td><td>{fila.cedula}</td>
             <td>{detalle}<small style={{ display: "block", color: "#6b7280" }}>Folio {fila.folio} · {fila.sucursal}</small></td>
             <td style={{ textAlign: "center" }}>{fila.con_acuerdo && cuotas > 0 ? cuotas : "—"}</td>
             <td style={{ textAlign: "right" }}><input inputMode="decimal" value={descuento} aria-label={`Valor a descontar a ${fila.empleado}, folio ${fila.folio}`}

@@ -519,3 +519,14 @@ body { background: #fff; }
 @media (max-width: 900px) { .operations-quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .page { padding-left: 16px; padding-right: 16px; } .operations-quick-grid { grid-template-columns: 1fr; } .dashboard-today-stats { grid-template-columns: 1fr; } .dashboard-card-links { width: 100%; } .branch-directory-card { max-width: 100%; } }
 @media print { .app-iris { display: none !important; } }
+
+/* Autorización de descuento a rol: titular */
+.titular-rol { display: grid; gap: 6px; margin: 10px 0 14px; padding: 12px; border: 1px solid #e2e9eb; border-radius: 12px; background: #f7fafb; }
+.titular-rol p { margin: 0; }
+.titular-rol small { color: #526474; }
+.titular-rol .text-action { justify-self: start; }
+.titular-rol-buscar { display: grid; gap: 6px; }
+.titular-rol-buscar > button:not(.text-action) { border: 1px solid #e1e9e9; border-radius: 10px; padding: 9px 11px; background: #fff; color: #16233a; text-align: left; cursor: pointer; }
+.titular-rol-buscar > button:not(.text-action):hover { border-color: #4f8a8b; background: #f4faf9; }
+.acuerdo-firmas { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 48px; font-size: 12px; text-align: center; }
+.acuerdo-firmas span { display: block; border-top: 1px solid #16233a; margin-bottom: 6px; }
