@@ -5,13 +5,13 @@ import { getOperationalContext } from "@/lib/operational-context";
 import { diasCalendarioGuayaquil } from "@/lib/record-date";
 
 export type DeudaVenta = { id: string; sucursal_id: string | null; total: number; pagado: number; saldo: number; creado_en: string; fecha_entrega_estimada: string | null; recibo_token: string; folio: number | null; apartado: boolean; apartado_hasta: string | null };
-export type ConvenioDeuda = { empresa: string; cuotas: number; monto_cuota: number; fecha_primera_cuota: string | null };
+export type ConvenioDeuda = { empresa: string; cuotas: number; monto_cuota: number; fecha_primera_cuota: string | null; titular?: string | null };
 export type CategoriaDeuda = "urgentes" | "recientes" | "semanales" | "quincenales" | "mensuales" | "convenio" | "apartados" | "rezagados";
 export type DeudaPaciente = { paciente_id: string; nombres: string; apellidos: string; telefono: string | null; sucursales: string[]; frecuencia_cobro: string | null; cobro_insistente: boolean; empresa_nombre: string; saldo_total: number; ventas: DeudaVenta[]; convenio: ConvenioDeuda | null; dias_mas_antigua: number; categoria: CategoriaDeuda; categoria_auto: CategoriaDeuda; categoria_manual: CategoriaDeuda | null; ultimo_mensaje: string | null; ultimo_mensaje_por: string | null; fecha_cobro_acordada: string | null };
 
 export { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
 import { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
-export type EmpresaConvenio = { id: string; nombre: string };
+export type EmpresaConvenio = { id: string; nombre: string; cuotas_predeterminadas?: number };
 export type LenteRezagado = { orden_id: string; sucursal_id: string | null; paciente_id: string | null; paciente_nombre: string; telefono: string | null; sucursal_nombre: string; laboratorio: string; estado: string; listo_en: string; dias_listo: number; venta_id: string | null; folio: number | null; saldo: number };
 export type CuentasCobrarProfile = { id: string; empresa_id: string; rol: string; nombre: string };
 export type CobroHoy = { paciente_id: string; nombres: string; apellidos: string; telefono: string | null; empresa_id: string; empresa_nombre: string; saldo: number; ventas: number; dias_deuda: number; motivo: string; cada_dias: number; ultimo_mensaje: string | null; cobro_insistente: boolean; frecuencia: "semanal" | "quincenal" | "mensual" | null; apartado: boolean; apartado_hasta: string | null; fecha_cobro_acordada: string | null };
@@ -46,7 +46,7 @@ export async function getCuentasCobrarData(convenioId?: string): Promise<Cuentas
     }
     const [ventasResult, empresasConvenioResult, rezagados] = await Promise.all([
       fetchAll((from, to) => { const q = supabase.from("ventas").select("id,empresa_id,sucursal_id,paciente_id,total,pagado,saldo,fecha_entrega_estimada,creado_en,recibo_token,folio,apartado,apartado_hasta,empresas(nombre),sucursales(nombre)").eq("estado", "completada").gt("saldo", 0).not("paciente_id", "is", null).order("creado_en", { ascending: true }).order("id").range(from, to); return role === "superadmin" ? q : q.eq("empresa_id", empresaActiva); }),
-      supabase.from("empresas_convenio").select("id,nombre").eq("activo", true).order("nombre"),
+      supabase.from("empresas_convenio").select("id,nombre,cuotas_predeterminadas").eq("activo", true).order("nombre"),
       cargarRezagados(supabase, role === "superadmin" ? null : empresaActiva),
     ]);
     let { data: ventas } = ventasResult;
@@ -83,10 +83,10 @@ export async function getCuentasCobrarData(convenioId?: string): Promise<Cuentas
     const nombreRemitente = new Map((remitentes ?? []).map((item) => [item.id, item.nombre]));
     const pacienteById = new Map((pacientes ?? []).map((p) => [p.id, p]));
     const ventaIds = (ventas ?? []).map((v) => v.id);
-    const { data: acuerdos } = ventaIds.length ? await supabase.from("acuerdos_pago").select("venta_id,cuotas,monto_cuota,fecha_primera_cuota,empresas_convenio(nombre)").in("venta_id", ventaIds) : { data: [] };
+    const { data: acuerdos } = ventaIds.length ? await supabase.from("acuerdos_pago").select("venta_id,cuotas,monto_cuota,fecha_primera_cuota,empresas_convenio(nombre),titular:pacientes_clinicos!acuerdos_pago_titular_paciente_id_fkey(nombres,apellidos)").in("venta_id", ventaIds) : { data: [] };
     const acuerdoByVenta = new Map((acuerdos ?? []).map((a) => {
       const emp = a.empresas_convenio as unknown as { nombre: string } | { nombre: string }[] | null;
-      return [a.venta_id as string, { empresa: (Array.isArray(emp) ? emp[0]?.nombre : emp?.nombre) ?? "Convenio", cuotas: Number(a.cuotas), monto_cuota: Number(a.monto_cuota), fecha_primera_cuota: a.fecha_primera_cuota as string | null } satisfies ConvenioDeuda];
+      return [a.venta_id as string, { empresa: (Array.isArray(emp) ? emp[0]?.nombre : emp?.nombre) ?? "Convenio", cuotas: Number(a.cuotas), monto_cuota: Number(a.monto_cuota), fecha_primera_cuota: a.fecha_primera_cuota as string | null, titular: (() => { const t = a.titular as unknown as { nombres: string | null; apellidos: string | null } | { nombres: string | null; apellidos: string | null }[] | null; const x = Array.isArray(t) ? t[0] : t; return x ? `${x.nombres ?? ""} ${x.apellidos ?? ""}`.trim() : null; })() } satisfies ConvenioDeuda];
     }));
 
     const grupos = new Map<string, DeudaPaciente>();

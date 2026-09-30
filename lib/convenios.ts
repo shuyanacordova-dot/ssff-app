@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/supabase/current-user";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 
-export type ConvenioEmpresa = { id: string; nombre: string; activo: boolean; acuerdos: number };
+export type ConvenioEmpresa = { id: string; nombre: string; activo: boolean; acuerdos: number; cuotas_predeterminadas: number };
 export type ConveniosData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; empresas: ConvenioEmpresa[] };
 
 type UserProfile = { activo: boolean; roles: { nombre: string } | { nombre: string }[] | null };
@@ -20,14 +20,14 @@ export async function getConveniosData(): Promise<ConveniosData> {
     const role = roleName(profile);
     if (profileError || !profile?.activo || !role || !convenioRoles.has(role)) return { status: "forbidden", message: "Tu perfil no tiene permiso para ver convenios.", ...empty };
 
-    const { data: empresas, error } = await supabase.from("empresas_convenio").select("id,nombre,activo").order("nombre");
+    const { data: empresas, error } = await supabase.from("empresas_convenio").select("id,nombre,activo,cuotas_predeterminadas").order("nombre");
     if (error) return { status: "error", message: "No se pudieron cargar los convenios.", ...empty };
     const ids = (empresas ?? []).map((e) => e.id);
     const { data: acuerdos } = ids.length ? await supabase.from("acuerdos_pago").select("id,empresa_convenio_id").in("empresa_convenio_id", ids) : { data: [] as { id: string; empresa_convenio_id: string }[] };
     const counts = new Map<string, number>();
     (acuerdos ?? []).forEach((a) => counts.set(a.empresa_convenio_id, (counts.get(a.empresa_convenio_id) ?? 0) + 1));
 
-    return { status: "ready", empresas: (empresas ?? []).map((e) => ({ id: e.id, nombre: e.nombre, activo: e.activo, acuerdos: counts.get(e.id) ?? 0 })) };
+    return { status: "ready", empresas: (empresas ?? []).map((e) => ({ id: e.id, nombre: e.nombre, activo: e.activo, acuerdos: counts.get(e.id) ?? 0, cuotas_predeterminadas: e.cuotas_predeterminadas ?? 6 })) };
   } catch {
     return { status: "error", message: "La conexión de convenios no está disponible.", ...empty };
   }

@@ -35,7 +35,7 @@ export default function Cart({ products, stock, branches, patients, empresasConv
   const [convenioActivo, setConvenioActivo] = useState(false);
   const [convenios, setConvenios] = useState(empresasConvenio);
   const [empresaConvenioId, setEmpresaConvenioId] = useState("");
-  const [cuotas, setCuotas] = useState("3");
+  const [cuotas, setCuotas] = useState("6");
   const [showNuevaConvenio, setShowNuevaConvenio] = useState(false);
   const [nuevaConvenioNombre, setNuevaConvenioNombre] = useState("");
   const [acuerdo, setAcuerdo] = useState<AcuerdoPago | null>(null);
@@ -71,7 +71,7 @@ export default function Cart({ products, stock, branches, patients, empresasConv
   const updatePayment = (index: number, patch: Partial<CartPayment>) => setPayments(payments.map((payment, i) => i === index ? { ...payment, ...patch } : payment));
   const removePayment = (index: number) => setPayments(payments.filter((_, i) => i !== index));
 
-  const resetAll = () => { setItems([]); setPayments([]); setCliente(""); setPacienteId(defaultPacienteId ?? ""); setConvenioActivo(false); setEmpresaConvenioId(""); setCuotas("3"); setModo(""); };
+  const resetAll = () => { setItems([]); setPayments([]); setCliente(""); setPacienteId(defaultPacienteId ?? ""); setConvenioActivo(false); setEmpresaConvenioId(""); setCuotas("6"); setModo(""); };
 
   const crearConvenio = () => start(async () => {
     try { const id = await crearEmpresaConvenio(nuevaConvenioNombre); setConvenios((list) => [...list, { id, nombre: nuevaConvenioNombre.trim() }]); setEmpresaConvenioId(id); setShowNuevaConvenio(false); setNuevaConvenioNombre(""); }
@@ -133,7 +133,7 @@ export default function Cart({ products, stock, branches, patients, empresasConv
         <label className="receta-option-header"><input type="checkbox" checked={convenioActivo} onChange={(event) => setConvenioActivo(event.target.checked)} /> Convenio por descuento a rol de pagos</label>
         {convenioActivo && <div className="receta-option-body">
           <div className="new-patient-form">
-            <label>Empresa<span style={{ display: "flex", gap: 6 }}><select value={empresaConvenioId} onChange={(event) => setEmpresaConvenioId(event.target.value)} style={{ flex: 1 }}><option value="">Selecciona la empresa</option>{convenios.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select><button type="button" className="outline-action" onClick={() => setShowNuevaConvenio(true)}>+</button></span></label>
+            <label>Empresa<span style={{ display: "flex", gap: 6 }}><select value={empresaConvenioId} onChange={(event) => { setEmpresaConvenioId(event.target.value); const conv = convenios.find((c) => c.id === event.target.value) as { cuotas_predeterminadas?: number } | undefined; if (conv?.cuotas_predeterminadas) setCuotas(String(conv.cuotas_predeterminadas)); }} style={{ flex: 1 }}><option value="">Selecciona la empresa</option>{convenios.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select><button type="button" className="outline-action" onClick={() => setShowNuevaConvenio(true)}>+</button></span></label>
             <label>Cantidad de cuotas<input type="number" min={1} step={1} value={cuotas} onChange={(event) => setCuotas(event.target.value)} /></label>
           </div>
           <p className="field-hint">Primera cuota posible: <strong>{formatFecha(primeraCuotaFecha())}</strong> (primer día del mes siguiente).</p>

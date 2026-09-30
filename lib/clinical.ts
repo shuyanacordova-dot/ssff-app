@@ -83,7 +83,7 @@ export async function getClinicalData(): Promise<ClinicalData> {
       hasSupabaseAdminConfiguration()
         ? createSupabaseAdminClient().from("usuarios").select("id,nombre,activo,roles(nombre)").eq("activo", true).order("nombre")
         : supabase.rpc("directorio_tareas"),
-      supabase.from("empresas_convenio").select("id,nombre").eq("activo", true).order("nombre"),
+      supabase.from("empresas_convenio").select("id,nombre,cuotas_predeterminadas").eq("activo", true).order("nombre"),
       getOperationalContext(),
     ]);
     if (consultationsResult.error || photosResult.error) return { status: "error", message: "No se pudieron leer los detalles clínicos.", ...empty };

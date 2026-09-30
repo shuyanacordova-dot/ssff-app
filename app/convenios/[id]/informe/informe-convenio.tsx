@@ -10,7 +10,7 @@ type Numeric = number | string;
 type Fila = {
   venta_id: string; folio: Numeric; fecha_venta: string; empleado: string; beneficiario?: string | null;
   cedula: string | null; sucursal: string | null;
-  total: Numeric; pagado: Numeric; saldo: Numeric; con_acuerdo: boolean;
+  total: Numeric; pagado: Numeric; saldo: Numeric; con_acuerdo: boolean; cuotas_automaticas?: boolean;
   cuotas: Numeric | null; monto_cuota: Numeric | null; cuota_numero: Numeric | null; cuota_mes: Numeric;
 };
 export type InformeData = {
@@ -92,13 +92,13 @@ export default function InformeConvenio(props: Props) {
           const valor = importe(descuento);
           const cuota = Number(fila.cuota_numero);
           const cuotas = Number(fila.cuotas);
-          const detalle = !fila.con_acuerdo ? "Saldo pendiente" : cuota < 1 ? "Aún no inicia"
-            : cuota > cuotas ? "Saldo final" : `Cuota ${cuota} de ${cuotas}`;
+          const detalle = !(cuotas > 0) ? "Saldo pendiente" : cuota < 1 ? "Aún no inicia"
+            : cuota > cuotas ? "Saldo final" : `Cuota ${cuota} de ${cuotas}${cuota === cuotas ? " (última)" : ""}${fila.con_acuerdo ? "" : " (automática)"}`;
           return <tr key={fila.venta_id} className={incluir ? undefined : "no-print"} style={{ opacity: incluir ? 1 : 0.45 }}>
             <td className="no-print"><input type="checkbox" checked={incluir} aria-label={`Incluir a ${fila.empleado}, folio ${fila.folio}`} onChange={(e) => editar(fila.venta_id, { incluir: e.target.checked })} /></td>
             <td>{incluir ? ++numero : "—"}</td><td>{fila.empleado}{fila.beneficiario && <><br /><small>Beneficiario: {fila.beneficiario}</small></>}</td><td>{fila.cedula}</td>
             <td>{detalle}<small style={{ display: "block", color: "#6b7280" }}>Folio {fila.folio} · {fila.sucursal}</small></td>
-            <td style={{ textAlign: "center" }}>{fila.con_acuerdo && cuotas > 0 ? cuotas : "—"}</td>
+            <td style={{ textAlign: "center" }}>{cuotas > 0 ? cuotas : "—"}</td>
             <td style={{ textAlign: "right" }}><input inputMode="decimal" value={descuento} aria-label={`Valor a descontar a ${fila.empleado}, folio ${fila.folio}`}
               aria-invalid={valor > saldo} aria-describedby={valor > saldo ? `saldo-${fila.venta_id}` : undefined}
               style={{ width: 90, textAlign: "right" }}

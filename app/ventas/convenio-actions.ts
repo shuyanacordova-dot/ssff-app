@@ -68,7 +68,7 @@ export async function datosAutorizacionRol(ventaId: string) {
   const { data: venta, error: ventaError } = await supabase.from("ventas").select("empresa_id,paciente_id,estado,saldo").eq("id", ventaId).maybeSingle();
   if (ventaError || !venta || venta.estado !== "completada" || !venta.paciente_id) throw new Error("No se encontró una venta válida.");
   const [empresas, acuerdo, paciente] = await Promise.all([
-    supabase.from("empresas_convenio").select("id,nombre").eq("activo", true).order("nombre"),
+    supabase.from("empresas_convenio").select("id,nombre,cuotas_predeterminadas").eq("activo", true).order("nombre"),
     supabase.from("acuerdos_pago").select("empresa_convenio_id,cuotas,titular_paciente_id").eq("venta_id", ventaId).maybeSingle(),
     supabase.from("pacientes_clinicos").select("id,nombres,apellidos,cedula,responsable_id").eq("id", venta.paciente_id).maybeSingle(),
   ]);
@@ -86,4 +86,13 @@ export async function buscarTitularConvenio(query: string): Promise<PersonaTitul
   const { data, error } = await supabase.from("pacientes_clinicos").select("id,nombres,apellidos,cedula").or(`nombres.ilike.%${q}%,apellidos.ilike.%${q}%,cedula.ilike.%${q}%`).order("nombres").limit(15);
   if (error) throw new Error("No se pudo buscar.");
   return (data ?? []).map(personaTitular);
+}
+
+// Número de cuotas que se sugiere para cada empresa de convenio (p. ej. 6 meses).
+export async function actualizarCuotasConvenio(empresaConvenioId: string, cuotas: number) {
+  if (!empresaConvenioId || !Number.isInteger(cuotas) || cuotas < 1 || cuotas > 36) throw new Error("Indica entre 1 y 36 cuotas.");
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("empresas_convenio").update({ cuotas_predeterminadas: cuotas }).eq("id", empresaConvenioId);
+  if (error) throw new Error(error.message || "No se pudo guardar.");
+  revalidatePath("/convenios"); revalidatePath("/ventas"); revalidatePath("/cuentas-cobrar"); revalidatePath("/pacientes");
 }

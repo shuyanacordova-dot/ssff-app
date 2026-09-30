@@ -17,7 +17,7 @@ export type SalePatient = { id: string; nombres: string; apellidos: string; cedu
 export type Sale = { id: string; empresa_id: string; sucursal_id: string | null; paciente_id: string | null; cliente_nombre: string | null; estado: SaleStatus; subtotal: number; descuento: number; total: number; pagado: number; saldo: number; motivo_anulacion: string | null; recibo_token: string; fecha_entrega_estimada: string | null; creado_en: string; folio: number | null; apartado?: boolean; apartado_hasta?: string | null; venta_items: SaleItem[]; pagos_venta: SalePayment[] };
 export type SalesProfile = { id: string; empresa_id: string; sucursal_id: string | null; rol: string };
 export type SaleLabOrder = { id: string; venta_id: string; venta_item_id: string | null; estado: string; laboratorio: string; creado_en: string; tipo_lente: string; es_garantia: boolean };
-export type EmpresaConvenio = { id: string; nombre: string };
+export type EmpresaConvenio = { id: string; nombre: string; cuotas_predeterminadas?: number };
 export type Garantia = { id: string; venta_id: string; venta_item_id: string | null; tipo: "armazon" | "luna"; motivo: string; estado: "abierta" | "resuelta" | "rechazada"; orden_laboratorio_id: string | null; notas: string | null; creado_en: string };
 export const CONSUMIDOR_FINAL_CEDULA = "9999999999999";
 export type VentasData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: SalesProfile; products: SaleProduct[]; stock: SaleStock[]; sales: Sale[]; companies: SaleCompany[]; branches: SaleBranch[]; accessibleBranches: SaleBranch[]; patients: SalePatient[]; labOrders: SaleLabOrder[]; garantias: Garantia[]; empresasConvenio: EmpresaConvenio[] };
@@ -42,7 +42,7 @@ export async function getVentasData(): Promise<VentasData> {
       supabase.from("ventas").select("id,empresa_id,sucursal_id,paciente_id,cliente_nombre,estado,subtotal,descuento,total,pagado,saldo,motivo_anulacion,recibo_token,fecha_entrega_estimada,creado_en,folio,apartado,apartado_hasta,venta_items(id,producto_id,descripcion,cantidad,precio_unitario,descuento,total_linea),pagos_venta(id,metodo,monto,referencia,banco,creado_en)").order("creado_en", { ascending: false }).limit(30),
       supabase.from("empresas").select("id,nombre,direccion,telefono,email,logo_url").eq("activo", true).order("nombre"),
       loadBranchIdentities(supabase),
-      supabase.from("empresas_convenio").select("id,nombre").eq("activo", true).order("nombre"),
+      supabase.from("empresas_convenio").select("id,nombre,cuotas_predeterminadas").eq("activo", true).order("nombre"),
       getOperationalContext(),
     ]);
     if (productsResult.error || salesResult.error || companiesResult.error) return { status: "error", message: "No se pudo cargar ventas. Revisa la conexión y los permisos.", ...empty };
