@@ -18,7 +18,8 @@ import { TodasSucursalesToggle, useTodasSucursales } from "@/app/todas-sucursale
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
 const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
-const frecuenciaLabel: Record<string, string> = { diaria: "Diaria", semanal: "Semanal", quincenal: "Quincenal", mensual: "Mensual" };
+// En "Cobros de hoy": diaria todos los días, semanal los lunes, quincenal los 15 y 30, mensual el día 1.
+const frecuenciaLabel: Record<string, string> = { diaria: "Diaria (todos los días)", semanal: "Semanal (lunes)", quincenal: "Quincenal (15 y 30)", mensual: "Mensual (día 1)" };
 // Clasificación (Shuyana 2026-10-01): sin repetir la frecuencia de cobro, que se elige aparte.
 const categorias: { id: CategoriaDeuda; label: string; ayuda: string }[] = [
   { id: "apartados", label: "Sistema de apartado", ayuda: `Productos separados con abono: se entregan solo cuando el paciente paga todo. Plazo de ${DIAS_APARTADO} días desde la venta; si vence, decide si extender o liberar (anular la venta devuelve el producto al stock).` },
