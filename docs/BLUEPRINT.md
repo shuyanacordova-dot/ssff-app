@@ -307,6 +307,8 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 
 ## 11. Pendientes abiertos (2026-09-24)
 
+**Facturas de Provisión (2026-10-01):** llegan a shuyanacordova@gmail.com. Hoy se suman a la deuda subiendo el XML en Mis deudas → Proveedores → "Agregar factura" (`registrar_factura_proveedor`, sin duplicados). Tarea programada de Claude "facturas-provision-diario" (8:10 a. m., solo lectura) avisa cuando llegan. El conector de Gmail no permite leer adjuntos: cuando llegue la primera factura, ver el formato del correo y decidir el registro automático (texto del correo o buzón dedicado con reenvío).
+
 **Próxima sesión (pedido de Shuyana, 2026-09-28), en este orden:**
 1. **Cuadrar Sacha (cuadre de caja mañana, Shuyana):** saldos del día de Pichincha, Guayaquil e Internacional + efectivo real; revisar cuadre de caja (no cuadra en LumOS desde el 22-09; ojo L34 con la apertura) y fijar punto de partida como Shushufindi ($2.142,93) y Focus ($830,94). Con eso Sacha aparece sola en el "Acumulado (dinero disponible)".
 2. ✅ **Acumulado (dinero disponible) en el inicio** — RPC `dinero_disponible()` (migración `20260928150000`), verificado: Shushufindi $2.142,93, Focus $830,94, Sacha "por cuadrar". Pantalla con Codex (28-09).
