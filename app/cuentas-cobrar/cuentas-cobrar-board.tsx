@@ -19,16 +19,14 @@ import { TodasSucursalesToggle, useTodasSucursales } from "@/app/todas-sucursale
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
 const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
 const frecuenciaLabel: Record<string, string> = { diaria: "Diaria", semanal: "Semanal", quincenal: "Quincenal", mensual: "Mensual" };
+// Clasificación (Shuyana 2026-10-01): sin repetir la frecuencia de cobro, que se elige aparte.
 const categorias: { id: CategoriaDeuda; label: string; ayuda: string }[] = [
-  { id: "urgentes", label: "Urgentes", ayuda: `Deudas de más de 3 meses (${DIAS_URGENTE} días), de la más antigua a la más reciente.` },
-  { id: "recientes", label: "Ventas recientes", ayuda: `Saldos de ventas de hasta 3 meses (${DIAS_URGENTE} días), de la venta más nueva a la más antigua.` },
-  { id: "diarios", label: "Cobros diarios", ayuda: "Pacientes con frecuencia de cobro diaria: salen en Cobros de hoy todos los días." },
-  { id: "semanales", label: "Cobros semanales", ayuda: "Pacientes con frecuencia de cobro semanal." },
-  { id: "quincenales", label: "Cobros quincenales", ayuda: "Pacientes con frecuencia de cobro quincenal." },
-  { id: "mensuales", label: "Cobros mensuales", ayuda: "Pacientes con frecuencia de cobro mensual." },
-  { id: "convenio", label: "Convenios", ayuda: "Deudas con acuerdo de pago con una empresa (descuento a rol)." },
-  { id: "apartados", label: "Apartados", ayuda: `Productos separados con abono: se entregan solo cuando el paciente paga todo. Plazo de ${DIAS_APARTADO} días desde la venta; si vence, decide si extender o liberar (anular la venta devuelve el producto al stock).` },
+  { id: "apartados", label: "Sistema de apartado", ayuda: `Productos separados con abono: se entregan solo cuando el paciente paga todo. Plazo de ${DIAS_APARTADO} días desde la venta; si vence, decide si extender o liberar (anular la venta devuelve el producto al stock).` },
   { id: "rezagados", label: "Lentes rezagados", ayuda: `Lentes listos que el paciente no retira: deudas que moviste aquí y órdenes de laboratorio listas o notificadas hace ${DIAS_REZAGO} días o más (tengan saldo o no).` },
+  { id: "credito_optica", label: "Crédito óptica", ayuda: "Crédito directo de la óptica: el paciente abona según su frecuencia de cobro." },
+  { id: "credito_kamina", label: "Crédito Kamina", ayuda: "Deudas con crédito Kamina." },
+  { id: "convenio", label: "Convenios", ayuda: "Deudas con descuento a rol de pagos de una empresa de convenio; entran al informe mensual." },
+  { id: "urgentes", label: "Cobro urgente", ayuda: `Deudas de más de 3 meses (${DIAS_URGENTE} días) o marcadas como urgentes, de la más antigua a la más reciente.` },
 ];
 type Pestana = CategoriaDeuda | "todas" | "hoy";
 const categoriaLabel = (id: CategoriaDeuda) => categorias.find((c) => c.id === id)?.label ?? id;
@@ -40,7 +38,7 @@ const apartadoInfo = (deuda: DeudaPaciente) => {
   return { venta, vencido, texto: venta.apartado_hasta ? `${vencido ? "Apartado vencido el" : "Apartado hasta"} ${formatDate(`${venta.apartado_hasta}T12:00:00-05:00`)}` : "Apartado" };
 };
 const ordenar = (categoria: Pestana, deudas: DeudaPaciente[]) => [...deudas].sort((a, b) =>
-  categoria === "recientes" ? a.dias_mas_antigua - b.dias_mas_antigua
+  categoria === "credito_optica" || categoria === "credito_kamina" ? a.dias_mas_antigua - b.dias_mas_antigua
   : categoria === "convenio" ? (a.convenio?.empresa ?? "").localeCompare(b.convenio?.empresa ?? "") || a.apellidos.localeCompare(b.apellidos)
   : b.dias_mas_antigua - a.dias_mas_antigua);
 

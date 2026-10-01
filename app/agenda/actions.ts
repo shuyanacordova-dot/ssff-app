@@ -54,7 +54,7 @@ export async function cambiarEstadoCita(formData: FormData) {
   revalidatePath("/agenda"); return { success: true };
 }
 
-const activityTypes = new Set(["reunion", "campana", "convenio", "pago", "capacitacion", "entrega", "otro"]);
+const activityTypes = new Set(["reunion", "campana", "convenio", "pago", "capacitacion", "entrega", "permiso", "vacaciones", "otro"]);
 const activityStates = new Set(["pendiente", "hecha", "cancelada"]);
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -72,6 +72,9 @@ export async function crearActividad(formData: FormData) {
     const parsedDate = new Date(fecha + "T00:00:00Z");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== fecha) throw new Error("La fecha no es válida.");
     if (!activityTypes.has(tipo)) throw new Error("Selecciona un tipo de actividad válido.");
+    // Permisos y vacaciones pueden durar varios días (fecha final opcional).
+    const fechaFin = field(formData, "fecha_fin");
+    if (fechaFin && (!/^\d{4}-\d{2}-\d{2}$/.test(fechaFin) || fechaFin < fecha)) throw new Error("La fecha final debe ser igual o posterior a la fecha de inicio.");
     const validTime = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
     if ((horaInicio && !validTime(horaInicio)) || (horaFin && !validTime(horaFin))) throw new Error("Las horas no son válidas.");
     if (horaFin && (!horaInicio || horaFin < horaInicio)) throw new Error("La hora fin debe ser igual o posterior a la hora inicio.");
@@ -86,7 +89,7 @@ export async function crearActividad(formData: FormData) {
       if (error || !(data as AgendaTeamMember[] | null)?.some((member) => member.id === responsableId)) throw new Error("La persona responsable no pertenece al equipo disponible.");
     }
     const { error } = await supabase.from("actividades_agenda").insert({
-      titulo, fecha, tipo, hora_inicio: horaInicio || null, hora_fin: horaFin || null,
+      titulo, fecha, fecha_fin: fechaFin && fechaFin !== fecha ? fechaFin : null, tipo, hora_inicio: horaInicio || null, hora_fin: horaFin || null,
       sucursal_id: sucursalId || null, responsable_id: responsableId || null,
       descripcion: field(formData, "descripcion") || null, estado: "pendiente", created_by: profile.id,
     });

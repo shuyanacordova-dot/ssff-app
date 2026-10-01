@@ -16,13 +16,21 @@ const formatTime = (value: string) => new Intl.DateTimeFormat("es-EC", { timeZon
 const dayKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 const ecuadorDay = (value: string | Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Guayaquil", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value));
 const todayDate = () => new Date(ecuadorDay(new Date()) + "T12:00:00");
-const activityLabels: Record<Activity["tipo"], string> = { reunion: "Reunión", campana: "Campaña", convenio: "Visita a convenio", pago: "Pago", capacitacion: "Capacitación", entrega: "Entrega", otro: "Otro" };
+const activityLabels: Record<Activity["tipo"], string> = { reunion: "Reunión", campana: "Campaña", convenio: "Visita a convenio", pago: "Pago", capacitacion: "Capacitación", entrega: "Entrega", permiso: "Permiso", vacaciones: "Vacaciones", otro: "Otro" };
 const optics = [
   { id: "3bd2a17c-b4e0-4137-a5f3-66475dbcb836", name: "Shuvision", tone: "cal-shuvision" },
   { id: "1db17433-cc24-409f-92d2-794a01ce79d4", name: "Sacha", tone: "cal-sacha" },
   { id: "e2775b83-2105-46a7-8c40-d8de6b3a63dd", name: "Focus", tone: "cal-focus" },
 ];
 const opticTone = (id: string | null) => id === null ? "cal-all" : optics.find((optic) => optic.id === id)?.tone ?? "cal-unspecified";
+// Días que ocupa una actividad (permisos y vacaciones pueden durar varios días).
+const diasEntre = (desde: string, hasta: string | null) => {
+  const dias = [desde];
+  if (!hasta || hasta <= desde) return dias;
+  const d = new Date(desde + "T12:00:00Z");
+  while (dias.length < 120) { d.setUTCDate(d.getUTCDate() + 1); const k = d.toISOString().slice(0, 10); if (k > hasta) break; dias.push(k); }
+  return dias;
+};
 type CalendarItem = { id: string; date: string; time: string; text: string; branchId: string | null; cancelled: boolean };
 const dateInputValue = (date: Date) => `${dayKey(date)}T09:00`;
 const byDay = (value: string, key: string) => ecuadorDay(value) === key;
@@ -49,13 +57,13 @@ export default function AgendaBoard({ modo = "citas", ...props }: AgendaData & {
   const filteredAppointments = useMemo(() => props.appointments.filter((item) => !branchFilter || item.sucursal_atencion_id === branchFilter), [props.appointments, branchFilter]);
   const filteredActivities = useMemo(() => props.activities.filter((item) => !branchFilter || item.sucursal_id === null || item.sucursal_id === branchFilter), [props.activities, branchFilter]);
   const appointments = filteredAppointments.filter((item) => byDay(item.inicio, dateKey));
-  const activities = filteredActivities.filter((item) => item.fecha === dateKey);
+  const activities = filteredActivities.filter((item) => item.fecha <= dateKey && dateKey <= (item.fecha_fin ?? item.fecha));
   const patientById = useMemo(() => new Map(props.patients.map((patient) => [patient.id, patient])), [props.patients]);
   const companyById = useMemo(() => new Map(props.companies.map((company) => [company.id, company])), [props.companies]);
   const branchById = useMemo(() => new Map(props.branches.map((branch) => [branch.id, branch])), [props.branches]);
   const teamById = useMemo(() => new Map(props.team.map((member) => [member.id, member])), [props.team]);
   const calendarItems = useMemo(() => {
-    const items: CalendarItem[] = esCitas ? filteredAppointments.map((item) => ({ id: "cita-" + item.id, date: ecuadorDay(item.inicio), time: formatTime(item.inicio), text: formatTime(item.inicio) + " " + nombreCorto(patientById.get(item.paciente_id)), branchId: item.sucursal_atencion_id, cancelled: item.estado === "cancelada" })) : filteredActivities.map((item) => ({ id: "actividad-" + item.id, date: item.fecha, time: item.hora_inicio?.slice(0, 5) ?? "", text: (item.estado === "hecha" ? "✓ " : "") + item.titulo + (item.hora_inicio ? " · " + item.hora_inicio.slice(0, 5) : ""), branchId: item.sucursal_id, cancelled: item.estado === "cancelada" }));
+    const items: CalendarItem[] = esCitas ? filteredAppointments.map((item) => ({ id: "cita-" + item.id, date: ecuadorDay(item.inicio), time: formatTime(item.inicio), text: formatTime(item.inicio) + " " + nombreCorto(patientById.get(item.paciente_id)), branchId: item.sucursal_atencion_id, cancelled: item.estado === "cancelada" })) : filteredActivities.flatMap((item) => diasEntre(item.fecha, item.fecha_fin).map((dia) => ({ id: "actividad-" + item.id + "-" + dia, date: dia, time: item.hora_inicio?.slice(0, 5) ?? "", text: (item.estado === "hecha" ? "✓ " : "") + item.titulo + (item.hora_inicio ? " · " + item.hora_inicio.slice(0, 5) : ""), branchId: item.sucursal_id, cancelled: item.estado === "cancelada" })));
     const map = new Map<string, CalendarItem[]>();
     items.sort((a, b) => a.time.localeCompare(b.time) || a.id.localeCompare(b.id));
     for (const item of items) map.set(item.date, [...(map.get(item.date) ?? []), item]);
@@ -100,7 +108,7 @@ export default function AgendaBoard({ modo = "citas", ...props }: AgendaData & {
     <div className="notice" role="status"><CircleAlert size={18} /><span>{notice || (esCitas ? "Las citas canceladas se conservan en el historial; no se borran." : "Las actividades sin óptica asignada aparecen en las 3 ópticas.")}</span></div>
     {view === "mes" ? <MonthGrid month={selectedDate} itemsByDay={calendarItems} onSelectDay={goToDay} /> : <>{!esCitas && <section className="cal-activities"><h2>Actividades</h2>
       {activities.length ? activities.map((activity) => <article key={activity.id} className={`glass cal-activity ${opticTone(activity.sucursal_id)} ${activity.estado === "cancelada" ? "cal-cancelled" : ""}`}>
-        <div className="appointment-meta"><span>{activityLabels[activity.tipo]}</span><span>{activity.hora_inicio ? activity.hora_inicio.slice(0, 5) + (activity.hora_fin ? "–" + activity.hora_fin.slice(0, 5) : "") : "Todo el día"}</span><span>{activity.sucursal_id ? branchById.get(activity.sucursal_id)?.nombre ?? optics.find((optic) => optic.id === activity.sucursal_id)?.name ?? "Óptica" : "Las 3 ópticas"}</span></div>
+        <div className="appointment-meta"><span>{activityLabels[activity.tipo]}</span><span>{activity.fecha_fin ? `Del ${activity.fecha.slice(8, 10)}/${activity.fecha.slice(5, 7)} al ${activity.fecha_fin.slice(8, 10)}/${activity.fecha_fin.slice(5, 7)}` : activity.hora_inicio ? activity.hora_inicio.slice(0, 5) + (activity.hora_fin ? "–" + activity.hora_fin.slice(0, 5) : "") : "Todo el día"}</span><span>{activity.sucursal_id ? branchById.get(activity.sucursal_id)?.nombre ?? optics.find((optic) => optic.id === activity.sucursal_id)?.name ?? "Óptica" : "Las 3 ópticas"}</span></div>
         <h3>{activity.estado === "hecha" && "✓ "}{activity.titulo}</h3>
         <p><UserRound size={14} /> {activity.responsable_id ? teamById.get(activity.responsable_id)?.nombre ?? "Responsable no disponible" : "Sin responsable asignado"}</p>
         {activity.descripcion && <p className="cal-description">{activity.descripcion}</p>}
@@ -164,6 +172,7 @@ function NewActivityModal({ branches, team, profile, esSuperadmin, date, error, 
         <div className="new-patient-form">
           <label>Título<input name="titulo" required maxLength={160} autoFocus /></label>
           <label>Fecha<input name="fecha" type="date" required defaultValue={date} /></label>
+          <label>Hasta (opcional)<input name="fecha_fin" type="date" min={date} title="Para permisos o vacaciones de varios días" /></label>
           <label>Hora inicio<input name="hora_inicio" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></label>
           <label>Hora fin (opcional)<input name="hora_fin" type="time" min={startTime || undefined} /></label>
           <label>Óptica<select name="sucursal_id" required={!esSuperadmin} defaultValue={defaultBranch}>

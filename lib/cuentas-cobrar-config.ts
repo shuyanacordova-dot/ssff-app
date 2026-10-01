@@ -1,4 +1,4 @@
-// Ventas con saldo de hasta 3 meses son "recientes"; más antiguas pasan a "urgentes".
+// Ventas con saldo de hasta 3 meses son "Crédito óptica"; más antiguas pasan a "Cobro urgente".
 export const DIAS_URGENTE = 90;
 
 // Un lente listo que no se retira en este número de días pasa a "Lentes rezagados".

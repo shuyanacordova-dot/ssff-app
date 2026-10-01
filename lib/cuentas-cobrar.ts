@@ -6,7 +6,7 @@ import { diasCalendarioGuayaquil } from "@/lib/record-date";
 
 export type DeudaVenta = { id: string; sucursal_id: string | null; total: number; pagado: number; saldo: number; creado_en: string; fecha_entrega_estimada: string | null; recibo_token: string; folio: number | null; apartado: boolean; apartado_hasta: string | null };
 export type ConvenioDeuda = { empresa: string; cuotas: number; monto_cuota: number; fecha_primera_cuota: string | null; titular?: string | null };
-export type CategoriaDeuda = "urgentes" | "recientes" | "diarios" | "semanales" | "quincenales" | "mensuales" | "convenio" | "apartados" | "rezagados";
+export type CategoriaDeuda = "apartados" | "rezagados" | "credito_optica" | "credito_kamina" | "convenio" | "urgentes";
 export type DeudaPaciente = { paciente_id: string; nombres: string; apellidos: string; telefono: string | null; sucursales: string[]; frecuencia_cobro: string | null; cobro_insistente: boolean; empresa_nombre: string; saldo_total: number; ventas: DeudaVenta[]; convenio: ConvenioDeuda | null; dias_mas_antigua: number; categoria: CategoriaDeuda; categoria_auto: CategoriaDeuda; categoria_manual: CategoriaDeuda | null; ultimo_mensaje: string | null; ultimo_mensaje_por: string | null; fecha_cobro_acordada: string | null };
 
 export { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
@@ -101,7 +101,7 @@ export async function getCuentasCobrarData(convenioId?: string): Promise<Cuentas
       const suc = venta.sucursales as unknown as { nombre: string } | { nombre: string }[] | null;
       const sucursalNombre = (Array.isArray(suc) ? suc[0]?.nombre : suc?.nombre) ?? "Sin sucursal";
       if (existente) { existente.saldo_total += Number(venta.saldo); existente.ventas.push(ventaResumen); if (!existente.sucursales.includes(sucursalNombre)) existente.sucursales.push(sucursalNombre); }
-      else grupos.set(key, { paciente_id: paciente.id, nombres: paciente.nombres, apellidos: paciente.apellidos, telefono: paciente.telefono, sucursales: [sucursalNombre], frecuencia_cobro: paciente.frecuencia_cobro, cobro_insistente: paciente.cobro_insistente ?? false, empresa_nombre: nombreEmpresa ?? "Empresa", saldo_total: Number(venta.saldo), ventas: [ventaResumen], convenio: null, dias_mas_antigua: 0, categoria: "recientes", categoria_auto: "recientes", categoria_manual: (paciente.categoria_cobro as CategoriaDeuda | null) ?? null, ultimo_mensaje: ultimoPorPaciente.get(key)?.enviado_en ?? null, ultimo_mensaje_por: nombreRemitente.get(ultimoPorPaciente.get(key)?.enviado_por ?? "") ?? null, fecha_cobro_acordada: paciente.fecha_cobro_acordada ?? null });
+      else grupos.set(key, { paciente_id: paciente.id, nombres: paciente.nombres, apellidos: paciente.apellidos, telefono: paciente.telefono, sucursales: [sucursalNombre], frecuencia_cobro: paciente.frecuencia_cobro, cobro_insistente: paciente.cobro_insistente ?? false, empresa_nombre: nombreEmpresa ?? "Empresa", saldo_total: Number(venta.saldo), ventas: [ventaResumen], convenio: null, dias_mas_antigua: 0, categoria: "credito_optica", categoria_auto: "credito_optica", categoria_manual: (paciente.categoria_cobro as CategoriaDeuda | null) ?? null, ultimo_mensaje: ultimoPorPaciente.get(key)?.enviado_en ?? null, ultimo_mensaje_por: nombreRemitente.get(ultimoPorPaciente.get(key)?.enviado_por ?? "") ?? null, fecha_cobro_acordada: paciente.fecha_cobro_acordada ?? null });
       const grupo = grupos.get(key)!;
       const acuerdo = acuerdoByVenta.get(venta.id);
       if (acuerdo && !grupo.convenio) grupo.convenio = acuerdo;
@@ -111,7 +111,7 @@ export async function getCuentasCobrarData(convenioId?: string): Promise<Cuentas
     const deudas = Array.from(grupos.values()).map((d) => {
       const dias = Math.max(0, ...d.ventas.map((v) => diasCalendarioGuayaquil(v.creado_en, ahora)));
       const tieneApartado = d.ventas.some((v) => v.apartado);
-      const categoria_auto: CategoriaDeuda = tieneApartado ? "apartados" : (d.convenio || pacientesConConvenio.has(d.paciente_id)) ? "convenio" : d.frecuencia_cobro === "mensual" ? "mensuales" : d.frecuencia_cobro === "quincenal" ? "quincenales" : d.frecuencia_cobro === "semanal" ? "semanales" : d.frecuencia_cobro === "diaria" ? "diarios" : dias > DIAS_URGENTE ? "urgentes" : "recientes";
+      const categoria_auto: CategoriaDeuda = tieneApartado ? "apartados" : (d.convenio || pacientesConConvenio.has(d.paciente_id)) ? "convenio" : dias > DIAS_URGENTE ? "urgentes" : "credito_optica";
       // Un apartado siempre va a su pestaña: el producto no se entrega hasta pagar todo.
       return { ...d, dias_mas_antigua: dias, categoria_auto, categoria: tieneApartado ? "apartados" : d.categoria_manual ?? categoria_auto };
     });
