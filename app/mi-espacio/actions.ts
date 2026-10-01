@@ -85,6 +85,31 @@ export async function registrarPagoDeuda(form: FormData): Promise<Resultado> {
   } catch (err) { return { ok: false, error: err instanceof Error ? err.message : "No se pudo registrar el pago." }; }
 }
 
+export async function registrarFacturaProveedor(form: FormData): Promise<Resultado> {
+  try {
+    const { supabase } = await privateContext();
+    const deudaId = value(form, "deuda_id");
+    const facturaNumero = value(form, "numero");
+    const fecha = value(form, "fecha");
+    const total = numero(form, "total");
+    if (!deudaId || !facturaNumero) return { ok: false, error: "Escribe el número de la factura." };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || Number.isNaN(Date.parse(`${fecha}T12:00:00Z`)) || new Date(`${fecha}T12:00:00Z`).toISOString().slice(0, 10) !== fecha) return { ok: false, error: "Indica una fecha válida (AAAA-MM-DD)." };
+    if (!Number.isFinite(total) || total <= 0) return { ok: false, error: "El total de la factura debe ser mayor que cero." };
+    const optionalAmount = (name: string) => value(form, name) ? numero(form, name) : null;
+    const subtotal = optionalAmount("subtotal"); const iva = optionalAmount("iva");
+    if ((subtotal !== null && (!Number.isFinite(subtotal) || subtotal < 0)) || (iva !== null && (!Number.isFinite(iva) || iva < 0))) return { ok: false, error: "Revisa el subtotal y el IVA." };
+    const { error } = await supabase.rpc("registrar_factura_proveedor", {
+      p_deuda: deudaId, p_numero: facturaNumero, p_fecha: fecha, p_total: total,
+      p_subtotal: subtotal, p_iva: iva, p_ruc: value(form, "ruc") || null,
+      p_razon_social: value(form, "razon_social") || null, p_clave_acceso: value(form, "clave_acceso") || null,
+      p_origen: value(form, "origen") === "xml" ? "xml" : "manual", p_notas: value(form, "notas") || null,
+    });
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/mi-espacio");
+    return { ok: true };
+  } catch (err) { return { ok: false, error: err instanceof Error ? err.message : "No se pudo agregar la factura." }; }
+}
+
 export async function archivarDeuda(deudaId: string): Promise<Resultado> {
   try {
     const { supabase } = await privateContext();

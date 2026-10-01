@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { Archive, ChevronLeft, ChevronRight, History, Landmark, LockKeyhole, Pencil, Plus, Wallet, X } from "lucide-react";
 import type { PrivateAdminData } from "@/lib/mi-espacio";
 import { atrasadas, avance, cuotasPagadas, fechaCorta, hoyEcuador, itemsDelMes, mesDe, modalidades, money, nombreMes, pagosDelMes, proximoPago, sumarMeses, tipos, type BusinessDebt, type ItemMes, type ModalidadDeuda, type TipoDeuda } from "@/lib/mis-deudas-calc";
-import { actualizarDeuda, archivarDeuda, crearDeuda, registrarPagoDeuda } from "./actions";
+import { actualizarDeuda, archivarDeuda, crearDeuda, registrarFacturaProveedor, registrarPagoDeuda } from "./actions";
 import s from "./mis-deudas.module.css";
 
 const estadoTexto = { pagado: "Pagado", vencido: "Vencido", hoy: "Vence hoy", proximo: "Próximo" } as const;
@@ -25,6 +26,7 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
   const [pagando, setPagando] = useState<Pago | null>(null);
   const [historial, setHistorial] = useState<BusinessDebt | null>(null);
   const [editando, setEditando] = useState<BusinessDebt | null>(null);
+  const [facturando, setFacturando] = useState<BusinessDebt | null>(null);
   const [vista, setVista] = useState<"todo" | "optica" | "personal">("optica");
   const [notice, setNotice] = useState(props.message ?? "");
   const [pending, start] = useTransition();
@@ -100,7 +102,7 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
           const saldo = rows.reduce((sum, d) => sum + (d.modalidad === "mensual" ? 0 : Number(d.saldo)), 0);
           const mensual = rows.reduce((sum, d) => sum + (d.modalidad === "libre" ? 0 : Number(d.monto_cuota ?? 0)), 0);
           const tarjetas = grupo.preset === "tarjeta" ? Array.from(new Set(rows.map((d) => d.proveedor))) : [];
-          const renderDeuda = (d: BusinessDebt) => <TarjetaDeuda key={d.id} deuda={d} empresa={d.sucursal_id ? props.branches.find((b) => b.id === d.sucursal_id)?.nombre : destino === "personal" ? "Personal" : props.companies.find((c) => c.id === d.empresa_id)?.nombre} pending={pending} onEditar={() => setEditando(d)} onPagar={() => { const p = proximoPago(d, hoy); setPagando({ deuda: d, monto: p?.monto ?? Number(d.saldo), periodo: p ? mesDe(p.fecha) : mesDe(hoy) }); }} onHistorial={() => setHistorial(d)} onArchivar={() => archivar(d)} />;
+          const renderDeuda = (d: BusinessDebt) => <TarjetaDeuda key={d.id} deuda={d} empresa={d.sucursal_id ? props.branches.find((b) => b.id === d.sucursal_id)?.nombre : destino === "personal" ? "Personal" : props.companies.find((c) => c.id === d.empresa_id)?.nombre} pending={pending} onEditar={() => setEditando(d)} onPagar={() => { const p = proximoPago(d, hoy); setPagando({ deuda: d, monto: p?.monto ?? Number(d.saldo), periodo: p ? mesDe(p.fecha) : mesDe(hoy) }); }} onHistorial={() => setHistorial(d)} onFactura={() => setFacturando(d)} onArchivar={() => archivar(d)} />;
           return <section key={grupo.label} className={s.debtGroup}>
             <div className={s.groupHead}><div><h4>{grupo.label} <span>({rows.length})</span></h4><p>Saldo {money(saldo)}{mensual > 0 ? ` · Mensual ${money(mensual)}` : ""}</p></div><button type="button" className="outline-action" onClick={() => setNueva({ tipo: grupo.preset, destino })}><Plus size={15} /> Agregar</button></div>
             {grupo.preset === "tarjeta" ? tarjetas.map((nombre) => { const cardRows = rows.filter((d) => d.proveedor === nombre); return <div key={nombre} className={s.cardGroup}><div className={s.cardGroupHead}><strong>{nombre}</strong><span>Saldo {money(cardRows.reduce((sum, d) => sum + Number(d.saldo), 0))} · Mensual {money(cardRows.reduce((sum, d) => sum + Number(d.monto_cuota ?? 0), 0))}</span></div><div className={s.grid}>{cardRows.map(renderDeuda)}</div></div>; }) : rows.length ? <div className={s.grid}>{rows.map(renderDeuda)}</div> : <p className={s.empty}>No hay deudas activas.</p>}
@@ -113,6 +115,7 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
     {pagando && <PagarDeuda pago={pagando} branches={props.branches} cuentas={props.cuentas} companies={props.companies} onClose={() => setPagando(null)} onSaved={(m) => { setNotice(m); setPagando(null); router.refresh(); }} />}
     {historial && <Historial deuda={historial} onClose={() => setHistorial(null)} />}
     {editando && <EditarDeuda deuda={editando} companies={props.companies} branches={props.branches} onClose={() => setEditando(null)} onSaved={(m) => { setNotice(m); setEditando(null); router.refresh(); }} />}
+    {facturando && <AgregarFactura deuda={facturando} onClose={() => setFacturando(null)} onSaved={() => { setNotice(`Factura agregada a ${facturando.proveedor}.`); setFacturando(null); router.refresh(); }} />}
   </div></main>;
 }
 
@@ -132,7 +135,7 @@ function FilaPago({ item, onPagar }: { item: ItemMes; onPagar: () => void }) {
   </article>;
 }
 
-function TarjetaDeuda({ deuda, empresa, pending, onPagar, onHistorial, onArchivar, onEditar }: { deuda: BusinessDebt; empresa?: string; pending: boolean; onPagar: () => void; onHistorial: () => void; onArchivar: () => void; onEditar: () => void }) {
+function TarjetaDeuda({ deuda, empresa, pending, onPagar, onHistorial, onFactura, onArchivar, onEditar }: { deuda: BusinessDebt; empresa?: string; pending: boolean; onPagar: () => void; onHistorial: () => void; onFactura: () => void; onArchivar: () => void; onEditar: () => void }) {
   const t = tipos[deuda.tipo];
   const prox = proximoPago(deuda);
   const pct = Math.round(avance(deuda) * 100);
@@ -148,6 +151,7 @@ function TarjetaDeuda({ deuda, empresa, pending, onPagar, onHistorial, onArchiva
     {deuda.notas && <p style={{ color: "#8a5a00" }}>{deuda.notas}</p>}
     <div className={s.actions}>
       <button className="new-consultation" type="button" onClick={onPagar}><Wallet size={14} /> Pagar</button>
+      {deuda.tipo === "proveedor" && deuda.modalidad === "libre" && <button className="outline-action" type="button" onClick={onFactura}><Plus size={14} /> Agregar factura</button>}
       <button className="outline-action" type="button" onClick={onHistorial}><History size={14} /> Historial</button>
       <button className="outline-action" type="button" onClick={onEditar}><Pencil size={14} /> Editar</button>
       <button className="outline-action" type="button" disabled={pending} onClick={onArchivar} title="Ya no aplica o se terminó"><Archive size={14} /> Quitar</button>
@@ -251,12 +255,83 @@ function PagarDeuda({ pago, branches, cuentas, companies, onClose, onSaved }: { 
 
 function Historial({ deuda, onClose }: { deuda: BusinessDebt; onClose: () => void }) {
   const pagos = [...deuda.pagos_deuda_negocio].sort((a, b) => b.fecha_pago.localeCompare(a.fecha_pago));
+  const facturas = [...(deuda.facturas_proveedor ?? [])].sort((a, b) => b.fecha_emision.localeCompare(a.fecha_emision));
   return <div className="modal-backdrop" onClick={onClose}><section className="new-patient-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
     <button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>
-    <p className="section-label">PAGOS REGISTRADOS</p><h2>{deuda.proveedor}</h2>
+    <p className="section-label">HISTORIAL</p><h2>{deuda.proveedor}</h2>
+    {deuda.tipo === "proveedor" && <><h3>Facturas ({facturas.length})</h3>{facturas.length ? <div className="task-list">{facturas.map((f) => <article className="task-card" key={f.id}><div className="task-main"><p style={{ margin: 0 }}><strong>{fechaCorta(f.fecha_emision)}</strong> · {f.numero} · {f.origen === "xml" ? "XML" : f.origen === "correo" ? "Correo" : "Manual"}</p>{f.razon_social && <p className="field-hint" style={{ margin: 0 }}>{f.razon_social}</p>}</div><div className="task-actions"><strong>{money(Number(f.total))}</strong></div></article>)}</div> : <p className={s.empty}>Todavía no hay facturas registradas.</p>}</>}
+    <h3>Pagos ({pagos.length})</h3>
     {pagos.length ? <div className="task-list">{pagos.map((p) => <article className="task-card" key={p.id}><div className="task-main"><p style={{ margin: 0 }}><strong>{fechaCorta(p.fecha_pago)}</strong> · {metodos.find((m) => m.value === p.metodo)?.label ?? p.metodo}{p.periodo ? ` · mes ${nombreMes(p.periodo.slice(0, 7))}` : ""}{p.referencia ? ` · Ref. ${p.referencia}` : ""}</p>{p.notas && <p className="field-hint" style={{ margin: 0 }}>{p.notas}</p>}</div><div className="task-actions"><strong>{money(Number(p.monto))}</strong></div></article>)}</div>
       : <p className={s.empty}>Todavía no hay pagos registrados.</p>}
   </section></div>;
+}
+
+function AgregarFactura({ deuda, onClose, onSaved }: { deuda: BusinessDebt; onClose: () => void; onSaved: () => void }) {
+  const [campos, setCampos] = useState({ numero: "", fecha: "", subtotal: "", iva: "", total: "", ruc: "", razon_social: "", clave_acceso: "", notas: "", origen: "manual" });
+  const [error, setError] = useState("");
+  const [pending, start] = useTransition();
+  const setCampo = (nombre: keyof typeof campos, valor: string) => setCampos((actual) => ({ ...actual, [nombre]: valor }));
+  const leerXml = async (archivo?: File) => {
+    if (!archivo) return;
+    try {
+      const parse = (texto: string) => {
+        const xml = new DOMParser().parseFromString(texto, "text/xml");
+        if (xml.getElementsByTagName("parsererror").length) throw new Error("XML inválido");
+        return xml;
+      };
+      let xml = parse(await archivo.text());
+      if (xml.documentElement.localName === "autorizacion") {
+        const comprobante = xml.getElementsByTagName("comprobante")[0]?.textContent;
+        if (!comprobante) throw new Error("Sin comprobante");
+        xml = parse(comprobante);
+      }
+      if (xml.documentElement.localName !== "factura") throw new Error("No es una factura");
+      const dato = (padre: Element | null, etiqueta: string) => padre?.getElementsByTagName(etiqueta)[0]?.textContent?.trim() ?? "";
+      const tributaria = xml.getElementsByTagName("infoTributaria")[0];
+      const info = xml.getElementsByTagName("infoFactura")[0];
+      const fechaSRI = dato(info, "fechaEmision");
+      const fechaPartes = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(fechaSRI);
+      const fecha = fechaPartes ? `${fechaPartes[3]}-${fechaPartes[2]}-${fechaPartes[1]}` : "";
+      const numeroFactura = ["estab", "ptoEmi", "secuencial"].map((campo) => dato(tributaria, campo)).join("-");
+      const subtotal = dato(info, "totalSinImpuestos");
+      const total = dato(info, "importeTotal");
+      if (!tributaria || !info || !fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha) || Number.isNaN(Date.parse(`${fecha}T12:00:00Z`)) || new Date(`${fecha}T12:00:00Z`).toISOString().slice(0, 10) !== fecha || numeroFactura.split("-").some((parte) => !parte) || !(Number(total) > 0)) throw new Error("Factura incompleta");
+      const impuestos = Array.from(info.getElementsByTagName("totalImpuesto"));
+      const iva = impuestos.length ? impuestos.reduce((suma, impuesto) => suma + Number(dato(impuesto, "valor") || 0), 0) : Number(total) - Number(subtotal || 0);
+      setCampos((actual) => ({ ...actual, numero: numeroFactura, fecha, subtotal, iva: iva.toFixed(2), total, ruc: dato(tributaria, "ruc"), razon_social: dato(tributaria, "razonSocial"), clave_acceso: dato(tributaria, "claveAcceso"), origen: "xml" }));
+      setError("");
+    } catch {
+      setCampos((actual) => ({ ...actual, origen: "manual", clave_acceso: "" }));
+      setError("No se pudo leer el XML; escribe los datos a mano.");
+    }
+  };
+  const submit = () => start(async () => {
+    setError("");
+    const data = new FormData();
+    data.set("deuda_id", deuda.id);
+    for (const [nombre, valor] of Object.entries(campos)) data.set(nombre, valor);
+    const resultado = await registrarFacturaProveedor(data);
+    if (!resultado.ok) { setError(resultado.error); return; }
+    onSaved();
+  });
+  return createPortal(<div className="modal-backdrop" onClick={onClose}><section className="new-patient-modal task-modal" role="dialog" aria-modal="true" aria-label={`Agregar factura a ${deuda.proveedor}`} style={{ width: "min(640px, 100%)" }} onClick={(e) => e.stopPropagation()}>
+    <button className="modal-close" type="button" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>
+    <p className="section-label">PROVEEDORES</p><h2>Agregar factura · {deuda.proveedor}</h2>
+    <form onSubmit={(e) => { e.preventDefault(); submit(); }}>
+      <div className="new-patient-form"><label className="task-description" style={{ gridColumn: "1 / -1" }}>Subir el XML de la factura (SRI)<input type="file" accept=".xml,text/xml" onChange={(e) => void leerXml(e.target.files?.[0])} /></label></div>
+      <div className="new-patient-form" style={{ marginTop: 12 }}>
+        <label>Número de factura<input name="numero" required value={campos.numero} onChange={(e) => setCampo("numero", e.target.value)} /></label>
+        <label>Fecha<input name="fecha" type="date" required value={campos.fecha} onChange={(e) => setCampo("fecha", e.target.value)} /></label>
+        <label>Subtotal $ (opcional)<input name="subtotal" inputMode="decimal" value={campos.subtotal} onChange={(e) => setCampo("subtotal", limpiarMonto(e.target.value))} /></label>
+        <label>IVA $ (opcional)<input name="iva" inputMode="decimal" value={campos.iva} onChange={(e) => setCampo("iva", limpiarMonto(e.target.value))} /></label>
+        <label>Total $<input name="total" inputMode="decimal" required value={campos.total} onChange={(e) => setCampo("total", limpiarMonto(e.target.value))} /></label>
+        <label className="task-description" style={{ gridColumn: "1 / -1" }}>Notas (opcional)<textarea name="notas" value={campos.notas} onChange={(e) => setCampo("notas", e.target.value)} /></label>
+      </div>
+      <p className={s.summaryLine}>Se sumará {money(Number(campos.total))} a la deuda con {deuda.proveedor}. Saldo nuevo: {money(Number(deuda.saldo) + (Number(campos.total) || 0))}</p>
+      {error && <p className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 700 }}>{error}</p>}
+      <div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" type="submit" disabled={pending}>{pending ? "Guardando…" : "Agregar factura"}</button></div>
+    </form>
+  </section></div>, document.body);
 }
 
 function EditarDeuda({ deuda, companies, branches, onClose, onSaved }: { deuda: BusinessDebt; companies: PrivateAdminData["companies"]; branches: PrivateAdminData["branches"]; onClose: () => void; onSaved: (m: string) => void }) {

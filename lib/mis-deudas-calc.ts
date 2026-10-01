@@ -2,6 +2,7 @@
 export type TipoDeuda = "proveedor" | "prestamo_banco" | "tarjeta" | "prestamo_personal" | "gasto_fijo" | "salario";
 export type ModalidadDeuda = "cuotas" | "libre" | "mensual";
 export type DebtPayment = { id: string; monto: number; fecha_pago: string; metodo: string; referencia: string | null; notas: string | null; periodo: string | null };
+export type SupplierInvoice = { id: string; numero: string; fecha_emision: string; total: number; origen: "xml" | "manual" | "correo"; razon_social: string | null };
 export type BusinessDebt = {
   id: string; empresa_id: string | null; sucursal_id: string | null; proveedor: string; concepto: string;
   monto_original: number; saldo: number; fecha_deuda: string; fecha_vencimiento: string | null;
@@ -9,6 +10,7 @@ export type BusinessDebt = {
   tipo: TipoDeuda; modalidad: ModalidadDeuda; cuotas_total: number | null; cuotas_previas: number; monto_cuota: number | null;
   dia_pago: number | null; fecha_inicio: string | null; ambito: string;
   pagos_deuda_negocio: DebtPayment[];
+  facturas_proveedor?: SupplierInvoice[];
 };
 
 export const tipos: Record<TipoDeuda, { label: string; plural: string; color: string; fondo: string; modalidad: ModalidadDeuda; ayuda: string }> = {
