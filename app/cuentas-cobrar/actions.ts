@@ -61,3 +61,22 @@ export async function fijarFechaCobro(pacienteId: string, fecha: string | null) 
   if (error) throw new Error(error.message || "No se pudo guardar la fecha de cobro.");
   revalidatePath("/cuentas-cobrar"); revalidatePath("/");
 }
+
+// Pasar una deuda a "Convenios": queda vinculada a la empresa y al trabajador titular para el informe mensual.
+export async function vincularConvenio(pacienteId: string, empresaConvenioId: string, titularId: string | null) {
+  if (!pacienteId || !empresaConvenioId) throw new Error("Elige la empresa del convenio.");
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("vincular_convenio_paciente", { p_paciente: pacienteId, p_empresa_convenio: empresaConvenioId, p_titular: titularId });
+  if (error) throw new Error(error.message || "No se pudo vincular al convenio.");
+  revalidatePath("/cuentas-cobrar"); revalidatePath("/convenios");
+}
+
+// Titular sugerido: el responsable de la cuenta del paciente o, si no tiene, el mismo paciente.
+export async function titularSugeridoConvenio(pacienteId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data: p, error } = await supabase.from("pacientes_clinicos").select("id,nombres,apellidos,cedula,responsable_id").eq("id", pacienteId).maybeSingle();
+  if (error || !p) throw new Error("Paciente no encontrado.");
+  const persona = (x: { id: string; nombres: string | null; apellidos: string | null; cedula: string | null }) => ({ id: x.id, nombre: `${x.nombres ?? ""} ${x.apellidos ?? ""}`.trim(), cedula: x.cedula });
+  const { data: r } = p.responsable_id ? await supabase.from("pacientes_clinicos").select("id,nombres,apellidos,cedula").eq("id", p.responsable_id).maybeSingle() : { data: null };
+  return { paciente: persona(p), titular: r ? persona(r) : persona(p) };
+}

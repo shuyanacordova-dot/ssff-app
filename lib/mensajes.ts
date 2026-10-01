@@ -10,12 +10,12 @@ export type ContextoMensaje = {
   // Fecha límite del apartado (AAAA-MM-DD).
   apartadoHasta?: string | null;
   // Frecuencia del recordatorio: cambia "este mes" por "esta semana" / "esta quincena".
-  frecuencia?: "semanal" | "quincenal" | "mensual" | null;
+  frecuencia?: "diaria" | "semanal" | "quincenal" | "mensual" | null;
   sucursal?: string | null;
 };
 
 export const plantillasContacto: Array<{ id: PlantillaContactoId; nombre: string; descripcion: string }> = [
-  { id: "cobro_mensual", nombre: "Recordatorio de pago", descripcion: "Tono amable: solo recordar el abono (mensual, quincenal o semanal)." },
+  { id: "cobro_mensual", nombre: "Recordatorio de pago", descripcion: "Tono amable: solo recordar el abono (mensual, quincenal, semanal o diario)." },
   { id: "cobro_insistente", nombre: "Cobro insistente", descripcion: "Tono firme para saldos vencidos." },
   { id: "cobro_apartado", nombre: "Apartado (6 meses)", descripcion: "Recuerda el saldo y la fecha límite del apartado." },
   { id: "lentes_rezagados", nombre: "Lentes rezagados", descripcion: "Lentes listos que el paciente no ha retirado." },
@@ -61,7 +61,7 @@ export function mensajeLentesListos({ nombre, empresa, sucursal, saldo, ticketUr
 }
 
 const fechaLarga = (ymd: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "numeric", month: "long", year: "numeric" }).format(new Date(`${ymd.slice(0, 10)}T12:00:00-05:00`));
-const periodoLabel = { semanal: "esta semana", quincenal: "esta quincena", mensual: "este mes" } as const;
+const periodoLabel = { diaria: "hoy", semanal: "esta semana", quincenal: "esta quincena", mensual: "este mes" } as const;
 
 // Plantilla sugerida según el tipo de cobro (Cobros de hoy y Cuentas por cobrar usan la misma regla):
 // insistente = tono firme; apartado = plazo de 6 meses; rezagados = lentes sin retirar; con frecuencia (mensual,

@@ -6,7 +6,7 @@ import { diasCalendarioGuayaquil } from "@/lib/record-date";
 
 export type DeudaVenta = { id: string; sucursal_id: string | null; total: number; pagado: number; saldo: number; creado_en: string; fecha_entrega_estimada: string | null; recibo_token: string; folio: number | null; apartado: boolean; apartado_hasta: string | null };
 export type ConvenioDeuda = { empresa: string; cuotas: number; monto_cuota: number; fecha_primera_cuota: string | null; titular?: string | null };
-export type CategoriaDeuda = "urgentes" | "recientes" | "semanales" | "quincenales" | "mensuales" | "convenio" | "apartados" | "rezagados";
+export type CategoriaDeuda = "urgentes" | "recientes" | "diarios" | "semanales" | "quincenales" | "mensuales" | "convenio" | "apartados" | "rezagados";
 export type DeudaPaciente = { paciente_id: string; nombres: string; apellidos: string; telefono: string | null; sucursales: string[]; frecuencia_cobro: string | null; cobro_insistente: boolean; empresa_nombre: string; saldo_total: number; ventas: DeudaVenta[]; convenio: ConvenioDeuda | null; dias_mas_antigua: number; categoria: CategoriaDeuda; categoria_auto: CategoriaDeuda; categoria_manual: CategoriaDeuda | null; ultimo_mensaje: string | null; ultimo_mensaje_por: string | null; fecha_cobro_acordada: string | null };
 
 export { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
@@ -14,7 +14,7 @@ import { DIAS_URGENTE } from "@/lib/cuentas-cobrar-config";
 export type EmpresaConvenio = { id: string; nombre: string; cuotas_predeterminadas?: number };
 export type LenteRezagado = { orden_id: string; sucursal_id: string | null; paciente_id: string | null; paciente_nombre: string; telefono: string | null; sucursal_nombre: string; laboratorio: string; estado: string; listo_en: string; dias_listo: number; venta_id: string | null; folio: number | null; saldo: number };
 export type CuentasCobrarProfile = { id: string; empresa_id: string; rol: string; nombre: string };
-export type CobroHoy = { paciente_id: string; nombres: string; apellidos: string; telefono: string | null; empresa_id: string; empresa_nombre: string; saldo: number; ventas: number; dias_deuda: number; motivo: string; cada_dias: number; ultimo_mensaje: string | null; cobro_insistente: boolean; frecuencia: "semanal" | "quincenal" | "mensual" | null; apartado: boolean; apartado_hasta: string | null; fecha_cobro_acordada: string | null };
+export type CobroHoy = { paciente_id: string; nombres: string; apellidos: string; telefono: string | null; empresa_id: string; empresa_nombre: string; saldo: number; ventas: number; dias_deuda: number; motivo: string; cada_dias: number; ultimo_mensaje: string | null; cobro_insistente: boolean; frecuencia: "diaria" | "semanal" | "quincenal" | "mensual" | null; apartado: boolean; apartado_hasta: string | null; fecha_cobro_acordada: string | null };
 export type CuentasCobrarData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: CuentasCobrarProfile; empresaNombre?: string; sucursalActivaId?: string; sucursalActivaNombre?: string; deudas: DeudaPaciente[]; rezagados: LenteRezagado[]; empresasConvenio: EmpresaConvenio[]; makeConfigured: boolean; colaHoy: CobroHoy[]; colaHoyError?: string; convenioFiltro?: EmpresaConvenio };
 
 const cobroRoles = new Set(["superadmin", "admin_sucursal", "vendedor", "caja", "optometra"]);
@@ -111,7 +111,7 @@ export async function getCuentasCobrarData(convenioId?: string): Promise<Cuentas
     const deudas = Array.from(grupos.values()).map((d) => {
       const dias = Math.max(0, ...d.ventas.map((v) => diasCalendarioGuayaquil(v.creado_en, ahora)));
       const tieneApartado = d.ventas.some((v) => v.apartado);
-      const categoria_auto: CategoriaDeuda = tieneApartado ? "apartados" : (d.convenio || pacientesConConvenio.has(d.paciente_id)) ? "convenio" : d.frecuencia_cobro === "mensual" ? "mensuales" : d.frecuencia_cobro === "quincenal" ? "quincenales" : d.frecuencia_cobro === "semanal" ? "semanales" : dias > DIAS_URGENTE ? "urgentes" : "recientes";
+      const categoria_auto: CategoriaDeuda = tieneApartado ? "apartados" : (d.convenio || pacientesConConvenio.has(d.paciente_id)) ? "convenio" : d.frecuencia_cobro === "mensual" ? "mensuales" : d.frecuencia_cobro === "quincenal" ? "quincenales" : d.frecuencia_cobro === "semanal" ? "semanales" : d.frecuencia_cobro === "diaria" ? "diarios" : dias > DIAS_URGENTE ? "urgentes" : "recientes";
       // Un apartado siempre va a su pestaña: el producto no se entrega hasta pagar todo.
       return { ...d, dias_mas_antigua: dias, categoria_auto, categoria: tieneApartado ? "apartados" : d.categoria_manual ?? categoria_auto };
     });

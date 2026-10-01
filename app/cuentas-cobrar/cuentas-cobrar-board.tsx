@@ -11,17 +11,18 @@ import { laboratorioLabels } from "@/lib/laboratorio";
 import { cambiarEstadoOrdenLaboratorio } from "@/app/ventas/lab-actions";
 import { construirMensajeContacto, plantillasContacto, plantillaSugerida, type PlantillaContactoId } from "@/lib/mensajes";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
-import { crearAcuerdoPago, crearEmpresaConvenio, type AcuerdoPago } from "@/app/ventas/convenio-actions";
-import { activarCobroInsistente, actualizarFrecuenciaCobro, clasificarDeuda, fijarFechaCobro, marcarApartado, marcarMensajeCobro, registrarCanje } from "./actions";
+import { buscarTitularConvenio, crearAcuerdoPago, crearEmpresaConvenio, type AcuerdoPago, type PersonaTitular } from "@/app/ventas/convenio-actions";
+import { activarCobroInsistente, actualizarFrecuenciaCobro, clasificarDeuda, titularSugeridoConvenio, vincularConvenio, fijarFechaCobro, marcarApartado, marcarMensajeCobro, registrarCanje } from "./actions";
 import Letterhead from "../print-letterhead";
 import { TodasSucursalesToggle, useTodasSucursales } from "@/app/todas-sucursales-toggle";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
 const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
-const frecuenciaLabel: Record<string, string> = { semanal: "Semanal", quincenal: "Quincenal", mensual: "Mensual" };
+const frecuenciaLabel: Record<string, string> = { diaria: "Diaria", semanal: "Semanal", quincenal: "Quincenal", mensual: "Mensual" };
 const categorias: { id: CategoriaDeuda; label: string; ayuda: string }[] = [
   { id: "urgentes", label: "Urgentes", ayuda: `Deudas de más de 3 meses (${DIAS_URGENTE} días), de la más antigua a la más reciente.` },
   { id: "recientes", label: "Ventas recientes", ayuda: `Saldos de ventas de hasta 3 meses (${DIAS_URGENTE} días), de la venta más nueva a la más antigua.` },
+  { id: "diarios", label: "Cobros diarios", ayuda: "Pacientes con frecuencia de cobro diaria: salen en Cobros de hoy todos los días." },
   { id: "semanales", label: "Cobros semanales", ayuda: "Pacientes con frecuencia de cobro semanal." },
   { id: "quincenales", label: "Cobros quincenales", ayuda: "Pacientes con frecuencia de cobro quincenal." },
   { id: "mensuales", label: "Cobros mensuales", ayuda: "Pacientes con frecuencia de cobro mensual." },
@@ -47,6 +48,7 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
   const [notice, setNotice] = useState(props.message ?? "");
   const [pending, startTransition] = useTransition();
   const [convenioDeuda, setConvenioDeuda] = useState<DeudaPaciente | null>(null);
+  const [vincularDeuda, setVincularDeuda] = useState<DeudaPaciente | null>(null);
   const [canjeDeuda, setCanjeDeuda] = useState<DeudaPaciente | null>(null);
   const [apartadoDeuda, setApartadoDeuda] = useState<DeudaPaciente | null>(null);
   const esSuperadmin = props.profile?.rol === "superadmin";
@@ -72,6 +74,8 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
   });
   const cambiarClasificacion = (deuda: DeudaPaciente, categoria: string) => {
     const esApartado = !!apartadoInfo(deuda);
+    // Convenios: se pide la empresa y el trabajador para que la deuda entre al informe mensual del convenio.
+    if (categoria === "convenio") { setVincularDeuda(deuda); return; }
     if (categoria === "apartados") {
       if (esApartado) return;
       if (deuda.ventas.length > 1) { setApartadoDeuda(deuda); return; }
@@ -120,6 +124,7 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
     </section>
     {apartadoDeuda && <ApartadoModal deuda={apartadoDeuda} onClose={() => setApartadoDeuda(null)} onNotice={setNotice} />}
     {canjeDeuda && <CanjeModal deuda={canjeDeuda} onClose={() => setCanjeDeuda(null)} onNotice={setNotice} />}
+    {vincularDeuda && <VincularConvenioModal deuda={vincularDeuda} empresasConvenio={props.empresasConvenio} onClose={() => setVincularDeuda(null)} onNotice={setNotice} />}
     {convenioDeuda && <ConvenioModal deuda={convenioDeuda} empresasConvenio={props.empresasConvenio} onClose={() => setConvenioDeuda(null)} onNotice={setNotice} />}
   </div></main>;
 }
@@ -169,7 +174,7 @@ function ColaCobrosHoy({ cola, sucursalId, sucursalNombre, error }: { cola: Cobr
 function DeudaCard({ deuda, sucursalActivaId, usuarioNombre, onMensaje, pending, onCanje, onApartado, mostrarCategoria, onClasificar, onFrecuencia, onCobroInsistente, onConvenio }: { deuda: DeudaPaciente; sucursalActivaId?: string; usuarioNombre: string; onMensaje: () => void; pending: boolean; onCanje?: () => void; onApartado: () => void; mostrarCategoria: boolean; onClasificar: (categoria: string) => void; onFrecuencia: (frecuencia: string) => void; onCobroInsistente: (activo: boolean) => void; onConvenio: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [origin, setOrigin] = useState("");
-  const [plantilla, setPlantilla] = useState<PlantillaContactoId>(() => plantillaSugerida({ rezagado: deuda.categoria === "rezagados", insistente: deuda.cobro_insistente, apartado: deuda.categoria === "apartados", frecuencia: deuda.frecuencia_cobro as "semanal" | "quincenal" | "mensual" | null, dias: deuda.dias_mas_antigua }));
+  const [plantilla, setPlantilla] = useState<PlantillaContactoId>(() => plantillaSugerida({ rezagado: deuda.categoria === "rezagados", insistente: deuda.cobro_insistente, apartado: deuda.categoria === "apartados", frecuencia: deuda.frecuencia_cobro as "diaria" | "semanal" | "quincenal" | "mensual" | null, dias: deuda.dias_mas_antigua }));
   const [verFecha, setVerFecha] = useState(false);
   const [fechaCobro, setFechaCobro] = useState(deuda.fecha_cobro_acordada ?? "");
   const [fechaError, setFechaError] = useState("");
@@ -182,7 +187,7 @@ function DeudaCard({ deuda, sucursalActivaId, usuarioNombre, onMensaje, pending,
   const token = deuda.ventas[0]?.recibo_token;
   const ticketUrl = origin && token ? `${origin}/recibo/${token}` : null;
   const fechaCompra = deuda.ventas[0]?.creado_en ?? null;
-  const mensaje = construirMensajeContacto(plantilla, { nombre: deuda.nombres, empresa: deuda.empresa_nombre, saldo: deuda.saldo_total, ticketUrl, fechaCompra, apartadoHasta: apartado?.venta.apartado_hasta, frecuencia: deuda.frecuencia_cobro as "semanal" | "quincenal" | "mensual" | null, sucursal: deuda.sucursales[0] });
+  const mensaje = construirMensajeContacto(plantilla, { nombre: deuda.nombres, empresa: deuda.empresa_nombre, saldo: deuda.saldo_total, ticketUrl, fechaCompra, apartadoHasta: apartado?.venta.apartado_hasta, frecuencia: deuda.frecuencia_cobro as "diaria" | "semanal" | "quincenal" | "mensual" | null, sucursal: deuda.sucursales[0] });
   const registrar = () => { const sucursal = [...deuda.ventas].sort((a, b) => b.creado_en.localeCompare(a.creado_en))[0]?.sucursal_id ?? sucursalActivaId; if (!sucursal) return; onMensaje(); void marcarMensajeCobro(deuda.paciente_id, sucursal).catch(() => {}); };
   const guardarFecha = (fecha: string | null) => startFecha(async () => { try { await fijarFechaCobro(deuda.paciente_id, fecha); setFechaCobro(fecha ?? ""); setVerFecha(false); } catch (err) { setFechaError(err instanceof Error ? err.message : "No se pudo guardar la fecha."); } });
   const wa = enlaceWhatsapp(deuda.telefono, mensaje);
@@ -285,6 +290,41 @@ function CanjeModal({ deuda, onClose, onNotice }: { deuda: DeudaPaciente; onClos
     {venta && Number.isFinite(valor) && valor > venta.saldo + 0.001 && <p className="notice">El canje no puede superar el saldo de esta venta.</p>}
     {error && <p className="notice" role="alert">{error}</p>}
     <div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" type="button" disabled={!valido || pending} onClick={guardar}>{pending ? "Guardando…" : "Registrar canje"}</button></div>
+  </section></div>;
+}
+
+function VincularConvenioModal({ deuda, empresasConvenio, onClose, onNotice }: { deuda: DeudaPaciente; empresasConvenio: EmpresaConvenio[]; onClose: () => void; onNotice: (message: string) => void }) {
+  const [empresaId, setEmpresaId] = useState("");
+  const [titular, setTitular] = useState<PersonaTitular | null>(null);
+  const [paciente, setPaciente] = useState<PersonaTitular | null>(null);
+  const [buscar, setBuscar] = useState<string | null>(null);
+  const [encontrados, setEncontrados] = useState<PersonaTitular[]>([]);
+  const [error, setError] = useState("");
+  const [pending, start] = useTransition();
+  useEffect(() => { void titularSugeridoConvenio(deuda.paciente_id).then((r) => { setPaciente(r.paciente); setTitular(r.titular); }).catch(() => setError("No se pudo cargar al paciente.")); }, [deuda.paciente_id]);
+  useEffect(() => {
+    if (buscar === null || buscar.trim().length < 2) { setEncontrados([]); return; }
+    let vigente = true;
+    const timer = window.setTimeout(() => { void buscarTitularConvenio(buscar).then((rows) => { if (vigente) setEncontrados(rows); }).catch(() => { if (vigente) setEncontrados([]); }); }, 300);
+    return () => { vigente = false; window.clearTimeout(timer); };
+  }, [buscar]);
+  const guardar = () => start(async () => {
+    try {
+      await vincularConvenio(deuda.paciente_id, empresaId, titular?.id ?? null);
+      const empresa = empresasConvenio.find((e) => e.id === empresaId)?.nombre ?? "el convenio";
+      onNotice(`${deuda.nombres} ${deuda.apellidos} quedó en ${empresa}${titular && paciente && titular.id !== paciente.id ? `, con descuento a ${titular.nombre}` : ""}. Ya aparece en el informe mensual.`);
+      onClose();
+    } catch (err) { setError(err instanceof Error ? err.message : "No se pudo vincular al convenio."); }
+  });
+  return <div className="modal-backdrop"><section className="new-patient-modal" role="dialog" aria-modal="true" aria-labelledby="vincular-convenio-title"><button className="modal-close" type="button" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>
+    <p className="section-label">CONVENIOS</p><h2 id="vincular-convenio-title">Pasar a convenio</h2>
+    <p className="field-hint">{deuda.nombres} {deuda.apellidos} · saldo {money(deuda.saldo_total)}. Al guardar, la deuda entra al informe mensual del convenio con la cuota automática de la empresa.</p>
+    <div className="new-patient-form"><label className="task-description">Empresa del convenio<select value={empresaId} onChange={(event) => setEmpresaId(event.target.value)} required><option value="">Selecciona la empresa del convenio</option>{empresasConvenio.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}</select></label></div>
+    <div className="titular-rol"><span className="section-label">TRABAJADOR TITULAR (A QUIEN DESCUENTAN)</span>{titular ? <p><strong>{titular.nombre}</strong>{titular.cedula ? ` · C.I. ${titular.cedula}` : ""}{paciente && titular.id !== paciente.id && <><br /><small>Beneficiario (paciente): {paciente.nombre}</small></>}</p> : <p className="field-hint">Cargando…</p>}
+      {buscar === null ? <button type="button" className="text-action" onClick={() => setBuscar("")}>Cambiar titular</button> : <div className="titular-rol-buscar"><input autoFocus value={buscar} onChange={(event) => setBuscar(event.target.value)} placeholder="Nombre o cédula del trabajador" />{encontrados.map((p) => <button type="button" key={p.id} onClick={() => { setTitular(p); setBuscar(null); }}>{p.nombre}{p.cedula ? ` · ${p.cedula}` : ""}</button>)}{paciente && <button type="button" className="text-action" onClick={() => { setTitular(paciente); setBuscar(null); }}>Es el mismo paciente</button>}</div>}
+    </div>
+    {error && <p className="notice" role="alert">{error}</p>}
+    <div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" type="button" disabled={pending || !empresaId || !titular} onClick={guardar}>{pending ? "Guardando…" : "Pasar a convenio"}</button></div>
   </section></div>;
 }
 
