@@ -29,11 +29,11 @@ export async function crearDeuda(form: FormData): Promise<Resultado> {
     const proveedor = value(form, "proveedor"); const concepto = value(form, "concepto") || proveedor; const notas = value(form, "notas");
     const destino = value(form, "empresa_id");
     const empresaId = destino && destino !== "personal" ? destino : null; const ambito = destino === "personal" ? "personal" : "general";
-    if (!["proveedor", "prestamo_banco", "tarjeta", "prestamo_personal", "gasto_fijo"].includes(tipo)) return { ok: false, error: "Elige el tipo de deuda." };
+    if (!["proveedor", "prestamo_banco", "tarjeta", "prestamo_personal", "gasto_fijo", "salario"].includes(tipo)) return { ok: false, error: "Elige el tipo de deuda." };
     if (!["cuotas", "libre", "mensual"].includes(modalidad)) return { ok: false, error: "Elige cómo se paga." };
     if (!proveedor) return { ok: false, error: "Escribe a quién le debes (acreedor)." };
     // Gastos fijos por sucursal (luz, internet, arriendo): el pago genera el egreso en la caja de esa sucursal.
-    const sucursalId = value(form, "sucursal_id") || null;
+    const sucursalId = destino === "personal" ? null : value(form, "sucursal_id") || null;
     let empresaFinal = empresaId;
     if (sucursalId) {
       const { data: suc } = await supabase.from("sucursales").select("empresa_id").eq("id", sucursalId).maybeSingle();
@@ -80,7 +80,7 @@ export async function registrarPagoDeuda(form: FormData): Promise<Resultado> {
       p_cuenta: metodo === "transferencia" ? value(form, "cuenta_id") || null : null,
     });
     if (error) return { ok: false, error: error.message };
-    revalidatePath("/mi-espacio"); revalidatePath("/mi-espacio/bancos"); revalidatePath("/caja");
+    revalidatePath("/mi-espacio"); revalidatePath("/mi-espacio/bancos"); revalidatePath("/caja"); revalidatePath("/resumen-dia");
     return { ok: true };
   } catch (err) { return { ok: false, error: err instanceof Error ? err.message : "No se pudo registrar el pago." }; }
 }
@@ -98,14 +98,15 @@ export async function archivarDeuda(deudaId: string): Promise<Resultado> {
 export async function actualizarDeuda(form: FormData): Promise<Resultado> {
   try {
     const { supabase } = await privateContext();
-    const id = value(form, "deuda_id"); const modalidad = value(form, "modalidad");
+    const id = value(form, "deuda_id"); const modalidad = value(form, "modalidad"); const tipo = value(form, "tipo");
     const proveedor = value(form, "proveedor"); const concepto = value(form, "concepto") || proveedor;
     const destino = value(form, "empresa_id");
+    if (!["proveedor", "prestamo_banco", "tarjeta", "prestamo_personal", "gasto_fijo", "salario"].includes(tipo)) return { ok: false, error: "Elige un tipo de deuda válido." };
     if (!id || !proveedor) return { ok: false, error: "Escribe a quién le debes." };
     const cambios: Record<string, unknown> = {
-      proveedor, concepto, notas: value(form, "notas") || null,
+      tipo, proveedor, concepto, notas: value(form, "notas") || null,
       empresa_id: destino && destino !== "personal" ? destino : null, ambito: destino === "personal" ? "personal" : "general",
-      sucursal_id: value(form, "sucursal_id") || null,
+      sucursal_id: destino === "personal" ? null : value(form, "sucursal_id") || null,
       actualizado_en: new Date().toISOString(),
     };
     if (cambios.sucursal_id) {

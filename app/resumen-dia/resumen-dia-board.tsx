@@ -20,10 +20,11 @@ export default function ResumenDiaBoard(props: ResumenDiaData & { fecha: string 
 
   const sucursalId = props.sucursalId ?? "";
   const irA = (fecha: string, sucursal: string) => router.push(`/resumen-dia?fecha=${fecha}&sucursal=${sucursal}`);
-  const { ventas, abonos, salidas } = props;
+  const { ventas, abonos, salidas, transferencias } = props;
   const totalVentas = ventas.reduce((sum, v) => sum + v.total, 0);
   const totalAbonos = abonos.reduce((sum, a) => sum + a.monto, 0);
   const totalSalidas = salidas.reduce((sum, s) => sum + s.monto, 0);
+  const totalTransferencias = transferencias.reduce((sum, t) => sum + t.monto, 0);
   const abonosPorMetodo = abonos.reduce<Record<string, number>>((acc, a) => { acc[a.metodo] = (acc[a.metodo] ?? 0) + a.monto; return acc; }, {});
   const salidasPorClasificacion = salidas.reduce<Record<string, typeof salidas>>((acc, s) => { (acc[s.clasificacion] ??= []).push(s); return acc; }, {});
 
@@ -71,6 +72,14 @@ export default function ResumenDiaBoard(props: ResumenDiaData & { fecha: string 
           </Fragment>)}
           <tr className="total-row"><td colSpan={1}>Total</td><td>{money(totalSalidas)}</td><td colSpan={2} /></tr>
         </tbody></table> : <p className="field-hint">No hay salidas registradas este día.</p>}
+      </section>
+      <section className="glass agenda-board" style={{ marginTop: 18 }}>
+        <p className="section-label">EGRESOS BANCARIOS</p><h2>Pagos por transferencia (no salen de la caja)</h2>
+        {transferencias.length ? <table className="resumen-table"><thead><tr><th>Concepto</th><th>Banco</th><th>Monto</th></tr></thead><tbody>
+          {transferencias.map((t) => <tr key={t.id}><td>{t.concepto}</td><td>{t.banco}</td><td>{money(t.monto)}</td></tr>)}
+          <tr className="total-row"><td colSpan={2}>Total transferencias</td><td>{money(totalTransferencias)}</td></tr>
+        </tbody></table> : <p className="field-hint">No hay pagos por transferencia este día.</p>}
+        <p className="summary-line"><strong>Total egresos del día: {money(totalSalidas + totalTransferencias)}</strong></p>
       </section>
     </div>
   </div></main>;

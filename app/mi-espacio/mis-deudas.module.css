@@ -60,3 +60,15 @@
   .right { grid-column: 1 / -1; justify-content: space-between; }
   .card strong { font-size: 21px; }
 }
+
+.part { margin-top: 18px; display: grid; gap: 16px; }
+.partTitle { margin: 0; color: #163d49; font-size: 19px; }
+.debtGroup { border: 1px solid #dce9e9; border-radius: 18px; padding: 16px; background: #f9fdfd; }
+.groupHead, .cardGroupHead { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.groupHead { margin-bottom: 12px; }
+.groupHead h4 { margin: 0; font-size: 17px; color: #163d49; }
+.groupHead h4 span { color: #66768b; }
+.groupHead p { margin: 3px 0 0; color: #526b75; font-size: 13px; font-weight: 700; }
+.cardGroup { border: 1px solid #dce9e9; border-radius: 14px; padding: 12px; margin-top: 10px; background: #fff; }
+.cardGroupHead { margin-bottom: 10px; color: #163d49; }
+.cardGroupHead span { font-size: 13px; color: #526b75; font-weight: 700; }

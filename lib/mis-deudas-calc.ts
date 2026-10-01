@@ -1,5 +1,5 @@
 // Cálculos de "Mis deudas" (sin código de servidor: se usan en la pantalla).
-export type TipoDeuda = "proveedor" | "prestamo_banco" | "tarjeta" | "prestamo_personal" | "gasto_fijo";
+export type TipoDeuda = "proveedor" | "prestamo_banco" | "tarjeta" | "prestamo_personal" | "gasto_fijo" | "salario";
 export type ModalidadDeuda = "cuotas" | "libre" | "mensual";
 export type DebtPayment = { id: string; monto: number; fecha_pago: string; metodo: string; referencia: string | null; notas: string | null; periodo: string | null };
 export type BusinessDebt = {
@@ -16,6 +16,7 @@ export const tipos: Record<TipoDeuda, { label: string; plural: string; color: st
   prestamo_banco: { label: "Préstamo bancario", plural: "Préstamos", color: "#274c77", fondo: "#e6eef8", modalidad: "cuotas", ayuda: "Préstamos con cuota mensual fija." },
   tarjeta: { label: "Tarjeta de crédito", plural: "Tarjetas", color: "#7a3fa0", fondo: "#f1e8f8", modalidad: "cuotas", ayuda: "Compras diferidas o saldo de tarjeta." },
   prestamo_personal: { label: "Préstamo personal", plural: "Personales", color: "#b5651d", fondo: "#fbeee2", modalidad: "libre", ayuda: "Dinero prestado por familia o personas." },
+  salario: { label: "Salario", plural: "Salarios", color: "#087f8c", fondo: "#def4f5", modalidad: "mensual", ayuda: "Sueldos del personal: se pagan cada mes." },
   gasto_fijo: { label: "Gasto fijo", plural: "Gastos fijos", color: "#a24150", fondo: "#fbe7ea", modalidad: "mensual", ayuda: "Arriendo, internet, luz, agua: se pagan cada mes." },
 };
 export const modalidades: Record<ModalidadDeuda, string> = { cuotas: "Cuotas fijas", libre: "Abonos libres", mensual: "Pago mensual fijo" };

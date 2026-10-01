@@ -20,12 +20,12 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
   const router = useRouter();
   const hoy = hoyEcuador();
   const [mes, setMes] = useState(mesDe(hoy));
-  const [filtro, setFiltro] = useState<TipoDeuda | "todas">("todas");
-  const [nueva, setNueva] = useState(false);
+  
+  const [nueva, setNueva] = useState<{ tipo?: TipoDeuda; destino: "optica" | "personal" } | null>(null);
   const [pagando, setPagando] = useState<Pago | null>(null);
   const [historial, setHistorial] = useState<BusinessDebt | null>(null);
   const [editando, setEditando] = useState<BusinessDebt | null>(null);
-  const [vista, setVista] = useState<"todo" | "optica" | "personal">("todo");
+  const [vista, setVista] = useState<"todo" | "optica" | "personal">("optica");
   const [notice, setNotice] = useState(props.message ?? "");
   const [pending, start] = useTransition();
 
@@ -43,22 +43,22 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
   // Recordatorio del cuadre de bancos: los sábados, o si pasó más de una semana desde el último.
   const diasDesdeCuadre = props.ultimoCuadreBanco ? Math.round((Date.parse(`${hoy}T12:00:00Z`) - Date.parse(`${props.ultimoCuadreBanco}T12:00:00Z`)) / 86400000) : null;
   const tocaCuadre = props.ultimoCuadreBanco !== hoy && ((new Date(`${hoy}T12:00:00Z`).getUTCDay() === 6) || diasDesdeCuadre === null || diasDesdeCuadre > 7);
-  const listaTipo = activas.filter((d) => filtro === "todas" || d.tipo === filtro);
+
 
   const archivar = (d: BusinessDebt) => {
-    if (!window.confirm(`¿Archivar "${d.proveedor}"? Ya no aparecerá en tus pagos.`)) return;
+    if (!window.confirm("¿Quitar esta deuda? Se archiva y se conserva su historial de pagos.")) return;
     start(async () => { const r = await archivarDeuda(d.id); setNotice(r.ok ? `"${d.proveedor}" archivada.` : r.error); if (r.ok) router.refresh(); });
   };
 
   return <main className="page agenda-page"><div className="container agenda-shell">
     <header className="agenda-header">
-      <div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">ESPACIO PRIVADO · SOLO PARA TI</p><h1>Mis deudas</h1><p className="subtitle">Lo que debe la óptica y cuándo toca pagarlo.</p></div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><Link className="outline-action" href="/mi-espacio/bancos" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Landmark size={16} /> Cuadre de bancos</Link><button className="new-task" type="button" onClick={() => setNueva(true)}><Plus size={18} /> Nueva deuda</button></div>
+      <div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">ESPACIO PRIVADO · SOLO PARA TI</p><h1>Mis deudas</h1><p className="subtitle">Pagos y deudas de Shuvisión y personales.</p></div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><Link className="outline-action" href="/mi-espacio/bancos" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Landmark size={16} /> Cuadre de bancos</Link><button className="new-task" type="button" onClick={() => setNueva({ destino: vista === "personal" ? "personal" : "optica" })}><Plus size={18} /> Nueva deuda</button></div>
     </header>
     {notice && <div className="notice"><LockKeyhole size={18} /><span>{notice}</span></div>}
     {tocaCuadre && <Link href="/mi-espacio/bancos" className="notice" style={{ textDecoration: "none", fontWeight: 800 }}><Landmark size={18} /><span>{new Date(`${hoy}T12:00:00Z`).getUTCDay() === 6 ? "Hoy es sábado: toca el cuadre de bancos." : "Hace más de una semana que no cuadras los bancos."} Ábrelo aquí →</span></Link>}
 
-    <div className="tabs" style={{ marginBottom: 10 }}>{([["todo", "Todo"], ["optica", "Óptica"], ["personal", "Personal Shu"]] as const).map(([v, label]) => <button key={v} type="button" className={vista === v ? "active" : ""} onClick={() => setVista(v)}>{label}</button>)}</div>
+    <div className="tabs" style={{ marginBottom: 10 }}>{([["optica", "Deudas Shuvisión"], ["personal", "Deudas personales"], ["todo", "Todo"]] as const).map(([v, label]) => <button key={v} type="button" className={vista === v ? "active" : ""} onClick={() => setVista(v)}>{label}</button>)}</div>
     <div className={s.monthNav}>
       <button type="button" onClick={() => setMes(sumarMeses(mes, -1))} aria-label="Mes anterior"><ChevronLeft size={16} /></button>
       <span className={s.monthName}>{nombreMes(mes)}</span>
@@ -82,15 +82,34 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
 
     <section className="glass agenda-board">
       <div className={s.sectionTitle}><h2>Todas mis deudas</h2></div>
-      <div className="tabs" style={{ flexWrap: "wrap", marginBottom: 12 }}>
-        <button type="button" className={filtro === "todas" ? "active" : ""} onClick={() => setFiltro("todas")}>Todas ({activas.length})</button>
-        {(Object.keys(tipos) as TipoDeuda[]).map((t) => <button key={t} type="button" className={filtro === t ? "active" : ""} onClick={() => setFiltro(t)}>{tipos[t].plural} ({activas.filter((d) => d.tipo === t).length})</button>)}
-      </div>
-      {listaTipo.length ? <div className={s.grid}>{listaTipo.map((d) => <TarjetaDeuda key={d.id} deuda={d} empresa={d.ambito === "personal" ? "Personal Shu" : d.sucursal_id ? props.branches.find((b) => b.id === d.sucursal_id)?.nombre : props.companies.find((c) => c.id === d.empresa_id)?.nombre} pending={pending} onEditar={() => setEditando(d)} onPagar={() => { const p = proximoPago(d, hoy); setPagando({ deuda: d, monto: p?.monto ?? Number(d.saldo), periodo: p ? mesDe(p.fecha) : mesDe(hoy) }); }} onHistorial={() => setHistorial(d)} onArchivar={() => archivar(d)} />)}</div>
-        : <p className={s.empty}>No hay deudas activas en esta categoría.</p>}
+      {(vista === "todo" ? (["optica", "personal"] as const) : [vista]).map((destino) => <div key={destino} className={s.part}>
+        <h3 className={s.partTitle}>{destino === "optica" ? "Deudas Shuvisión" : "Deudas personales"}</h3>
+        {(destino === "optica" ? [
+          { label: "Gastos fijos", tipos: ["gasto_fijo"] as TipoDeuda[], preset: "gasto_fijo" as TipoDeuda },
+          { label: "Salarios", tipos: ["salario"] as TipoDeuda[], preset: "salario" as TipoDeuda },
+          { label: "Préstamos", tipos: ["prestamo_banco", "prestamo_personal"] as TipoDeuda[], preset: "prestamo_banco" as TipoDeuda },
+          { label: "Tarjetas", tipos: ["tarjeta"] as TipoDeuda[], preset: "tarjeta" as TipoDeuda },
+          { label: "Proveedores", tipos: ["proveedor"] as TipoDeuda[], preset: "proveedor" as TipoDeuda },
+        ] : [
+          { label: "Tarjetas", tipos: ["tarjeta"] as TipoDeuda[], preset: "tarjeta" as TipoDeuda },
+          { label: "Gastos fijos", tipos: ["gasto_fijo"] as TipoDeuda[], preset: "gasto_fijo" as TipoDeuda },
+          { label: "Préstamos", tipos: ["prestamo_banco", "prestamo_personal"] as TipoDeuda[], preset: "prestamo_personal" as TipoDeuda },
+        ]).map((grupo) => {
+          const rows = props.debts.filter((d) => d.estado === "pendiente" && (destino === "personal" ? d.ambito === "personal" : d.ambito !== "personal") && grupo.tipos.includes(d.tipo));
+          if (destino === "personal" && !rows.length && grupo.label === "Préstamos") return null;
+          const saldo = rows.reduce((sum, d) => sum + (d.modalidad === "mensual" ? 0 : Number(d.saldo)), 0);
+          const mensual = rows.reduce((sum, d) => sum + (d.modalidad === "libre" ? 0 : Number(d.monto_cuota ?? 0)), 0);
+          const tarjetas = grupo.preset === "tarjeta" ? Array.from(new Set(rows.map((d) => d.proveedor))) : [];
+          const renderDeuda = (d: BusinessDebt) => <TarjetaDeuda key={d.id} deuda={d} empresa={d.sucursal_id ? props.branches.find((b) => b.id === d.sucursal_id)?.nombre : destino === "personal" ? "Personal" : props.companies.find((c) => c.id === d.empresa_id)?.nombre} pending={pending} onEditar={() => setEditando(d)} onPagar={() => { const p = proximoPago(d, hoy); setPagando({ deuda: d, monto: p?.monto ?? Number(d.saldo), periodo: p ? mesDe(p.fecha) : mesDe(hoy) }); }} onHistorial={() => setHistorial(d)} onArchivar={() => archivar(d)} />;
+          return <section key={grupo.label} className={s.debtGroup}>
+            <div className={s.groupHead}><div><h4>{grupo.label} <span>({rows.length})</span></h4><p>Saldo {money(saldo)}{mensual > 0 ? ` · Mensual ${money(mensual)}` : ""}</p></div><button type="button" className="outline-action" onClick={() => setNueva({ tipo: grupo.preset, destino })}><Plus size={15} /> Agregar</button></div>
+            {grupo.preset === "tarjeta" ? tarjetas.map((nombre) => { const cardRows = rows.filter((d) => d.proveedor === nombre); return <div key={nombre} className={s.cardGroup}><div className={s.cardGroupHead}><strong>{nombre}</strong><span>Saldo {money(cardRows.reduce((sum, d) => sum + Number(d.saldo), 0))} · Mensual {money(cardRows.reduce((sum, d) => sum + Number(d.monto_cuota ?? 0), 0))}</span></div><div className={s.grid}>{cardRows.map(renderDeuda)}</div></div>; }) : rows.length ? <div className={s.grid}>{rows.map(renderDeuda)}</div> : <p className={s.empty}>No hay deudas activas.</p>}
+          </section>;
+        })}
+      </div>)}
     </section>
 
-    {nueva && <NuevaDeuda companies={props.companies} branches={props.branches} onClose={() => setNueva(false)} onSaved={(m) => { setNotice(m); setNueva(false); router.refresh(); }} />}
+    {nueva && <NuevaDeuda preset={nueva} companies={props.companies} branches={props.branches} onClose={() => setNueva(null)} onSaved={(m) => { setNotice(m); setNueva(null); router.refresh(); }} />}
     {pagando && <PagarDeuda pago={pagando} branches={props.branches} cuentas={props.cuentas} companies={props.companies} onClose={() => setPagando(null)} onSaved={(m) => { setNotice(m); setPagando(null); router.refresh(); }} />}
     {historial && <Historial deuda={historial} onClose={() => setHistorial(null)} />}
     {editando && <EditarDeuda deuda={editando} companies={props.companies} branches={props.branches} onClose={() => setEditando(null)} onSaved={(m) => { setNotice(m); setEditando(null); router.refresh(); }} />}
@@ -129,19 +148,20 @@ function TarjetaDeuda({ deuda, empresa, pending, onPagar, onHistorial, onArchiva
     {deuda.notas && <p style={{ color: "#8a5a00" }}>{deuda.notas}</p>}
     <div className={s.actions}>
       <button className="new-consultation" type="button" onClick={onPagar}><Wallet size={14} /> Pagar</button>
-      <button className="outline-action" type="button" onClick={onHistorial}><History size={14} /> Pagos</button>
+      <button className="outline-action" type="button" onClick={onHistorial}><History size={14} /> Historial</button>
       <button className="outline-action" type="button" onClick={onEditar}><Pencil size={14} /> Editar</button>
-      <button className="outline-action" type="button" disabled={pending} onClick={onArchivar} title="Ya no aplica o se terminó"><Archive size={14} /> Archivar</button>
+      <button className="outline-action" type="button" disabled={pending} onClick={onArchivar} title="Ya no aplica o se terminó"><Archive size={14} /> Quitar</button>
     </div>
   </article>;
 }
 
-function NuevaDeuda({ companies, branches, onClose, onSaved }: { companies: PrivateAdminData["companies"]; branches: PrivateAdminData["branches"]; onClose: () => void; onSaved: (m: string) => void }) {
-  const [tipo, setTipo] = useState<TipoDeuda | null>(null);
-  const [modalidad, setModalidad] = useState<ModalidadDeuda>("libre");
+function NuevaDeuda({ preset, companies, branches, onClose, onSaved }: { preset: { tipo?: TipoDeuda; destino: "optica" | "personal" }; companies: PrivateAdminData["companies"]; branches: PrivateAdminData["branches"]; onClose: () => void; onSaved: (m: string) => void }) {
+  const [tipo, setTipo] = useState<TipoDeuda | null>(preset.tipo ?? null);
+  const [modalidad, setModalidad] = useState<ModalidadDeuda>(preset.tipo ? tipos[preset.tipo].modalidad : "libre");
   const [cuota, setCuota] = useState(""); const [nCuotas, setNCuotas] = useState(""); const [previas, setPrevias] = useState("0");
   const [total, setTotal] = useState(""); const [saldo, setSaldo] = useState("");
   const [error, setError] = useState(""); const [pending, start] = useTransition();
+  const [destino, setDestino] = useState(preset.destino === "personal" ? "personal" : "");
   const elegir = (t: TipoDeuda) => { setTipo(t); setModalidad(tipos[t].modalidad); };
   const totalCuotas = (Number(cuota) || 0) * (Number(nCuotas) || 0);
   const saldoCuotas = (Number(cuota) || 0) * Math.max(0, (Number(nCuotas) || 0) - (Number(previas) || 0));
@@ -160,8 +180,8 @@ function NuevaDeuda({ companies, branches, onClose, onSaved }: { companies: Priv
       <div className="new-patient-form" style={{ marginTop: 12 }}>
         <label>{tipo === "gasto_fijo" ? "¿Qué se paga?" : "¿A quién le debes?"}<input name="proveedor" required placeholder={tipo === "gasto_fijo" ? "Ej.: Arriendo local Shushufindi" : tipo === "prestamo_banco" ? "Ej.: Banco Pichincha" : "Ej.: Optec"} /></label>
         <label>Detalle (opcional)<input name="concepto" placeholder={tipo === "gasto_fijo" ? "Ej.: Internet CNT" : "Ej.: Lunas de agosto"} /></label>
-        <label>¿De quién es la deuda?<select name="empresa_id" defaultValue=""><option value="">General (las 3 sucursales)</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}<option value="personal">Personal (Shu)</option></select></label>
-        {tipo !== "gasto_fijo" && <label>¿Cómo se paga?<select value={modalidad} onChange={(e) => setModalidad(e.target.value as ModalidadDeuda)}><option value="cuotas">{modalidades.cuotas}</option><option value="libre">{modalidades.libre}</option></select></label>}
+        <label>¿De quién es la deuda?<select name="empresa_id" value={destino} onChange={(e) => setDestino(e.target.value)}><option value="">General (las 3 sucursales)</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}<option value="personal">Personal (Shu)</option></select></label>
+        {tipo !== "gasto_fijo" && tipo !== "salario" && <label>¿Cómo se paga?<select value={modalidad} onChange={(e) => setModalidad(e.target.value as ModalidadDeuda)}><option value="cuotas">{modalidades.cuotas}</option><option value="libre">{modalidades.libre}</option></select></label>}
       </div>
       {modalidad === "cuotas" && <div className="new-patient-form" style={{ marginTop: 12 }}>
         <label>Valor de cada cuota $<input name="monto_cuota" inputMode="decimal" required value={cuota} onChange={(e) => setCuota(limpiarMonto(e.target.value))} /></label>
@@ -180,7 +200,7 @@ function NuevaDeuda({ companies, branches, onClose, onSaved }: { companies: Priv
         <label>Monto mensual $<input name="monto_cuota" inputMode="decimal" required value={cuota} onChange={(e) => setCuota(limpiarMonto(e.target.value))} /></label>
         <label>Día de pago (1–31)<input name="dia_pago" inputMode="numeric" required placeholder="Ej.: 1" /></label>
         <label>Desde el mes<input name="desde" type="month" defaultValue={mesDe(hoyEcuador())} /></label>
-        {tipo === "gasto_fijo" && <label>Sucursal (se registra el egreso en su caja)<select name="sucursal_id" defaultValue=""><option value="">Ninguna / pago general</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label>}
+        {(tipo === "gasto_fijo" || tipo === "salario") && destino !== "personal" && <label>Sucursal (se registra el egreso en su caja)<select name="sucursal_id" defaultValue=""><option value="">Ninguna / pago general</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label>}
       </div>}
       <div className="new-patient-form" style={{ marginTop: 12 }}><label className="task-description" style={{ gridColumn: "1 / -1" }}>Notas (opcional)<textarea name="notas" /></label></div>
       {error && <p className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 700 }}>{error}</p>}
@@ -191,24 +211,23 @@ function NuevaDeuda({ companies, branches, onClose, onSaved }: { companies: Priv
 
 function PagarDeuda({ pago, branches, cuentas, companies, onClose, onSaved }: { pago: Pago; branches: PrivateAdminData["branches"]; cuentas: PrivateAdminData["cuentas"]; companies: PrivateAdminData["companies"]; onClose: () => void; onSaved: (m: string) => void }) {
   const d = pago.deuda;
-  // Por defecto la transferencia sale del Pichincha de la empresa de la deuda (las personales, de otra cuenta).
-  const cuentaInicial = d.ambito === "personal" ? "" : (cuentas.find((c) => d.sucursal_id && c.sucursal_id === d.sucursal_id && c.banco === "pichincha") ?? cuentas.find((c) => c.empresa_id === d.empresa_id && c.banco === "pichincha"))?.id ?? "";
-  const [cuentaId, setCuentaId] = useState(cuentaInicial);
+  const [origen, setOrigen] = useState(d.ambito === "personal" ? "personal" : "");
   const nombreCuenta = (c: PrivateAdminData["cuentas"][number]) => `${bancoLabel[c.banco] ?? c.banco} · ${branches.find((b) => b.id === c.sucursal_id)?.nombre ?? companies.find((e) => e.id === c.empresa_id)?.nombre ?? "Empresa"}`;
   const [monto, setMonto] = useState(pago.monto.toFixed(2));
-  const [metodo, setMetodo] = useState(d.sucursal_id ? "efectivo" : "transferencia");
-  const [egreso, setEgreso] = useState(!!d.sucursal_id);
   const [error, setError] = useState(""); const [pending, start] = useTransition();
   const submit = (form: HTMLFormElement) => start(async () => {
     setError("");
     const data = new FormData(form); data.set("deuda_id", d.id);
-    const desdeCuenta = metodo === "transferencia" && !!cuentaId;
-    if (desdeCuenta) { data.set("cuenta_id", cuentaId); if (d.sucursal_id) data.set("egreso_sucursal", d.sucursal_id); }
-    else if (!egreso || metodo === "transferencia" || metodo === "tarjeta") data.delete("egreso_sucursal");
+    if (!origen) { setError("Elige de dónde salió el dinero."); return; }
+    const cuentaId = origen.startsWith("cuenta:") ? origen.slice(7) : "";
+    const sucursalId = origen.startsWith("caja:") ? origen.slice(5) : "";
+    data.set("metodo", cuentaId ? "transferencia" : sucursalId ? "efectivo" : "otro");
+    if (cuentaId) { data.set("cuenta_id", cuentaId); if (d.sucursal_id) data.set("egreso_sucursal", d.sucursal_id); }
+    else if (sucursalId) data.set("egreso_sucursal", sucursalId);
     const r = await registrarPagoDeuda(data);
     if (!r.ok) { setError(r.error); return; }
     const cuenta = cuentas.find((c) => c.id === cuentaId);
-    onSaved(`Pago de ${money(Number(monto))} a "${d.proveedor}" registrado.${desdeCuenta && cuenta ? ` Salió de ${nombreCuenta(cuenta)} y entra al cuadre de bancos.` : egreso && metodo !== "transferencia" && metodo !== "tarjeta" ? " También quedó como egreso de caja." : ""}`);
+    onSaved(`Pago de ${money(Number(monto))} a "${d.proveedor}" registrado.${cuenta ? ` Salió de ${nombreCuenta(cuenta)}.` : sucursalId ? " También quedó como egreso de caja." : ""}`);
   });
   return <div className="modal-backdrop"><section className="new-patient-modal" role="dialog" aria-modal="true">
     <button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>
@@ -219,13 +238,11 @@ function PagarDeuda({ pago, branches, cuentas, companies, onClose, onSaved }: { 
         <label>Monto $<input name="monto" inputMode="decimal" required value={monto} onChange={(e) => setMonto(limpiarMonto(e.target.value))} /></label>
         <label>Fecha de pago<input name="fecha_pago" type="date" defaultValue={hoyEcuador()} /></label>
         <label>Corresponde al mes<input name="periodo" type="month" defaultValue={pago.periodo} /></label>
-        <label>Forma de pago<select name="metodo" value={metodo} onChange={(e) => setMetodo(e.target.value)}>{metodos.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select></label>
+        <label>¿De dónde salió el dinero?<select required value={origen} onChange={(e) => setOrigen(e.target.value)}><option value="" disabled>Selecciona el origen</option>{cuentas.map((c) => <option key={c.id} value={`cuenta:${c.id}`}>{nombreCuenta(c)}</option>)}{branches.map((b) => <option key={b.id} value={`caja:${b.id}`}>Efectivo de la caja de {b.nombre}</option>)}<option value="personal">Dinero personal (no afecta a las ópticas)</option></select></label>
         <label>Referencia (opcional)<input name="referencia" placeholder="N.º de transferencia o recibo" /></label>
         <label>Nota (opcional)<input name="notas" /></label>
       </div>
-      {metodo === "transferencia" && <div className="new-patient-form" style={{ marginTop: 10 }}><label>¿De qué cuenta salió?<select value={cuentaId} onChange={(e) => setCuentaId(e.target.value)}>{cuentas.map((c) => <option key={c.id} value={c.id}>{nombreCuenta(c)}</option>)}<option value="">Otra cuenta (personal, no entra al cuadre)</option></select></label></div>}
-      {(metodo === "efectivo" || metodo === "otro") && <label className="radio-row" style={{ marginTop: 12, fontWeight: 700, fontSize: 13 }}><input type="checkbox" checked={egreso} onChange={(e) => setEgreso(e.target.checked)} /> El dinero salió de la caja de una sucursal (registrar también como egreso de caja)</label>}
-      {egreso && (metodo === "efectivo" || metodo === "otro") && <div className="new-patient-form" style={{ marginTop: 8 }}><label>Sucursal<select name="egreso_sucursal" required defaultValue={d.sucursal_id ?? ""}><option value="" disabled>Selecciona</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label></div>}
+      <p className="field-hint">Los pagos con dinero de las ópticas aparecen como egreso en el Resumen del día y se restan del “a cuenta” del mes de esa sucursal.</p>
       {error && <p className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 700 }}>{error}</p>}
       <div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" type="submit" disabled={pending || !(Number(monto) > 0)}>{pending ? "Guardando…" : "Registrar pago"}</button></div>
     </form>
@@ -259,6 +276,7 @@ function EditarDeuda({ deuda, companies, branches, onClose, onSaved }: { deuda: 
       <div className="new-patient-form">
         <label>{deuda.tipo === "gasto_fijo" ? "¿Qué se paga?" : "¿A quién le debes?"}<input name="proveedor" required defaultValue={deuda.proveedor} /></label>
         <label>Detalle<input name="concepto" defaultValue={deuda.concepto} /></label>
+        <label>Tipo<select name="tipo" defaultValue={deuda.tipo}>{(Object.keys(tipos) as TipoDeuda[]).map((t) => <option key={t} value={t}>{tipos[t].label}</option>)}</select></label>
         <label>¿De quién es la deuda?<select name="empresa_id" defaultValue={destino}><option value="">General (las 3 sucursales)</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}<option value="personal">Personal (Shu)</option></select></label>
         {deuda.modalidad !== "libre" && <label>{deuda.modalidad === "mensual" ? "Monto mensual $" : "Valor de cada cuota $"}<input name="monto_cuota" inputMode="decimal" required defaultValue={deuda.monto_cuota ?? ""} /></label>}
         {deuda.modalidad !== "libre" && <label>Día de pago (1–31)<input name="dia_pago" inputMode="numeric" defaultValue={deuda.dia_pago ?? ""} placeholder="Vacío = por confirmar" /></label>}
