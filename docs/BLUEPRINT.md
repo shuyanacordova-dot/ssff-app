@@ -328,7 +328,6 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 8. **Make – Focus separado**: plan Free (2 escenarios activos, 1.000 operaciones/mes). Todos los escenarios (Cumpleaños, Cobros, Control anual, Convenios) envían desde un solo número y leen de Notion. Para separar Focus: registrar el número de Focus en Meta (WhatsApp Cloud API), crear su conexión en Make y filtrar por empresa. Probablemente requiere subir de plan en Make.
 9. **WhatsApp Business de las 3 ópticas dentro de LumOS** (propuesta): conectar cada número a la API oficial de WhatsApp (Meta Cloud API, con "coexistencia" para seguir usando la app en el celular), bandeja de mensajes en LumOS ligada a la carpeta del paciente (pestaña Comunicaciones), asistente con IA que sugiere o envía respuestas a preguntas frecuentes (horarios, estado de la orden, saldo) y siempre pide confirmación en lo sensible. Make queda solo para campañas.
 
-| 2026-09-30 | Cobros de hoy y tarjetas de deuda: plantillas según tipo, historial de mensajes, fecha acordada y apartados de 180 días. Ventas: autorización de descuento a rol desde la tarjeta, con cuotas e impresión. Agenda: búsqueda de paciente al agendar. TypeScript correcto; sin commit ni publicación por petición expresa. La tabla de empresas convenio no tiene vínculo directo con una óptica; la lista usa los permisos de lectura existentes. | Sin commit |
 
 ---
 
