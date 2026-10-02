@@ -23,17 +23,17 @@ const usoDesdeCalculado = (uso: UsoCalculado): UsoLente => uso === "lejos_y_cerc
 const tipoParaUso = (uso: UsoLente): TipoLente => uso === "todas" ? "progresivo" : uso === "lejos_y_cerca" ? "bifocal" : tipoLenteSugerido(usoDb(uso));
 const calcularRx = (rx: OrdenLaboratorioRx, uso: UsoLente) => uso === "cerca" ? rxCerca(rx) : uso === "intermedio" ? rxIntermedia(rx) : { od: { ...rx.od }, oi: { ...rx.oi } };
 
-function RxEyeCard({ eye, value, onChange, disabled, cerca = false, conProcesar = true }: { eye: "OD" | "OI"; value: RxEye; onChange: (v: RxEye) => void; disabled?: boolean; cerca?: boolean; conProcesar?: boolean }) {
+function RxEyeCard({ eye, value, onChange, disabled, cerca = false, conProcesar = true, faltan }: { eye: "OD" | "OI"; value: RxEye; onChange: (v: RxEye) => void; disabled?: boolean; cerca?: boolean; conProcesar?: boolean; faltan?: Set<string> }) {
   const set = (k: keyof RxEye) => (event: React.ChangeEvent<HTMLInputElement>) => onChange({ ...value, [k]: event.target.value });
   const off = disabled || (conProcesar && !value.procesar);
   return <div className={`eye-card ${rxStyles.card}`}>
     <div className="eye-card-header with-toggle"><span>{eye}</span>{conProcesar && <label className="eye-toggle"><input type="checkbox" checked={value.procesar} onChange={(event) => onChange({ ...value, procesar: event.target.checked })} disabled={disabled} /> Procesar</label>}</div>
     <div className={rxStyles.body}>
-      <RxNumberField label="Esf" kind="esfera" value={value.esfera} onChange={(v) => onChange({ ...value, esfera: v })} disabled={off} />
+      <RxNumberField label="Esf" kind="esfera" value={value.esfera} onChange={(v) => onChange({ ...value, esfera: v })} disabled={off} invalid={faltan?.has("esfera")} />
       <RxNumberField label="Cil" kind="cilindro" value={value.cilindro} onChange={(v) => onChange({ ...value, cilindro: v })} disabled={off} onTranspose={(cilindro) => onChange({ ...value, ...transponer({ ...value, cilindro }) })} />
-      <RxNumberField label="Eje" kind="eje" value={value.eje} onChange={(v) => onChange({ ...value, eje: v })} disabled={off} />
-      <RxNumberField label="Add" kind="add" value={value.add} onChange={(v) => onChange({ ...value, add: v })} disabled={off} />
-      <label>{cerca ? "DNP de cerca (sugerida)" : "DNP"}<input inputMode="decimal" value={value.dnp} onChange={set("dnp")} placeholder="mm" disabled={off} /></label>
+      <RxNumberField label="Eje" kind="eje" value={value.eje} onChange={(v) => onChange({ ...value, eje: v })} disabled={off} invalid={faltan?.has("eje")} />
+      <RxNumberField label="Add" kind="add" value={value.add} onChange={(v) => onChange({ ...value, add: v })} disabled={off} invalid={faltan?.has("add")} />
+      <label className={faltan?.has("dnp") ? "campo-faltante" : undefined}>{cerca ? "DNP de cerca (sugerida)" : "DNP"}<input inputMode="decimal" value={value.dnp} onChange={set("dnp")} placeholder="mm" disabled={off} /></label>
     </div>
   </div>;
 }
@@ -136,12 +136,42 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
   };
   const anisometropiaAviso = avisoAnisometropia(rx);
 
+  // Campos necesarios para la orden (Shuyana 2026-10-01): se avisa cuáles faltan y se marcan en rojo.
+  const [intentado, setIntentado] = useState(false);
+  const multifocal = tipoLente === "progresivo" || tipoLente === "bifocal";
+  const vacio = (v?: string | null) => !(v ?? "").toString().trim();
+  const faltanOjo = (eye: "od" | "oi") => {
+    const set = new Set<string>(); const v = rx[eye];
+    if (!v.procesar) return set;
+    if (vacio(v.esfera)) set.add("esfera");
+    if ((parseRxNumber(v.cilindro) ?? 0) !== 0 && vacio(v.eje)) set.add("eje");
+    if (multifocal && !(parseRxNumber(v.add) ?? 0)) set.add("add");
+    if (vacio(v.dnp) && vacio(medidas.dnp)) set.add("dnp");
+    return set;
+  };
+  const faltanOD = faltanOjo("od"); const faltanOI = faltanOjo("oi");
+  const faltaMedida = (k: "vertical" | "horizontal_mayor" | "puente") => vacio(medidas[k]);
+  const faltaAltura = multifocal && (["od", "oi"] as const).some((eye) => rx[eye].procesar && vacio(medidas[eye === "od" ? "altura_od" : "altura_oi"]) && vacio(medidas.altura));
+  const nombresCampo: Record<string, string> = { esfera: "Esfera", eje: "Eje", add: "Adición", dnp: "DNP" };
+  const faltantes = [
+    ...[...faltanOD].map((k) => `${nombresCampo[k]} OD`), ...[...faltanOI].map((k) => `${nombresCampo[k]} OI`),
+    ...(faltaMedida("vertical") ? ["Vertical"] : []), ...(faltaMedida("horizontal_mayor") ? ["Horizontal mayor"] : []), ...(faltaMedida("puente") ? ["Puente"] : []),
+    ...(faltaAltura ? ["Altura de montaje"] : []),
+  ];
+  const marca = (falta: boolean) => intentado && falta ? "campo-faltante" : undefined;
+
   const submit = () => {
     setError("");
+    if (!rx.od.procesar && !rx.oi.procesar) { setError("Marca al menos un ojo para procesar (OD u OI)."); return; }
+    if (faltantes.length) {
+      setIntentado(true);
+      setError(`Faltan datos necesarios para la orden: ${faltantes.join(", ")}.`);
+      window.setTimeout(() => document.querySelector(".lab-modal .campo-faltante")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+      return;
+    }
     const alturaError = validarAlturaMontaje(tipoLente, medidas, rx, anterior);
     if (alturaError) { setError(alturaError); return; }
     if (!orderId && !itemId) { setError("Elige el producto de esta venta."); return; }
-    if (!rx.od.procesar && !rx.oi.procesar) { setError("Marca al menos un ojo para procesar (OD u OI)."); return; }
     start(async () => {
       const data = new FormData();
       data.set("laboratorio", laboratorio);
@@ -210,7 +240,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
         {(uso === "cerca" || uso === "intermedio") && examen && (["od", "oi"] as const).some((eye) => rx[eye].procesar && !(parseRxNumber(examen[eye].add) ?? 0)) && <p className="notice" role="status">Falta la adición para calcular la visión de cerca</p>}
         <p className="section-label" style={{ marginTop: 14 }}>Rx calculada para el laboratorio</p>
         <p className="field-hint">Puedes ajustar la receta calculada. Cambiar el uso o el examen vuelve a calcularla.{uso === "intermedio" ? " Intermedio: se aplica la mitad de la adición, redondeada a 0,25 D." : ""}</p>
-        <div className={rxStyles.cards} style={{ marginTop: 10 }} key={`${consultaId}-${uso}`}><RxEyeCard eye="OD" value={rx.od} cerca={uso === "cerca"} onChange={(value) => setRx(editarRxLaboratorio(rx, "od", value))} /><RxEyeCard eye="OI" value={rx.oi} cerca={uso === "cerca"} onChange={(value) => setRx(editarRxLaboratorio(rx, "oi", value))} /></div>
+        <div className={rxStyles.cards} style={{ marginTop: 10 }} key={`${consultaId}-${uso}`}><RxEyeCard eye="OD" value={rx.od} cerca={uso === "cerca"} faltan={intentado ? faltanOD : undefined} onChange={(value) => setRx(editarRxLaboratorio(rx, "od", value))} /><RxEyeCard eye="OI" value={rx.oi} cerca={uso === "cerca"} faltan={intentado ? faltanOI : undefined} onChange={(value) => setRx(editarRxLaboratorio(rx, "oi", value))} /></div>
         <LunasStockAlert empresaId={sale.empresa_id} rx={rx} orderId={orderId || null} patientName={patientName} />
 
         {anisometropiaAviso && <div className="glass notice" role="status">{anisometropiaAviso}</div>}
@@ -241,14 +271,14 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
 
         <p className="section-label" style={{ marginTop: 14 }}>PARÁMETROS DEL ARMAZÓN (MM)</p>
         <div className="new-patient-form">
-          <label>Vertical<input value={medidas.vertical} onChange={(event) => setMedidas({ ...medidas, vertical: event.target.value })} /></label>
-          <label>Horizontal mayor<input value={medidas.horizontal_mayor} onChange={(event) => setMedidas({ ...medidas, horizontal_mayor: event.target.value })} /></label>
-          <label>Puente<input value={medidas.puente} onChange={(event) => setMedidas({ ...medidas, puente: event.target.value })} /></label>
-          <label>Altura común<input value={medidas.altura} onChange={(event) => setMedidas({ ...medidas, altura: event.target.value })} /></label>
+          <label className={marca(faltaMedida("vertical"))}>Vertical<input value={medidas.vertical} onChange={(event) => setMedidas({ ...medidas, vertical: event.target.value })} /></label>
+          <label className={marca(faltaMedida("horizontal_mayor"))}>Horizontal mayor<input value={medidas.horizontal_mayor} onChange={(event) => setMedidas({ ...medidas, horizontal_mayor: event.target.value })} /></label>
+          <label className={marca(faltaMedida("puente"))}>Puente<input value={medidas.puente} onChange={(event) => setMedidas({ ...medidas, puente: event.target.value })} /></label>
+          <label className={marca(faltaAltura)}>Altura común<input value={medidas.altura} onChange={(event) => setMedidas({ ...medidas, altura: event.target.value })} /></label>
           <label>Altura OD<input inputMode="decimal" value={medidas.altura_od ?? ""} onChange={(event) => setMedidas({ ...medidas, altura_od: event.target.value })} placeholder="Usa altura común si está vacía" /></label>
           <label>Altura OI<input inputMode="decimal" value={medidas.altura_oi ?? ""} onChange={(event) => setMedidas({ ...medidas, altura_oi: event.target.value })} placeholder="Usa altura común si está vacía" /></label>
           <label>Diagonal efectiva (ED)<input inputMode="decimal" value={medidas.diagonal_efectiva ?? ""} onChange={(event) => setMedidas({ ...medidas, diagonal_efectiva: event.target.value })} placeholder="Diagonal mayor, opcional" /></label>
-          <label>{uso === "cerca" ? "DNP de cerca (sugerida, binocular)" : "DNP binocular"}<input inputMode="decimal" value={medidas.dnp} onChange={(event) => setMedidas({ ...medidas, dnp: event.target.value })} /></label>
+          <label className={marca((faltanOD.has("dnp") || faltanOI.has("dnp")))}>{uso === "cerca" ? "DNP de cerca (sugerida, binocular)" : "DNP binocular"}<input inputMode="decimal" value={medidas.dnp} onChange={(event) => setMedidas({ ...medidas, dnp: event.target.value })} /></label>
         </div>
 
         {(tipoLente === "progresivo" || tipoLente === "bifocal") && <p className="field-hint">Altura de montaje obligatoria: ingresa la altura común o una altura para cada ojo a procesar.</p>}

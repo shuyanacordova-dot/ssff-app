@@ -571,3 +571,6 @@ body { background: #fff; }
 .dash-acum .field-hint { margin: 10px 0 0; }
 @media (max-width: 520px) { .dash-acum-row { grid-template-columns: minmax(0, 1fr) repeat(3, minmax(0, auto)); font-size: 12.5px; gap: 6px; } }
 .dash-acum-tarj { display: block; color: #a26c17; font-size: 11px; font-weight: 700; }
+/* Orden de laboratorio: campo necesario que falta */
+.campo-faltante input, .campo-faltante select, input.campo-faltante { border-color: #c0392b !important; background: #fff5f4 !important; outline-color: #c0392b; }
+.campo-faltante > label, label.campo-faltante { color: #b43a43 !important; font-weight: 800; }

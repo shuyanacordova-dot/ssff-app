@@ -13,7 +13,7 @@ export type Receta = { lagrimas_artificiales: boolean; lagrimas_productos: strin
 export type Consultation = { id: string; paciente_id: string; empresa_atencion_id: string | null; sucursal_atencion_id: string | null; optometrista_id: string | null; optometrista_nombre: string | null; fecha_consulta: string; motivo_consulta: string | null; antecedentes: Record<string, string>; agudeza_visual: Record<string, string>; lensometria: Record<string, string>; queratometria: Record<string, string>; autorefractor: Record<string, string>; refraccion: Record<string, string>; examen_binocular: Record<string, string>; biomicroscopia: Record<string, string>; impresion_diagnostica: string | null; receta: Receta; plan_manejo: string | null; observaciones: string | null };
 export type ClinicalPhoto = { id: string; paciente_id: string; consulta_id: string | null; tipo: "foto" | "documento"; descripcion: string | null; storage_path: string; creado_en: string; url: string | null };
 export type PatientSale = Sale;
-export type ClinicalProfile = { id: string; nombre: string; rol: string; empresa_id: string; sucursal_id: string };
+export type ClinicalProfile = { id: string; nombre: string; rol: string; empresa_id: string; sucursal_id: string; puede_anular?: boolean };
 export type ClinicalOptometrist = { id: string; nombre: string };
 export type ClinicalData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: ClinicalProfile; patients: PatientRecord[]; consultations: Consultation[]; photos: ClinicalPhoto[]; sales: PatientSale[]; companies: SaleCompany[]; products: SaleProduct[]; stock: SaleStock[]; branches: SaleBranch[]; optometrists: ClinicalOptometrist[]; empresasConvenio: EmpresaConvenio[]; labOrders: SaleLabOrder[]; garantias: Garantia[] };
 
@@ -62,7 +62,7 @@ export async function getClinicalData(): Promise<ClinicalData> {
     const supabase = await createSupabaseServerClient();
     const auth = { user: await getCurrentUser() };
     if (!auth.user) return { status: "needs_login", message: "Inicia sesión para abrir historias clínicas.", ...empty };
-    const { data: rawProfile, error: profileError } = await supabase.from("usuarios").select("id,nombre,empresa_id,sucursal_id,activo,roles(nombre)").eq("auth_user_id", auth.user.id).maybeSingle();
+    const { data: rawProfile, error: profileError } = await supabase.from("usuarios").select("id,nombre,empresa_id,sucursal_id,activo,puede_anular_ventas,roles(nombre)").eq("auth_user_id", auth.user.id).maybeSingle();
     const profile = rawProfile as unknown as UserProfile | null;
     const role = roleName(profile);
     if (profileError || !profile?.activo || !role || !clinicalRoles.has(role)) return { status: "forbidden", message: "Tu perfil no tiene permiso clínico.", ...empty };
@@ -111,7 +111,7 @@ export async function getClinicalData(): Promise<ClinicalData> {
 
     return {
       status: "ready",
-      profile: { id: profile.id, nombre: profile.nombre, rol: role, empresa_id: operationalContext?.activeCompany.id ?? profile.empresa_id, sucursal_id: operationalContext?.activeBranch.id ?? profile.sucursal_id },
+      profile: { id: profile.id, nombre: profile.nombre, rol: role, empresa_id: operationalContext?.activeCompany.id ?? profile.empresa_id, sucursal_id: operationalContext?.activeBranch.id ?? profile.sucursal_id, puede_anular: !!(profile as { puede_anular_ventas?: boolean }).puede_anular_ventas },
       patients: enrichedPatients,
       consultations: consultationRows.map((consultation) => ({ ...consultation, optometrista_nombre: consultation.optometrista_id ? optometristaNombre.get(consultation.optometrista_id) ?? null : null })) as unknown as Consultation[],
       photos: photoRows.map((photo) => ({ ...photo, url: urlByPath.get(photo.storage_path) ?? null })) as ClinicalPhoto[],

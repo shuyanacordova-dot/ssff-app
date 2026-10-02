@@ -15,7 +15,7 @@ export type SaleItem = { id: string; producto_id: string | null; descripcion: st
 export type SalePayment = { id: string; metodo: PaymentMethod; monto: number; referencia: string | null; banco: string | null; creado_en: string };
 export type SalePatient = { id: string; nombres: string; apellidos: string; cedula: string | null; telefono: string | null };
 export type Sale = { id: string; empresa_id: string; sucursal_id: string | null; paciente_id: string | null; cliente_nombre: string | null; estado: SaleStatus; subtotal: number; descuento: number; total: number; pagado: number; saldo: number; motivo_anulacion: string | null; recibo_token: string; fecha_entrega_estimada: string | null; creado_en: string; folio: number | null; apartado?: boolean; apartado_hasta?: string | null; venta_items: SaleItem[]; pagos_venta: SalePayment[] };
-export type SalesProfile = { id: string; empresa_id: string; sucursal_id: string | null; rol: string };
+export type SalesProfile = { id: string; empresa_id: string; sucursal_id: string | null; rol: string; puede_anular?: boolean };
 export type SaleLabOrder = { id: string; venta_id: string; venta_item_id: string | null; estado: string; laboratorio: string; creado_en: string; tipo_lente: string; es_garantia: boolean };
 export type EmpresaConvenio = { id: string; nombre: string; cuotas_predeterminadas?: number };
 export type Garantia = { id: string; venta_id: string; venta_item_id: string | null; tipo: "armazon" | "luna"; motivo: string; estado: "abierta" | "resuelta" | "rechazada"; orden_laboratorio_id: string | null; notas: string | null; creado_en: string };
@@ -32,8 +32,8 @@ export async function getVentasData(): Promise<VentasData> {
     const supabase = await createSupabaseServerClient();
     const auth = { user: await getCurrentUser() };
     if (!auth.user) return { status: "needs_login", message: "Inicia sesión para abrir ventas.", ...empty };
-    const { data: rawProfile, error: profileError } = await supabase.from("usuarios").select("id,empresa_id,sucursal_id,activo,roles(nombre)").eq("auth_user_id", auth.user.id).maybeSingle();
-    const profile = rawProfile as unknown as { id: string; empresa_id: string; sucursal_id: string | null; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null } | null;
+    const { data: rawProfile, error: profileError } = await supabase.from("usuarios").select("id,empresa_id,sucursal_id,activo,puede_anular_ventas,roles(nombre)").eq("auth_user_id", auth.user.id).maybeSingle();
+    const profile = rawProfile as unknown as { id: string; empresa_id: string; sucursal_id: string | null; activo: boolean; puede_anular_ventas?: boolean; roles: { nombre: string } | { nombre: string }[] | null } | null;
     const role = roleName(profile);
     if (profileError || !profile?.activo || !role || !salesRoles.has(role)) return { status: "forbidden", message: "Tu perfil no tiene permiso para ventas.", ...empty };
 
@@ -77,7 +77,7 @@ export async function getVentasData(): Promise<VentasData> {
 
     return {
       status: "ready",
-      profile: { id: profile.id, empresa_id: operationalContext?.activeCompany.id ?? profile.empresa_id, sucursal_id: operationalContext?.activeBranch.id ?? profile.sucursal_id, rol: role },
+      profile: { id: profile.id, empresa_id: operationalContext?.activeCompany.id ?? profile.empresa_id, sucursal_id: operationalContext?.activeBranch.id ?? profile.sucursal_id, rol: role, puede_anular: !!profile.puede_anular_ventas },
       products: (productsResult.data ?? []) as SaleProduct[],
       stock: stockResult.data ?? [],
       sales: (salesResult.data ?? []) as unknown as Sale[],

@@ -8,9 +8,11 @@ type Props = {
   label: string; kind: RxNumberKind; name?: string; value: string;
   onChange: (value: string) => void; disabled?: boolean;
   onTranspose?: (positiveCylinder: string) => void;
+  // Marca el campo en rojo cuando falta y es necesario (orden de laboratorio).
+  invalid?: boolean;
 };
 
-export default function RxNumberField({ label, kind, name, value, onChange, disabled, onTranspose }: Props) {
+export default function RxNumberField({ label, kind, name, value, onChange, disabled, onTranspose, invalid }: Props) {
   const id = useId();
   const [draft, setDraft] = useState<string | null>(null);
   const [negative, setNegative] = useState(false);
@@ -20,7 +22,7 @@ export default function RxNumberField({ label, kind, name, value, onChange, disa
   const isNegative = (number ?? 0) < 0 || (!number && negative);
   const positive = positiveCylinder ?? (kind === "cilindro" && (parseRxNumber(value) ?? 0) > 0 ? value : null);
   const commit = (next: string) => { setDraft(null); onChange(normalizeRxNumber(next, kind)); };
-  return <div className={styles.field}>
+  return <div className={`${styles.field}${invalid ? " campo-faltante" : ""}`}>
     <label htmlFor={id}>{label}</label>
     <div className={styles.value}>
       {kind === "esfera" && <button type="button" disabled={disabled} aria-label={`Cambiar signo de ${label}`} aria-pressed={isNegative} onClick={() => {

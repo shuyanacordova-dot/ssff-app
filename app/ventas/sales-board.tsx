@@ -37,7 +37,8 @@ export default function SalesBoard(props: VentasData) {
   const [pending, startTransition] = useTransition();
   const role = props.profile?.rol;
   const canCreateProduct = role === "superadmin" || role === "admin_sucursal";
-  const canAnular = role === "superadmin";
+  // Superadmin, o persona autorizada a anular ventas (p. ej. Erick en Focus; la base solo permite su empresa).
+  const canAnular = role === "superadmin" || !!props.profile?.puede_anular;
   const productoById = useMemo(() => new Map(catalogo.products.map((product) => [product.id, product])), [catalogo.products]);
   const patientById = useMemo(() => new Map(props.patients.map((patient) => [patient.id, patient])), [props.patients]);
   const accessibleBranchIds = useMemo(() => new Set(props.accessibleBranches.map((branch) => branch.id)), [props.accessibleBranches]);

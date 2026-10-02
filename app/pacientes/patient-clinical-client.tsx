@@ -153,7 +153,7 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
   const eligibleLabSales = sales.filter((sale) => sale.estado === "completada");
   const canEditPatient = ["superadmin", "admin_sucursal", "optometra", "vendedor", "caja"].includes(props.profile?.rol ?? "")
     && (props.profile?.rol === "superadmin" || !!selected?.empresa_ids.includes(props.profile?.empresa_id ?? ""));
-  const canAnular = props.profile?.rol === "superadmin";
+  const canAnular = props.profile?.rol === "superadmin" || !!props.profile?.puede_anular;
   const canAuthorClinical = props.profile?.rol !== "vendedor";
   const abonar = (sale: PatientSale, data: FormData) => start(async () => { data.set("venta_id", sale.id); try { await registrarAbono(data); setNotice("Abono registrado."); refreshSelected(); } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo registrar el abono."); } });
   const anular = (sale: PatientSale, motivo: string, opciones: OpcionesAnulacion) => start(async () => { const data = new FormData(); data.set("venta_id", sale.id); data.set("motivo", motivo); data.set("modo", opciones.modo); data.set("devolucion_origen", opciones.devolucion_origen); data.set("devolucion_banco", opciones.devolucion_banco); try { await anularVenta(data); setNotice(sale.pagado > 0 ? (opciones.modo === "credito" ? `Venta anulada. $${sale.pagado.toFixed(2)} quedan como saldo a favor del paciente.` : `Venta anulada. Devolución de $${sale.pagado.toFixed(2)} registrada como salida de hoy.`) : "Venta anulada."); setAnulling(null); refreshSelected(); } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo anular la venta."); } });
