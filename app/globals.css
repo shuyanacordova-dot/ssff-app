@@ -559,3 +559,13 @@ body { background: #fff; }
 .agenda-switch { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; padding: 4px; border: 1px solid #e2e9eb; border-radius: 999px; background: #fff; }
 .agenda-switch a { padding: 8px 14px; border-radius: 999px; color: #285f61; font-size: 13px; font-weight: 750; }
 .agenda-switch a.active { background: #4f8a8b; color: #fff; }
+/* Inicio: acumulado del mes por óptica */
+.dash-acum-table { display: grid; gap: 0; }
+.dash-acum-row { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); gap: 8px; align-items: center; padding: 9px 2px; border-top: 1px solid #e2e9eb; font-size: 14px; color: #16233a; }
+.dash-acum-row > :not(:first-child) { text-align: right; }
+.dash-acum-head { border-top: 0; color: #526474; font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.dash-acum-total { font-weight: 800; border-top: 2px solid #cbdcda; }
+.dash-acum-pos { color: #20754c; }
+.dash-acum-neg { color: #b43a43; }
+.dash-acum .field-hint { margin: 10px 0 0; }
+@media (max-width: 520px) { .dash-acum-row { grid-template-columns: minmax(0, 1fr) repeat(3, minmax(0, auto)); font-size: 12.5px; gap: 6px; } }

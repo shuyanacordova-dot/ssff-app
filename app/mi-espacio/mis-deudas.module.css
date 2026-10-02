@@ -72,3 +72,10 @@
 .cardGroup { border: 1px solid #dce9e9; border-radius: 14px; padding: 12px; margin-top: 10px; background: #fff; }
 .cardGroupHead { margin-bottom: 10px; color: #163d49; }
 .cardGroupHead span { font-size: 13px; color: #526b75; font-weight: 700; }
+
+/* Clasificaciones plegables */
+.debtGroup > summary { list-style: none; cursor: pointer; margin-bottom: 0; }
+.debtGroup > summary::-webkit-details-marker { display: none; }
+.debtGroup > summary h4::before { content: "▸"; display: inline-block; width: 18px; color: #4f8a8b; transition: transform .15s; }
+.debtGroup[open] > summary h4::before { transform: rotate(90deg); }
+.debtGroup[open] > summary { margin-bottom: 12px; }

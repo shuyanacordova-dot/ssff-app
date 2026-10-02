@@ -50,6 +50,7 @@ export default function DashboardShell({ taskData, informeMensual, metasMessage,
 
     {cobrosHoy.cantidad > 0 && <section className="glass cob-dashboard-banner"><span>Hoy hay <strong>{cobrosHoy.cantidad}</strong> mensajes de cobro por enviar ({money(cobrosHoy.total)})</span><Link className="outline-action" href="/cuentas-cobrar">Ver cobros de hoy</Link></section>}
     {resumenHoy && <ResumenDelDia r={resumenHoy} />}
+    {canVerInformes && informeMensual && <AcumuladoOpticas informe={informeMensual} />}
     <section className="dashboard-main dashboard-main-wide">
       {canVerInformes && <MetasDashboard informe={informeMensual} message={metasMessage} />}
       <PendingTasks taskData={taskData} />
@@ -66,6 +67,23 @@ function PendingTasks({ taskData }: { taskData: TaskData }) {
   const formatDue = (value: string) => new Intl.DateTimeFormat("es-EC", { day: "numeric", month: "short", year: "numeric", timeZone: "America/Guayaquil" }).format(new Date(`${value.slice(0, 10)}T12:00:00Z`));
   return <section className="glass dashboard-tasks"><div className="dashboard-card-heading"><div><p className="section-label">TAREAS</p><h2>Tareas pendientes</h2></div><Link className="outline-action" href="/tareas">Ver todas</Link></div>
     {ownTasks.length ? <ul>{ownTasks.map((task) => <li key={task.id}><span>{task.revisar && <strong>Por revisar · </strong>}{task.titulo}</span>{task.fecha_limite && <small>{formatDue(task.fecha_limite)}</small>}</li>)}</ul> : <p className="field-hint">Sin tareas pendientes</p>}
+  </section>;
+}
+
+// Acumulado del mes por óptica = lo que entró a cuenta − egresos (en efectivo y por transferencia), pedido de Shuyana 2026-10-01.
+function AcumuladoOpticas({ informe }: { informe: InformeMensual }) {
+  const mes = new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", month: "long" }).format(new Date());
+  const filas = informe.por_sucursal.map((row) => ({ id: row.sucursal_id, nombre: row.sucursal_nombre, aCuenta: Number(row.ingresos_total ?? 0), egresos: Number(row.gastos_total ?? 0) }));
+  const total = filas.reduce((t, f) => ({ aCuenta: t.aCuenta + f.aCuenta, egresos: t.egresos + f.egresos }), { aCuenta: 0, egresos: 0 });
+  const tono = (n: number) => n < 0 ? "dash-acum-neg" : "dash-acum-pos";
+  return <section className="glass dashboard-today dash-acum">
+    <div className="dashboard-card-heading"><div><p className="section-label">ACUMULADO DE {mes.toUpperCase()}</p><h2>Las {filas.length} ópticas</h2></div><Link className="outline-action" href="/informes">Ver informes</Link></div>
+    <div className="dash-acum-table" role="table" aria-label="Acumulado del mes por óptica">
+      <div className="dash-acum-row dash-acum-head" role="row"><span role="columnheader">Óptica</span><span role="columnheader">A cuenta</span><span role="columnheader">Egresos</span><span role="columnheader">Acumulado</span></div>
+      {filas.map((f) => <div className="dash-acum-row" role="row" key={f.id}><span role="cell">{f.nombre}</span><span role="cell">{money(f.aCuenta)}</span><span role="cell">− {money(f.egresos)}</span><strong role="cell" className={tono(f.aCuenta - f.egresos)}>{money(f.aCuenta - f.egresos)}</strong></div>)}
+      <div className="dash-acum-row dash-acum-total" role="row"><span role="cell">Total</span><span role="cell">{money(total.aCuenta)}</span><span role="cell">− {money(total.egresos)}</span><strong role="cell" className={tono(total.aCuenta - total.egresos)}>{money(total.aCuenta - total.egresos)}</strong></div>
+    </div>
+    <p className="field-hint">Egresos = gastos pagados en efectivo y por transferencia en el mes (incluye pagos de deudas hechos con dinero de las ópticas).</p>
   </section>;
 }
 

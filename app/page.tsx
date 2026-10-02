@@ -17,7 +17,7 @@ export default async function Home() {
     const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Guayaquil", year: "numeric", month: "2-digit" }).formatToParts(new Date());
     const year = parts.find((part) => part.type === "year")?.value;
     const month = parts.find((part) => part.type === "month")?.value;
-    try { informeMensual = await obtenerInformeMensual(taskData.profile?.empresaId ?? null, `${year}-${month}-01`); }
+    try { informeMensual = await obtenerInformeMensual(taskData.profile?.rol === "superadmin" ? null : taskData.profile?.empresaId ?? null, `${year}-${month}-01`); }
     catch { metasMessage = "No se pudo cargar el avance de metas en este momento."; }
   }
 

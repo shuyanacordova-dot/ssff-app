@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { Archive, ChevronLeft, ChevronRight, History, Landmark, LockKeyhole, Pencil, Plus, Wallet, X } from "lucide-react";
 import type { PrivateAdminData } from "@/lib/mi-espacio";
-import { atrasadas, avance, cuotasPagadas, fechaCorta, hoyEcuador, itemsDelMes, mesDe, modalidades, money, nombreMes, pagosDelMes, proximoPago, sumarMeses, tipos, type BusinessDebt, type ItemMes, type ModalidadDeuda, type TipoDeuda } from "@/lib/mis-deudas-calc";
+import { atrasadas, avance, cuotasPagadas, fechaCorta, hoyEcuador, itemsDelMes, mesDe, modalidades, money, nombreMes, proximoPago, sumarMeses, tipos, type BusinessDebt, type ItemMes, type ModalidadDeuda, type TipoDeuda } from "@/lib/mis-deudas-calc";
 import { actualizarDeuda, archivarDeuda, crearDeuda, registrarFacturaProveedor, registrarPagoDeuda } from "./actions";
 import s from "./mis-deudas.module.css";
 
@@ -38,10 +38,6 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
 
   if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">ESPACIO PRIVADO</p><h1>Mis deudas</h1><p className="subtitle">{props.message}</p></div></header><div className="notice"><LockKeyhole size={18} /><span>Este apartado es solo para la Superadministradora.</span></div></div></main>;
 
-  const aPagar = items.filter((i) => i.estado !== "pagado").reduce((sum, i) => sum + i.monto, 0);
-  const pagadoMes = deudas.reduce((sum, d) => sum + pagosDelMes(d, mes).reduce((a, p) => a + Number(p.monto), 0), 0);
-  const vencido = [...atraso, ...items.filter((i) => i.estado === "vencido")].reduce((sum, i) => sum + i.monto, 0);
-  const deudaTotal = activas.filter((d) => d.modalidad !== "mensual").reduce((sum, d) => sum + Number(d.saldo), 0);
   // Recordatorio del cuadre de bancos: los sábados, o si pasó más de una semana desde el último.
   const diasDesdeCuadre = props.ultimoCuadreBanco ? Math.round((Date.parse(`${hoy}T12:00:00Z`) - Date.parse(`${props.ultimoCuadreBanco}T12:00:00Z`)) / 86400000) : null;
   const tocaCuadre = props.ultimoCuadreBanco !== hoy && ((new Date(`${hoy}T12:00:00Z`).getUTCDay() === 6) || diasDesdeCuadre === null || diasDesdeCuadre > 7);
@@ -68,12 +64,6 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
       {mes !== mesDe(hoy) && <button type="button" onClick={() => setMes(mesDe(hoy))}>Volver a este mes</button>}
     </div>
 
-    <section className={s.cards}>
-      <div className={`${s.card} ${s.cardTeal}`}><span>Por pagar este mes</span><strong>{money(aPagar)}</strong><small>{items.filter((i) => i.estado !== "pagado").length} pago(s) pendiente(s)</small></div>
-      <div className={`${s.card} ${s.cardGreen}`}><span>Pagado este mes</span><strong>{money(pagadoMes)}</strong><small>{items.filter((i) => i.estado === "pagado").length} pago(s) al día</small></div>
-      <div className={`${s.card} ${s.cardRed}`}><span>Vencido</span><strong>{money(vencido)}</strong><small>{atraso.length + items.filter((i) => i.estado === "vencido").length} pago(s) atrasado(s)</small></div>
-      <div className={`${s.card} ${s.cardNavy}`}><span>Deuda total</span><strong>{money(deudaTotal)}</strong><small>{activas.length} deuda(s) activa(s)</small></div>
-    </section>
 
     <section className="glass agenda-board" style={{ marginBottom: 18 }}>
       <div className={s.sectionTitle}><h2>Pagos de {nombreMes(mes)}</h2><span className="field-hint">Del más próximo al más lejano</span></div>
@@ -103,10 +93,11 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
           const mensual = rows.reduce((sum, d) => sum + (d.modalidad === "libre" ? 0 : Number(d.monto_cuota ?? 0)), 0);
           const tarjetas = grupo.preset === "tarjeta" ? Array.from(new Set(rows.map((d) => d.proveedor))) : [];
           const renderDeuda = (d: BusinessDebt) => <TarjetaDeuda key={d.id} deuda={d} empresa={d.sucursal_id ? props.branches.find((b) => b.id === d.sucursal_id)?.nombre : destino === "personal" ? "Personal" : props.companies.find((c) => c.id === d.empresa_id)?.nombre} pending={pending} onEditar={() => setEditando(d)} onPagar={() => { const p = proximoPago(d, hoy); setPagando({ deuda: d, monto: p?.monto ?? Number(d.saldo), periodo: p ? mesDe(p.fecha) : mesDe(hoy) }); }} onHistorial={() => setHistorial(d)} onFactura={() => setFacturando(d)} onArchivar={() => archivar(d)} />;
-          return <section key={grupo.label} className={s.debtGroup}>
-            <div className={s.groupHead}><div><h4>{grupo.label} <span>({rows.length})</span></h4><p>Saldo {money(saldo)}{mensual > 0 ? ` · Mensual ${money(mensual)}` : ""}</p></div><button type="button" className="outline-action" onClick={() => setNueva({ tipo: grupo.preset, destino })}><Plus size={15} /> Agregar</button></div>
+          // Cada clasificación se abre y se cierra (Shuyana 2026-10-01): cerrada muestra solo el total.
+          return <details key={grupo.label} className={s.debtGroup}>
+            <summary className={s.groupHead}><div><h4>{grupo.label} <span>({rows.length})</span></h4><p>Saldo {money(saldo)}{mensual > 0 ? ` · Mensual ${money(mensual)}` : ""}</p></div><button type="button" className="outline-action" onClick={(event) => { event.preventDefault(); setNueva({ tipo: grupo.preset, destino }); }}><Plus size={15} /> Agregar</button></summary>
             {grupo.preset === "tarjeta" ? tarjetas.map((nombre) => { const cardRows = rows.filter((d) => d.proveedor === nombre); return <div key={nombre} className={s.cardGroup}><div className={s.cardGroupHead}><strong>{nombre}</strong><span>Saldo {money(cardRows.reduce((sum, d) => sum + Number(d.saldo), 0))} · Mensual {money(cardRows.reduce((sum, d) => sum + Number(d.monto_cuota ?? 0), 0))}</span></div><div className={s.grid}>{cardRows.map(renderDeuda)}</div></div>; }) : rows.length ? <div className={s.grid}>{rows.map(renderDeuda)}</div> : <p className={s.empty}>No hay deudas activas.</p>}
-          </section>;
+          </details>;
         })}
       </div>)}
     </section>
