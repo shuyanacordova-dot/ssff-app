@@ -6,6 +6,7 @@ import { Plus, Trash2, X } from "lucide-react";
 import { useState, useTransition } from "react";
 import { crearConsulta, actualizarConsulta } from "./actions";
 import type { ClinicalOptometrist, Consultation } from "@/lib/clinical";
+import { formatRecordDate } from "@/lib/record-date";
 
 const astig = (k1: string, k2: string) => { const a = Number(k1); const b = Number(k2); return k1 !== "" && k2 !== "" && Number.isFinite(a) && Number.isFinite(b) ? `${Math.abs(a - b).toFixed(2)} D estimado` : ""; };
 const hyloSystaneProductos = ["Hylo-Comod", "Hylo-Gel", "Hylo-Forte", "Hylo-Fresh", "Hylo Dual", "Hylo Care", "Systane Ultra", "Systane Balance", "Systane Complete", "Systane Gel", "Systane Hydration", "Systane Ultra PF"];
@@ -92,8 +93,20 @@ function EyeRxCard({ eye, prefix, showDnp, showAv = true, showAdd = true, defaul
   </div>;
 }
 
-export default function ConsultationModal({ pacienteId, optometrists, defaultOptometristId, initial, onClose, onSaved }: { pacienteId: string; optometrists: ClinicalOptometrist[]; defaultOptometristId?: string; initial?: Consultation; onClose: () => void; onSaved: (message: string) => void }) {
+const tieneRx = (rx?: Record<string, string>) => !!rx && ["od_esfera", "od_cilindro", "od_eje", "od_add", "oi_esfera", "oi_cilindro", "oi_eje", "oi_add"].some((key) => (rx[key] ?? "").trim() !== "");
+
+export default function ConsultationModal({ pacienteId, optometrists, defaultOptometristId, initial, previousConsultations = [], onClose, onSaved }: { pacienteId: string; optometrists: ClinicalOptometrist[]; defaultOptometristId?: string; initial?: Consultation; previousConsultations?: Consultation[]; onClose: () => void; onSaved: (message: string) => void }) {
   const [pending, start] = useTransition();
+  // Nueva revisión: la lensometría arranca con la RX final de la última revisión (Shuyana 2026-10-02). Solo esfera, cilindro, eje y ADD; la AV se mide de nuevo.
+  const ultimaRx = initial ? undefined : [...previousConsultations].sort((a, b) => b.fecha_consulta.localeCompare(a.fecha_consulta)).find((consulta) => tieneRx(consulta.refraccion));
+  const [lensKey, setLensKey] = useState(0);
+  const [lensDesdeUltima, setLensDesdeUltima] = useState(Boolean(ultimaRx));
+  const lensDefaults = (eye: "od" | "oi"): Record<string, string> | undefined => {
+    if (initial?.lensometria) return { esfera: initial.lensometria[`${eye}_esfera`], cilindro: initial.lensometria[`${eye}_cilindro`], eje: initial.lensometria[`${eye}_eje`], av_lejos: initial.lensometria[`${eye}_av_lejos`], add: initial.lensometria[`${eye}_add`], av_cerca: initial.lensometria[`${eye}_av_cerca`] };
+    if (ultimaRx && lensDesdeUltima) return { esfera: ultimaRx.refraccion[`${eye}_esfera`] ?? "", cilindro: ultimaRx.refraccion[`${eye}_cilindro`] ?? "", eje: ultimaRx.refraccion[`${eye}_eje`] ?? "", add: ultimaRx.refraccion[`${eye}_add`] ?? "" };
+    return undefined;
+  };
+  const cambiarLens = (desdeUltima: boolean) => { setLensDesdeUltima(desdeUltima); setLensKey((key) => key + 1); };
   const [saveError, setSaveError] = useState("");
   const [k, setK] = useState({ odK1: initial?.queratometria?.od_k1 ?? "", odK2: initial?.queratometria?.od_k2 ?? "", oiK1: initial?.queratometria?.oi_k1 ?? "", oiK2: initial?.queratometria?.oi_k2 ?? "" });
   const [receta, setReceta] = useState({ lagrimas: initial?.receta?.lagrimas_artificiales ?? false, vitaminas: initial?.receta?.vitaminas ?? false, terapia: initial?.receta?.terapia_visual ?? false });
@@ -143,7 +156,8 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
 
     <p className="section-label">CON CORRECCIÓN · RX ANTIGUA (LENSOMETRÍA)</p>
     <p className="field-hint">Mide la fórmula de los lentes que trae el paciente y su agudeza visual, lejos y cerca, con esa corrección.</p>
-    <div className={rxStyles.cards}><EyeRxCard eye="OD" prefix="lens_od" defaults={initial?.lensometria ? { esfera: initial.lensometria.od_esfera, cilindro: initial.lensometria.od_cilindro, eje: initial.lensometria.od_eje, av_lejos: initial.lensometria.od_av_lejos, add: initial.lensometria.od_add, av_cerca: initial.lensometria.od_av_cerca } : undefined} /><EyeRxCard eye="OI" prefix="lens_oi" defaults={initial?.lensometria ? { esfera: initial.lensometria.oi_esfera, cilindro: initial.lensometria.oi_cilindro, eje: initial.lensometria.oi_eje, av_lejos: initial.lensometria.oi_av_lejos, add: initial.lensometria.oi_add, av_cerca: initial.lensometria.oi_av_cerca } : undefined} /></div>
+    {ultimaRx && <p className="field-hint">{lensDesdeUltima ? <>Cargada la RX final de la última revisión ({formatRecordDate(ultimaRx.fecha_consulta)}). Confírmala con el lensómetro. <button type="button" className="link-button" onClick={() => cambiarLens(false)}>Dejar en blanco</button></> : <button type="button" className="link-button" onClick={() => cambiarLens(true)}>Cargar la RX final de la última revisión ({formatRecordDate(ultimaRx.fecha_consulta)})</button>}</p>}
+    <div className={rxStyles.cards} key={lensKey}><EyeRxCard eye="OD" prefix="lens_od" defaults={lensDefaults("od")} /><EyeRxCard eye="OI" prefix="lens_oi" defaults={lensDefaults("oi")} /></div>
 
     <p className="section-label">QUERATOMETRÍA</p>
     <div className="quera-entry-grid">
