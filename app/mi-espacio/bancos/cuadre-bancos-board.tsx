@@ -8,8 +8,9 @@ import { fechaCorta, hoyEcuador, money } from "@/lib/mis-deudas-calc";
 import { previsualizarCuadreBanco, registrarCuadreBanco, type MovimientoCuadre, type ResultadoCuadreBanco, type VistaCuadreBanco } from "./actions";
 import s from "../mis-deudas.module.css";
 import { ExtrasSucursal, type FilaCuadreGeneral } from "./cuadre-general";
+import TarjetasAcreditacion, { type PagoPendiente, type AcreditacionReciente } from "./tarjetas-acreditacion";
 
-export type CuentaCuadre = { id: string; empresa_id: string; empresa_nombre: string; sucursal_nombre: string; banco: string; saldo_actual: number };
+export type CuentaCuadre = { id: string; empresa_id: string; empresa_nombre: string; sucursal_id: string; sucursal_nombre: string; banco: string; saldo_actual: number };
 export type CuadreGuardado = { id: string; cuenta_id: string; fecha: string; desde: string | null; saldo_anterior: number | null; transferencias: number; tarjetas: number; depositos_caja: number; otros_ingresos: number; egresos: number; comisiones: number; saldo_esperado: number | null; saldo_real: number; diferencia: number | null; notas: string | null };
 
 const bancoLabel: Record<string, string> = { pichincha: "Banco Pichincha", guayaquil: "Banco Guayaquil", internacional: "Banco Internacional" };
@@ -26,7 +27,7 @@ function PillDiferencia({ diferencia }: { diferencia: number | null }) {
   return <span className={`${s.pill} ${s.pillVencido}`}>{diferencia > 0 ? `Sobra ${money(diferencia)}` : `Falta ${money(-diferencia)}`}</span>;
 }
 
-export default function CuadreBancosBoard(props: { status: "ready" | "needs_login" | "forbidden"; fecha: string; cuentas: CuentaCuadre[]; historial: CuadreGuardado[]; general: FilaCuadreGeneral[] }) {
+export default function CuadreBancosBoard(props: { status: "ready" | "needs_login" | "forbidden"; fecha: string; cuentas: CuentaCuadre[]; historial: CuadreGuardado[]; general: FilaCuadreGeneral[]; pendientes?: PagoPendiente[]; acreditaciones?: AcreditacionReciente[]; errorTarjetas?: string | null }) {
   const router = useRouter();
   // La fecha va en la dirección (?fecha=) para que el cuadre general se calcule en el servidor.
   const fecha = props.fecha;
@@ -50,6 +51,8 @@ export default function CuadreBancosBoard(props: { status: "ready" | "needs_logi
     </header>
     {notice && <div className="notice"><LockKeyhole size={18} /><span>{notice}</span></div>}
 
+    <TarjetasAcreditacion pendientes={props.pendientes ?? []} acreditaciones={props.acreditaciones ?? []} cuentas={props.cuentas} errorCarga={props.errorTarjetas ?? null} />
+
     {!esSabado && <div className="notice"><Landmark size={18} /><span>El cuadre toca los sábados, pero puedes hacerlo cualquier día: se cuenta desde el último cuadre de cada cuenta hasta la fecha elegida.</span></div>}
 
     <div className={s.cards} style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
@@ -71,7 +74,7 @@ export default function CuadreBancosBoard(props: { status: "ready" | "needs_logi
           <div className={s.actions}><button type="button" className={hecha ? "outline-action" : "new-consultation"} onClick={() => setAbierta(c)}>{hecha ? "Rehacer cuadre" : "Cuadrar"}</button></div>
         </article>;
       })}
-        {fila && <ExtrasSucursal key={`${fila.sucursal_id}:${fecha}:${fila.guardado?.creado_en ?? ""}`} fila={fila} fecha={fecha} />}
+        {fila && <ExtrasSucursal key={`${fila.sucursal_id}:${fecha}:${fila.guardado?.creado_en ?? ""}`} fila={fila} fecha={fecha} tarjetasPendientes={(props.pendientes ?? []).filter((p) => p.sucursal_id === fila.sucursal_id && p.fecha <= fecha).reduce((sum, p) => sum + Number(p.monto), 0)} />}
       </div>
     </section>;
     })}

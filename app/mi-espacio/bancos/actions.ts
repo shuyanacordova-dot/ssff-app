@@ -32,20 +32,29 @@ export async function registrarCuadreBanco(cuentaId: string, fecha: string, sald
 }
 
 export async function guardarCuadreGeneral(fecha: string, tarjetas: Record<string, number>, notas: string): Promise<Resultado<{ sucursales: number; diferencia_total: number }>> {
-  if (Object.values(tarjetas).some((v) => !Number.isFinite(v) || v < 0)) return { ok: false, error: "Las tarjetas por acreditar deben ser montos positivos." };
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("guardar_cuadre_general", { p_fecha: fecha, p_tarjetas: tarjetas, p_notas: notas || null });
+  const { data, error } = await supabase.rpc("guardar_cuadre_general", { p_fecha: fecha, p_tarjetas: Object.fromEntries(Object.keys(tarjetas).map((id) => [id, 0])), p_notas: notas || null });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/mi-espacio/bancos");
   return { ok: true, data: data as { sucursales: number; diferencia_total: number } };
 }
 
 export async function guardarCuadreSucursal(sucursalId: string, fecha: string, tarjetas: string, notas: string): Promise<Resultado<{ total_real: number; total_esperado: number; diferencia: number }>> {
-  const monto = tarjetas.trim() ? Number(tarjetas.replace(/,/g, ".")) : 0;
-  if (!Number.isFinite(monto) || monto < 0) return { ok: false, error: "Escribe un monto de tarjetas por depositar igual o mayor que cero." };
+  void tarjetas;
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("guardar_cuadre_sucursal", { p_sucursal: sucursalId, p_fecha: fecha, p_tarjetas: monto, p_notas: notas || null });
+  const { data, error } = await supabase.rpc("guardar_cuadre_sucursal", { p_sucursal: sucursalId, p_fecha: fecha, p_tarjetas: 0, p_notas: notas || null });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/mi-espacio/bancos");
   return { ok: true, data: data as { total_real: number; total_esperado: number; diferencia: number } };
+}
+
+export async function registrarAcreditacionTarjeta(pagos: string[], cuentaId: string, fecha: string, montoNeto: number, notas: string): Promise<Resultado<string>> {
+  if (!pagos.length) return { ok: false, error: "Elige al menos un cobro con tarjeta." };
+  if (!cuentaId || !fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return { ok: false, error: "Elige una cuenta y una fecha válida." };
+  if (!Number.isFinite(montoNeto) || montoNeto <= 0) return { ok: false, error: "El monto recibido debe ser mayor que cero." };
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("registrar_acreditacion_tarjeta", { p_pagos: pagos, p_cuenta: cuentaId, p_fecha: fecha, p_monto_neto: montoNeto, p_notas: notas || null });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/mi-espacio/bancos"); revalidatePath("/");
+  return { ok: true, data: data as string };
 }

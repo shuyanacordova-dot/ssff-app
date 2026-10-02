@@ -209,3 +209,24 @@ begin
   return jsonb_build_object('total_real', v_real, 'total_esperado', v_esp, 'diferencia', round(v_real - v_esp, 2), 'tarjetas_por_acreditar', v_tarj);
 end;
 $function$;
+
+-- Cuadre general (todas las sucursales): mismas tarjetas por acreditar automáticas, en lo real y en lo esperado.
+do $cg$
+declare v_def text; v_nuevo text;
+begin
+  v_def := pg_get_functiondef('public.guardar_cuadre_general(date,jsonb,text)'::regprocedure);
+  v_nuevo := replace(v_def,
+$a$    v_tarj := coalesce(nullif(p_tarjetas->>(r->>'sucursal_id'), '')::numeric, 0);$a$,
+$b$    select coalesce(sum(p.monto), 0) into v_tarj
+    from public.pagos_venta p join public.ventas v on v.id = p.venta_id
+    where v.sucursal_id = (r->>'sucursal_id')::uuid and p.metodo = 'tarjeta' and p.tarjeta_acreditada_en is null
+      and (v.estado <> 'anulada' or v.anulacion_modo is not null) and (p.creado_en at time zone 'America/Guayaquil')::date <= (r->>'fecha')::date;$b$);
+  v_nuevo := replace(v_nuevo,
+$c$    v_esp := (r->>'bancos_esperado')::numeric + (r->>'caja_esperada')::numeric;$c$,
+$d$    v_esp := (r->>'bancos_esperado')::numeric + (r->>'caja_esperada')::numeric + v_tarj;$d$);
+  if v_nuevo = v_def or position('tarjeta_acreditada_en' in v_nuevo) = 0 or position('caja_esperada'')::numeric + v_tarj' in v_nuevo) = 0 then
+    raise exception 'No se pudo actualizar guardar_cuadre_general (texto inesperado).';
+  end if;
+  execute v_nuevo;
+end
+$cg$;

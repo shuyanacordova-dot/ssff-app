@@ -26,21 +26,18 @@ function Pill({ diferencia }: { diferencia: number }) {
   return <span className={`${s.pill} ${s.pillVencido}`}>{diferencia > 0 ? `Sobra ${money(diferencia)}` : `Falta ${money(-diferencia)}`}</span>;
 }
 
-export function ExtrasSucursal({ fila, fecha }: { fila: FilaCuadreGeneral; fecha: string }) {
+export function ExtrasSucursal({ fila, fecha, tarjetasPendientes }: { fila: FilaCuadreGeneral; fecha: string; tarjetasPendientes: number }) {
   const router = useRouter();
-  const [tarjetas, setTarjetas] = useState(fila.guardado ? String(Number(fila.guardado.tarjetas_por_acreditar)) : "");
   const [notas, setNotas] = useState(fila.guardado?.notas ?? "");
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
 
-  const montoTarjetas = Number(tarjetas) || 0;
+  const montoTarjetas = tarjetasPendientes;
   const real = Number(fila.bancos_real) + Number(fila.caja_real ?? 0) + montoTarjetas;
-  const esperado = Number(fila.bancos_esperado) + Number(fila.caja_esperada);
+  const esperado = Number(fila.bancos_esperado) + Number(fila.caja_esperada) + montoTarjetas;
   const diferencia = redondear(real - esperado);
   const faltanCuentas = Number(fila.cuentas_total) - Number(fila.cuentas_cuadradas);
-  const desde = new Date(`${fila.tarjetas_desde}T12:00:00Z`);
-  desde.setUTCDate(desde.getUTCDate() + 1);
   const guardadoFecha = fila.guardado ? new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Guayaquil", year: "numeric", month: "2-digit", day: "2-digit",
   }).format(new Date(fila.guardado.creado_en)) : null;
@@ -48,7 +45,7 @@ export function ExtrasSucursal({ fila, fecha }: { fila: FilaCuadreGeneral; fecha
   const guardar = () => start(async () => {
     setMensaje("");
     setError("");
-    const r = await guardarCuadreSucursal(fila.sucursal_id, fecha, tarjetas, notas);
+    const r = await guardarCuadreSucursal(fila.sucursal_id, fecha, "0", notas);
     if (!r.ok) { setError(r.error); return; }
     setMensaje("Resultado guardado.");
     router.refresh();
@@ -56,12 +53,8 @@ export function ExtrasSucursal({ fila, fecha }: { fila: FilaCuadreGeneral; fecha
 
   return <>
     <article className={s.debt} style={{ borderTop: "4px solid #7a3fa0" }}>
-      <h3>Tarjetas por depositar</h3>
-      <p>Cobrado con tarjeta desde el {fechaCorta(desde.toISOString().slice(0, 10))}: {money(Number(fila.tarjetas_cobradas))}</p>
-      <p>Datafast deposita días después: escribe cuánto de eso todavía no llega al banco.</p>
-      <label style={{ display: "grid", gap: 4, fontSize: 12, fontWeight: 800, color: "#5d7086" }}>Por depositar $
-        <input type="text" inputMode="decimal" value={tarjetas} disabled={pending} onChange={(e) => { setTarjetas(limpiarMonto(e.target.value)); setMensaje(""); }} placeholder="0.00" style={{ border: "1px solid #d4e0ea", borderRadius: 9, padding: "7px 9px" }} />
-      </label>
+      <h3>Tarjetas por acreditar</h3>
+      <p>Tarjetas por acreditar (automático): {money(montoTarjetas)} — se marcan en la sección <Link href="#tarjetas">Tarjetas por acreditar</Link>.</p>
     </article>
 
     <article className={s.debt} style={{ borderTop: "4px solid #247658" }}>
