@@ -13,7 +13,7 @@ export type InformeMensual = {
 
 export type InformesCompany = { id: string; nombre: string };
 export type InformesProfile = { id: string; empresa_id: string; rol: string };
-export type DineroDisponible = { sucursal_id: string; sucursal_nombre: string; estado: "listo" | "pendiente"; cuentas_sin_cuadre: number; bancos: number; efectivo: number | null; total: number | null };
+export type DineroDisponible = { sucursal_id: string; sucursal_nombre: string; estado: "listo" | "pendiente"; cuentas_sin_cuadre: number; bancos: number; tarjetas_por_acreditar?: number; efectivo: number | null; total: number | null };
 export type InformesData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: InformesProfile; companies: InformesCompany[]; dineroDisponible?: DineroDisponible[] };
 
 const informesRoles = new Set(["superadmin", "admin_sucursal"]);
