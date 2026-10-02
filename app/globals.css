@@ -567,5 +567,6 @@ body { background: #fff; }
 .dash-acum-total { font-weight: 800; border-top: 2px solid #cbdcda; }
 .dash-acum-pos { color: #20754c; }
 .dash-acum-neg { color: #b43a43; }
+.dash-acum-pend { color: #a26c17; }
 .dash-acum .field-hint { margin: 10px 0 0; }
 @media (max-width: 520px) { .dash-acum-row { grid-template-columns: minmax(0, 1fr) repeat(3, minmax(0, auto)); font-size: 12.5px; gap: 6px; } }

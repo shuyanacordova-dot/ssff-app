@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Banknote, CalendarDays, Coins, Landmark, LogOut, Receipt, Target, UserPlus } from "lucide-react";
 import type { TaskData } from "@/lib/tasks";
 import type { InformeMensual } from "./informes/actions";
+import type { DineroDisponible } from "@/lib/informes";
 import { cerrarSesion } from "./login/actions";
 import { BranchDirectory } from "./branch-selector";
 
@@ -28,7 +29,7 @@ function ResumenDelDia({ r }: { r: ResumenHoy }) {
   </section>;
 }
 
-export default function DashboardShell({ taskData, informeMensual, metasMessage, resumenHoy, cobrosHoy }: { taskData: TaskData; informeMensual: InformeMensual | null; metasMessage?: string; resumenHoy?: ResumenHoy | null; cobrosHoy: { cantidad: number; total: number } }) {
+export default function DashboardShell({ taskData, informeMensual, metasMessage, resumenHoy, cobrosHoy, acumulado }: { taskData: TaskData; informeMensual: InformeMensual | null; metasMessage?: string; resumenHoy?: ResumenHoy | null; cobrosHoy: { cantidad: number; total: number }; acumulado?: DineroDisponible[] | null }) {
   const role = taskData.profile?.rol;
   const canVerInformes = role === "superadmin" || role === "admin_sucursal";
 
@@ -50,7 +51,7 @@ export default function DashboardShell({ taskData, informeMensual, metasMessage,
 
     {cobrosHoy.cantidad > 0 && <section className="glass cob-dashboard-banner"><span>Hoy hay <strong>{cobrosHoy.cantidad}</strong> mensajes de cobro por enviar ({money(cobrosHoy.total)})</span><Link className="outline-action" href="/cuentas-cobrar">Ver cobros de hoy</Link></section>}
     {resumenHoy && <ResumenDelDia r={resumenHoy} />}
-    {canVerInformes && informeMensual && <AcumuladoOpticas informe={informeMensual} />}
+    {acumulado && acumulado.length > 0 && <AcumuladoOpticas filas={acumulado} />}
     <section className="dashboard-main dashboard-main-wide">
       {canVerInformes && <MetasDashboard informe={informeMensual} message={metasMessage} />}
       <PendingTasks taskData={taskData} />
@@ -70,20 +71,19 @@ function PendingTasks({ taskData }: { taskData: TaskData }) {
   </section>;
 }
 
-// Acumulado del mes por óptica = lo que entró a cuenta − egresos (en efectivo y por transferencia), pedido de Shuyana 2026-10-01.
-function AcumuladoOpticas({ informe }: { informe: InformeMensual }) {
-  const mes = new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", month: "long" }).format(new Date());
-  const filas = informe.por_sucursal.map((row) => ({ id: row.sucursal_id, nombre: row.sucursal_nombre, aCuenta: Number(row.ingresos_total ?? 0), egresos: Number(row.gastos_total ?? 0) }));
-  const total = filas.reduce((t, f) => ({ aCuenta: t.aCuenta + f.aCuenta, egresos: t.egresos + f.egresos }), { aCuenta: 0, egresos: 0 });
-  const tono = (n: number) => n < 0 ? "dash-acum-neg" : "dash-acum-pos";
+// Acumulado de cada óptica = dinero disponible (bancos desde su último cuadre + efectivo de caja). No se reinicia cada mes:
+// suben los cobros (efectivo, transferencias, tarjetas) y bajan los egresos (Shuyana 2026-10-01).
+function AcumuladoOpticas({ filas }: { filas: DineroDisponible[] }) {
+  const listas = filas.filter((f) => f.estado === "listo" && f.total !== null);
+  const total = listas.reduce((t, f) => t + Number(f.total ?? 0), 0);
   return <section className="glass dashboard-today dash-acum">
-    <div className="dashboard-card-heading"><div><p className="section-label">ACUMULADO DE {mes.toUpperCase()}</p><h2>Las {filas.length} ópticas</h2></div><Link className="outline-action" href="/informes">Ver informes</Link></div>
-    <div className="dash-acum-table" role="table" aria-label="Acumulado del mes por óptica">
-      <div className="dash-acum-row dash-acum-head" role="row"><span role="columnheader">Óptica</span><span role="columnheader">A cuenta</span><span role="columnheader">Egresos</span><span role="columnheader">Acumulado</span></div>
-      {filas.map((f) => <div className="dash-acum-row" role="row" key={f.id}><span role="cell">{f.nombre}</span><span role="cell">{money(f.aCuenta)}</span><span role="cell">− {money(f.egresos)}</span><strong role="cell" className={tono(f.aCuenta - f.egresos)}>{money(f.aCuenta - f.egresos)}</strong></div>)}
-      <div className="dash-acum-row dash-acum-total" role="row"><span role="cell">Total</span><span role="cell">{money(total.aCuenta)}</span><span role="cell">− {money(total.egresos)}</span><strong role="cell" className={tono(total.aCuenta - total.egresos)}>{money(total.aCuenta - total.egresos)}</strong></div>
+    <div className="dashboard-card-heading"><div><p className="section-label">ACUMULADO · DINERO DISPONIBLE</p><h2>Las {filas.length} ópticas</h2></div><Link className="outline-action" href="/mi-espacio/bancos">Cuadre de bancos</Link></div>
+    <div className="dash-acum-table" role="table" aria-label="Acumulado por óptica">
+      <div className="dash-acum-row dash-acum-head" role="row"><span role="columnheader">Óptica</span><span role="columnheader">Bancos</span><span role="columnheader">Efectivo</span><span role="columnheader">Acumulado</span></div>
+      {filas.map((f) => <div className="dash-acum-row" role="row" key={f.sucursal_id}><span role="cell">{f.sucursal_nombre}</span><span role="cell">{f.cuentas_sin_cuadre > 0 ? "Por cuadrar" : money(Number(f.bancos))}</span><span role="cell">{f.efectivo === null ? "—" : money(Number(f.efectivo))}</span><strong role="cell" className={f.total === null ? "dash-acum-pend" : Number(f.total) < 0 ? "dash-acum-neg" : "dash-acum-pos"}>{f.total === null ? "Pendiente" : money(Number(f.total))}</strong></div>)}
+      <div className="dash-acum-row dash-acum-total" role="row"><span role="cell">Total{listas.length < filas.length ? ` (${listas.length} de ${filas.length})` : ""}</span><span role="cell" /><span role="cell" /><strong role="cell">{money(total)}</strong></div>
     </div>
-    <p className="field-hint">Egresos = gastos pagados en efectivo y por transferencia en el mes (incluye pagos de deudas hechos con dinero de las ópticas).</p>
+    <p className="field-hint">Parte del último cuadre de bancos y de caja; suma lo que entra (efectivo, transferencias, tarjetas) y resta los egresos. No se reinicia cada mes.{filas.some((f) => f.cuentas_sin_cuadre > 0) ? " Las ópticas \"Por cuadrar\" necesitan su primer cuadre de bancos." : ""}</p>
   </section>;
 }
 

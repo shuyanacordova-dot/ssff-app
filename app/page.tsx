@@ -4,6 +4,7 @@ import { obtenerInformeMensual, type InformeMensual } from "./informes/actions";
 import { getOperationalContext } from "@/lib/operational-context";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { ResumenHoy } from "./dashboard-shell";
+import type { DineroDisponible } from "@/lib/informes";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,17 @@ export default async function Home() {
     const month = parts.find((part) => part.type === "month")?.value;
     try { informeMensual = await obtenerInformeMensual(taskData.profile?.rol === "superadmin" ? null : taskData.profile?.empresaId ?? null, `${year}-${month}-01`); }
     catch { metasMessage = "No se pudo cargar el avance de metas en este momento."; }
+  }
+
+  // Acumulado = dinero disponible de cada óptica (bancos desde su último cuadre + efectivo de caja). No se reinicia cada
+  // mes: solo suben los cobros y bajan los egresos (Shuyana 2026-10-01). Solo superadmin.
+  let acumulado: DineroDisponible[] | null = null;
+  if (taskData.profile?.rol === "superadmin") {
+    try {
+      const supabase = await createSupabaseServerClient();
+      const { data, error } = await supabase.rpc("dinero_disponible", { p_fecha: null });
+      if (!error && Array.isArray(data)) acumulado = data as DineroDisponible[];
+    } catch { acumulado = null; }
   }
 
   // Resumen del día de la sucursal donde se trabaja (mismos cálculos que el cuadre de caja).
@@ -37,5 +49,5 @@ export default async function Home() {
     }
   } catch { resumenHoy = null; }
 
-  return <DashboardShell taskData={taskData} informeMensual={informeMensual} metasMessage={metasMessage} resumenHoy={resumenHoy} cobrosHoy={cobrosHoy} />;
+  return <DashboardShell taskData={taskData} informeMensual={informeMensual} metasMessage={metasMessage} resumenHoy={resumenHoy} cobrosHoy={cobrosHoy} acumulado={acumulado} />;
 }
