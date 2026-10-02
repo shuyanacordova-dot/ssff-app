@@ -3,7 +3,7 @@ import { Pencil, Printer, X } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import LunasStockAlert from "./lunas-stock-alert";
 import type { Sale, SaleCompany, SaleItem, SaleProduct } from "@/lib/ventas";
-import { calcularUso, emptyMedidas, emptyRx, estadoOrdenLabels, laboratorioLabels, rxFromRefraccion, tipoLenteLabels, tipoLenteSugerido, rxCerca, rxIntermedia, dnpCerca, transponer, normalizarRx, compensacionVertice, aplicarCompensacionVertice, editarRxLaboratorio, deshacerCompensacionVertice, validarAlturaMontaje, avisoAnisometropia } from "@/lib/laboratorio";
+import { calcularUso, emptyMedidas, emptyRx, estadoOrdenLabels, laboratorioLabels, rxFromRefraccion, tipoLenteLabels, tipoLenteSugerido, rxCerca, rxIntermedia, dnpCerca, transponer, normalizarRx, compensacionVertice, aplicarCompensacionVertice, editarRxLaboratorio, deshacerCompensacionVertice, avisoAnisometropia } from "@/lib/laboratorio";
 import type { EstadoOrdenLaboratorio, LaboratorioProveedor, OrdenLaboratorioMedidas, OrdenLaboratorioRx, RefraccionOption, RxEye, TipoLente, UsoCalculado } from "@/lib/laboratorio";
 import { actualizarOrdenLaboratorio, cambiarEstadoOrdenLaboratorio, crearOrdenLaboratorio, getOrdenLaboratorio, getRefraccionesPaciente } from "./lab-actions";
 import LabOrderPrint from "../lab-order-print";
@@ -64,7 +64,6 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
   const [tipoLente, setTipoLente] = useState<TipoLente>("monofocal_lejos");
   const [notas, setNotas] = useState("");
   const [error, setError] = useState("");
-  const [anterior, setAnterior] = useState<Parameters<typeof validarAlturaMontaje>[3]>();
 
   useEffect(() => {
     let active = true;
@@ -78,7 +77,6 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
     getOrdenLaboratorio(existingOrderId).then((orden) => {
       if (!active || !orden) return;
       setEstado(orden.estado); setItemId(orden.venta_item_id ?? lensItems[0]?.id ?? ""); setLaboratorio(orden.laboratorio); setOrderCreatedAt(orden.creado_en);
-      setAnterior(orden);
       setConsultaId(orden.consulta_id ?? ""); setRx(orden.rx); setMedidas({ ...emptyMedidas(), ...orden.medidas }); setTipoLente(orden.tipo_lente); setNotas((orden.notas ?? "").replace(/^Intermedio\s*[:·—-]?\s*/i, ""));
       setUso(/^Intermedio\b/i.test(orden.notas ?? "") ? "intermedio" : orden.uso_calculado === "lejos_y_cerca" ? (orden.tipo_lente === "bifocal" ? "lejos_y_cerca" : "todas") : orden.uso_calculado);
       setUsoElegido(true);
@@ -137,6 +135,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
   const anisometropiaAviso = avisoAnisometropia(rx);
 
   // Campos necesarios para la orden (Shuyana 2026-10-01): se avisa cuáles faltan y se marcan en rojo.
+  // Solo la receta bloquea (y la ADD en progresivo/bifocal); las medidas del armazón son opcionales (Shuyana 2026-10-02).
   const [intentado, setIntentado] = useState(false);
   const multifocal = tipoLente === "progresivo" || tipoLente === "bifocal";
   const vacio = (v?: string | null) => !(v ?? "").toString().trim();
@@ -150,13 +149,9 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
     return set;
   };
   const faltanOD = faltanOjo("od"); const faltanOI = faltanOjo("oi");
-  const faltaMedida = (k: "vertical" | "horizontal_mayor" | "puente") => vacio(medidas[k]);
-  const faltaAltura = multifocal && (["od", "oi"] as const).some((eye) => rx[eye].procesar && vacio(medidas[eye === "od" ? "altura_od" : "altura_oi"]) && vacio(medidas.altura));
   const nombresCampo: Record<string, string> = { esfera: "Esfera", eje: "Eje", add: "Adición", dnp: "DNP" };
   const faltantes = [
     ...[...faltanOD].map((k) => `${nombresCampo[k]} OD`), ...[...faltanOI].map((k) => `${nombresCampo[k]} OI`),
-    ...(faltaMedida("vertical") ? ["Vertical"] : []), ...(faltaMedida("horizontal_mayor") ? ["Horizontal mayor"] : []), ...(faltaMedida("puente") ? ["Puente"] : []),
-    ...(faltaAltura ? ["Altura de montaje"] : []),
   ];
   const marca = (falta: boolean) => intentado && falta ? "campo-faltante" : undefined;
 
@@ -169,8 +164,6 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
       window.setTimeout(() => document.querySelector(".lab-modal .campo-faltante")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
       return;
     }
-    const alturaError = validarAlturaMontaje(tipoLente, medidas, rx, anterior);
-    if (alturaError) { setError(alturaError); return; }
     if (!orderId && !itemId) { setError("Elige el producto de esta venta."); return; }
     start(async () => {
       const data = new FormData();
@@ -271,17 +264,16 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
 
         <p className="section-label" style={{ marginTop: 14 }}>PARÁMETROS DEL ARMAZÓN (MM)</p>
         <div className="new-patient-form">
-          <label className={marca(faltaMedida("vertical"))}>Vertical<input value={medidas.vertical} onChange={(event) => setMedidas({ ...medidas, vertical: event.target.value })} /></label>
-          <label className={marca(faltaMedida("horizontal_mayor"))}>Horizontal mayor<input value={medidas.horizontal_mayor} onChange={(event) => setMedidas({ ...medidas, horizontal_mayor: event.target.value })} /></label>
-          <label className={marca(faltaMedida("puente"))}>Puente<input value={medidas.puente} onChange={(event) => setMedidas({ ...medidas, puente: event.target.value })} /></label>
-          <label className={marca(faltaAltura)}>Altura común<input value={medidas.altura} onChange={(event) => setMedidas({ ...medidas, altura: event.target.value })} /></label>
+          <label>Vertical<input value={medidas.vertical} onChange={(event) => setMedidas({ ...medidas, vertical: event.target.value })} /></label>
+          <label>Horizontal mayor<input value={medidas.horizontal_mayor} onChange={(event) => setMedidas({ ...medidas, horizontal_mayor: event.target.value })} /></label>
+          <label>Puente<input value={medidas.puente} onChange={(event) => setMedidas({ ...medidas, puente: event.target.value })} /></label>
+          <label>Altura común<input value={medidas.altura} onChange={(event) => setMedidas({ ...medidas, altura: event.target.value })} /></label>
           <label>Altura OD<input inputMode="decimal" value={medidas.altura_od ?? ""} onChange={(event) => setMedidas({ ...medidas, altura_od: event.target.value })} placeholder="Usa altura común si está vacía" /></label>
           <label>Altura OI<input inputMode="decimal" value={medidas.altura_oi ?? ""} onChange={(event) => setMedidas({ ...medidas, altura_oi: event.target.value })} placeholder="Usa altura común si está vacía" /></label>
           <label>Diagonal efectiva (ED)<input inputMode="decimal" value={medidas.diagonal_efectiva ?? ""} onChange={(event) => setMedidas({ ...medidas, diagonal_efectiva: event.target.value })} placeholder="Diagonal mayor, opcional" /></label>
           <label className={marca((faltanOD.has("dnp") || faltanOI.has("dnp")))}>{uso === "cerca" ? "DNP de cerca (sugerida, binocular)" : "DNP binocular"}<input inputMode="decimal" value={medidas.dnp} onChange={(event) => setMedidas({ ...medidas, dnp: event.target.value })} /></label>
         </div>
 
-        {(tipoLente === "progresivo" || tipoLente === "bifocal") && <p className="field-hint">Altura de montaje obligatoria: ingresa la altura común o una altura para cada ojo a procesar.</p>}
 
         <div className="new-patient-form" style={{ marginTop: 10 }}><label className="task-description">Observaciones<textarea value={notas} onChange={(event) => setNotas(event.target.value)} placeholder="Indicaciones para el laboratorio" /></label></div>
 
