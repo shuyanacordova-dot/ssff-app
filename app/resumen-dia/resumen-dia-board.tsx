@@ -81,6 +81,16 @@ export default function ResumenDiaBoard(props: ResumenDiaData & { fecha: string 
         </tbody></table> : <p className="field-hint">No hay pagos por transferencia este día.</p>}
         <p className="summary-line"><strong>Total egresos del día: {money(totalSalidas + totalTransferencias)}</strong></p>
       </section>
+      {props.profile?.rol === "superadmin" && props.acumulado && <section className="glass agenda-board no-print" style={{ marginTop: 18 }}>
+        <p className="section-label">ACUMULADO · SOLO LO VES TÚ</p><h2>Dinero disponible de {props.sucursalNombre} al {props.fecha}</h2>
+        <table className="resumen-table"><tbody>
+          <tr><td>Bancos</td><td>{props.acumulado.bancos === null ? "Por cuadrar" : money(props.acumulado.bancos)}</td></tr>
+          {props.acumulado.tarjetas > 0.004 && <tr><td>Tarjetas por acreditar</td><td>{money(props.acumulado.tarjetas)}</td></tr>}
+          <tr><td>Efectivo en caja</td><td>{props.acumulado.efectivo === null ? "—" : money(props.acumulado.efectivo)}</td></tr>
+          <tr className="total-row"><td>Acumulado</td><td>{props.acumulado.total === null ? "Pendiente (falta cuadrar bancos)" : money(props.acumulado.total)}</td></tr>
+        </tbody></table>
+        <p className="field-hint">Parte del último cuadre de bancos y de caja; suma lo que entra y resta los egresos. No se reinicia cada mes.</p>
+      </section>}
     </div>
   </div></main>;
 }

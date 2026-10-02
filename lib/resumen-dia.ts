@@ -8,7 +8,8 @@ export type SalidaResumen = { id: string; sucursal_id: string | null; clasificac
 export type TransferenciaResumen = { id: string; concepto: string; monto: number; banco: string };
 export type ResumenCompany = { id: string; nombre: string };
 export type ResumenBranch = { id: string; nombre: string };
-export type ResumenDiaData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: { id: string; empresa_id: string; rol: string }; companies: ResumenCompany[]; branches: ResumenBranch[]; sucursalId?: string; sucursalNombre?: string; ventas: VentaResumen[]; abonos: AbonoResumen[]; salidas: SalidaResumen[]; transferencias: TransferenciaResumen[] };
+export type AcumuladoResumen = { bancos: number | null; tarjetas: number; efectivo: number | null; total: number | null };
+export type ResumenDiaData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: { id: string; empresa_id: string; rol: string }; companies: ResumenCompany[]; branches: ResumenBranch[]; sucursalId?: string; sucursalNombre?: string; ventas: VentaResumen[]; abonos: AbonoResumen[]; salidas: SalidaResumen[]; transferencias: TransferenciaResumen[]; acumulado?: AcumuladoResumen | null };
 
 const roles = new Set(["superadmin", "admin_sucursal", "vendedor", "caja"]);
 const roleName = (profile: { roles: { nombre: string } | { nombre: string }[] | null } | null) => Array.isArray(profile?.roles) ? profile.roles[0]?.nombre : profile?.roles?.nombre;
@@ -108,6 +109,13 @@ export async function getResumenDiaData(fecha: string, sucursalParam?: string): 
       autor_nombre: g.created_by ? usuarioNombre.get(g.created_by) ?? null : null,
     }));
 
-    return { ...base, sucursalId: sucursal.id, sucursalNombre: sucursal.nombre, ventas, abonos, salidas, transferencias };
+    // Acumulado (dinero disponible) de la sucursal a esa fecha: solo lo ve la Superadministradora.
+    let acumulado: AcumuladoResumen | null = null;
+    if (role === "superadmin") {
+      const { data: dd } = await supabase.rpc("dinero_disponible", { p_fecha: fecha });
+      const fila = (Array.isArray(dd) ? dd : []).find((x: { sucursal_id: string }) => x.sucursal_id === sucursal.id) as { cuentas_sin_cuadre: number; bancos: number; tarjetas_por_acreditar?: number; efectivo: number | null; total: number | null } | undefined;
+      if (fila) acumulado = { bancos: fila.cuentas_sin_cuadre > 0 ? null : Number(fila.bancos), tarjetas: Number(fila.tarjetas_por_acreditar ?? 0), efectivo: fila.efectivo === null ? null : Number(fila.efectivo), total: fila.total === null ? null : Number(fila.total) };
+    }
+    return { ...base, sucursalId: sucursal.id, sucursalNombre: sucursal.nombre, ventas, abonos, salidas, transferencias, acumulado };
   } catch { return { status: "error", message: "El resumen del día no está disponible.", ...empty }; }
 }
