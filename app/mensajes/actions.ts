@@ -22,9 +22,9 @@ export async function marcarMensajeDia(input: { pacienteId: string; empresaId: s
   revalidatePath("/mensajes");
 }
 
-export async function configurarMensajesAutomaticos(input: { empresaId: string; activo: boolean; cumpleanos: boolean; control: boolean }) {
+export async function configurarMensajesAutomaticos(input: { empresaId: string; activo: boolean; cumpleanos: boolean; control: boolean; cobros: boolean }) {
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.rpc("configurar_mensajes_automaticos", { p_empresa: input.empresaId, p_activo: input.activo, p_cumpleanos: input.cumpleanos, p_control: input.control });
+  const { error } = await supabase.rpc("configurar_mensajes_automaticos", { p_empresa: input.empresaId, p_activo: input.activo, p_cumpleanos: input.cumpleanos, p_control: input.control, p_cobros: input.cobros });
   if (error) throw new Error(error.message || "No se pudo guardar la configuración.");
   revalidatePath("/mensajes");
 }

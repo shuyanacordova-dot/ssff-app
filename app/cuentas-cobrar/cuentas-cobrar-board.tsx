@@ -12,7 +12,7 @@ import { cambiarEstadoOrdenLaboratorio } from "@/app/ventas/lab-actions";
 import { construirMensajeContacto, plantillasContacto, plantillaSugerida, type PlantillaContactoId } from "@/lib/mensajes";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import { buscarTitularConvenio, crearAcuerdoPago, crearEmpresaConvenio, type AcuerdoPago, type PersonaTitular } from "@/app/ventas/convenio-actions";
-import { activarCobroInsistente, actualizarFrecuenciaCobro, clasificarDeuda, titularSugeridoConvenio, vincularConvenio, fijarFechaCobro, marcarApartado, marcarMensajeCobro, registrarCanje } from "./actions";
+import { cambiarCobroAutomatico, activarCobroInsistente, actualizarFrecuenciaCobro, clasificarDeuda, titularSugeridoConvenio, vincularConvenio, fijarFechaCobro, marcarApartado, marcarMensajeCobro, registrarCanje } from "./actions";
 import Letterhead from "../print-letterhead";
 import { TodasSucursalesToggle, useTodasSucursales } from "@/app/todas-sucursales-toggle";
 
@@ -180,6 +180,9 @@ function DeudaCard({ deuda, sucursalActivaId, usuarioNombre, onMensaje, pending,
   const [fechaPending, startFecha] = useTransition();
   const [copied, setCopied] = useState(false);
   const [verMensaje, setVerMensaje] = useState(false);
+  const [auto, setAuto] = useState(deuda.cobro_automatico);
+  const [autoPending, startAuto] = useTransition();
+  const [autoError, setAutoError] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
   const nombre = `${deuda.nombres} ${deuda.apellidos}`;
   const apartado = apartadoInfo(deuda);
@@ -205,7 +208,10 @@ function DeudaCard({ deuda, sucursalActivaId, usuarioNombre, onMensaje, pending,
     <div className="collection-controls">
       <label>Clasificación<select value={apartado ? "apartados" : deuda.categoria_manual ?? ""} disabled={pending} onChange={(event) => onClasificar(event.target.value)}><option value="">{deuda.categoria_auto === "apartados" ? "Automática" : `Automática (${categoriaLabel(deuda.categoria_auto)})`}</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
       <label>Frecuencia de cobro<select defaultValue={deuda.frecuencia_cobro ?? ""} disabled={pending} onChange={(event) => onFrecuencia(event.target.value)}><option value="">Sin definir</option>{Object.entries(frecuenciaLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <label>Envío automático<button type="button" className={auto ? "new-consultation" : "outline-action"} disabled={autoPending || !deuda.telefono} title={deuda.telefono ? "El sistema envía el recordatorio por WhatsApp según la frecuencia de cobro" : "Sin WhatsApp registrado"} onClick={() => { const nuevo = !auto; setAutoError(""); startAuto(async () => { try { await cambiarCobroAutomatico(deuda.paciente_id, nuevo); setAuto(nuevo); } catch (err) { setAutoError(err instanceof Error ? err.message : "No se pudo cambiar."); } }); }}><Repeat size={14} /> {auto ? "Activado" : "Desactivado"}</button></label>
     </div>
+    {autoError && <p className="notice" role="alert">{autoError}</p>}
+    {auto && <p className="field-hint">Envío automático: el sistema le escribe por WhatsApp según su frecuencia de cobro ({deuda.cobro_insistente ? "todos los días" : deuda.frecuencia_cobro ? frecuenciaLabel[deuda.frecuencia_cobro as keyof typeof frecuenciaLabel] ?? deuda.frecuencia_cobro : "cada 15 días"}).</p>}
     {verFecha && <div className="modal-backdrop" onClick={() => setVerFecha(false)}><section className="new-patient-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setVerFecha(false)} aria-label="Cerrar"><X size={19} /></button><h2>Fecha de cobro</h2><label>Fecha acordada<input type="date" value={fechaCobro} onChange={(event) => setFechaCobro(event.target.value)} /></label><p className="field-hint">Ese día el paciente aparece en Cobros de hoy; antes de esa fecha no se le escribe.</p>{fechaError && <p className="notice">{fechaError}</p>}<div className="modal-actions"><button className="outline-action" disabled={fechaPending} onClick={() => guardarFecha(null)}>Quitar fecha</button><button className="new-consultation" disabled={fechaPending || !fechaCobro} onClick={() => guardarFecha(fechaCobro)}>Guardar</button></div></section></div>}
     {verMensaje && <div className="modal-backdrop" onClick={() => setVerMensaje(false)}><section className="new-patient-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
       <button className="modal-close" onClick={() => setVerMensaje(false)} aria-label="Cerrar"><X size={19} /></button>

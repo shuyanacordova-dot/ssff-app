@@ -28,14 +28,33 @@ export function mensajeControlAnual(nombre: string, empresaId?: string | null) {
   return `👁️✨ *TU CONTROL VISUAL ANUAL TE ESTÁ ESPERANDO* ✨\n\nHola ${primerNombre(nombre) || "😊"}, ha pasado aproximadamente *un año desde tu último control visual* y queremos recordarte que ya es momento de revisar nuevamente tu visión.\n\n🎁 *Por ser paciente de ${optica}, tu examen visual es completamente GRATUITO.*\n\nDurante tu control podremos verificar tu agudeza visual, revisar si tu graduación continúa siendo adecuada y orientarte sobre cualquier cambio que necesites.\n\nAdemás, si necesitas renovar tus lentes, *mantenemos para nuestros pacientes el precio de sus lentes* siempre que se conserve una calidad equivalente en armazón, lunas y filtros.\n\n📅 *Agenda tu control respondiendo a este mensaje.*\n\nTu visión cambia. Nosotros queremos seguir cuidándola contigo. 💙\n\n*${optica} — cuidamos tu visión. 👁️*`;
 }
 
-// Plantillas de Meta (WhatsApp Cloud API) usadas por el envío automático.
-export const plantillasMeta = {
-  cumpleanos: { nombre: "feliz_cumpleanos", idioma: "es_EC", imagen: "https://res.cloudinary.com/ip1jz9eg/image/upload/v1787675996/ChatGPT_Image_23_ago_2026_23_43_46.png" },
-  control: { nombre: "recordatorio_control_anual", idioma: "es_EC", imagen: "https://res.cloudinary.com/ip1jz9eg/image/upload/v1787676005/ChatGPT_Image_23_ago_2026_23_53_31.png" },
-} as const;
+// Plantillas de Meta (WhatsApp Cloud API) del envío automático. Shuvisión usa las aprobadas en tiempo de Make;
+// Focus usa las suyas ("_focus") y el control de 3/6 meses usa "recordatorio_control_periodico" (creadas 2026-10-06).
+export type TipoPlantilla = "cumpleanos" | "control_anual" | "control_periodico" | "cobro" | "cobro_insistente" | "cobro_apartado";
+export type PlantillaMeta = { nombre: string; idioma: string; imagen?: string };
+const IMG_CUMPLE = "https://res.cloudinary.com/ip1jz9eg/image/upload/v1787675996/ChatGPT_Image_23_ago_2026_23_43_46.png";
+const IMG_CONTROL = "https://res.cloudinary.com/ip1jz9eg/image/upload/v1787676005/ChatGPT_Image_23_ago_2026_23_53_31.png";
+const plantillasShuvision: Record<TipoPlantilla, PlantillaMeta> = {
+  cumpleanos: { nombre: "feliz_cumpleanos", idioma: "es_EC", imagen: IMG_CUMPLE },
+  control_anual: { nombre: "recordatorio_control_anual", idioma: "es_EC", imagen: IMG_CONTROL },
+  control_periodico: { nombre: "recordatorio_control_periodico", idioma: "es_EC" },
+  cobro: { nombre: "recordatorio_cobro", idioma: "es_EC" },
+  cobro_insistente: { nombre: "cobranza_insistente", idioma: "es_EC" },
+  cobro_apartado: { nombre: "sistema_apartado_recordatorio", idioma: "es_EC" },
+};
+const plantillasFocus: Record<TipoPlantilla, PlantillaMeta> = {
+  cumpleanos: { nombre: "feliz_cumpleanos_focus", idioma: "es_EC" },
+  control_anual: { nombre: "recordatorio_control_anual_focus", idioma: "es_EC" },
+  control_periodico: { nombre: "recordatorio_control_periodico", idioma: "es_EC" },
+  cobro: { nombre: "recordatorio_cobro_focus", idioma: "es_EC" },
+  cobro_insistente: { nombre: "cobranza_insistente_focus", idioma: "es_EC" },
+  cobro_apartado: { nombre: "apartado_recordatorio_focus", idioma: "es_EC" },
+};
+export const plantillaMeta = (empresaId: string, tipo: TipoPlantilla) => (empresaId === SHUVISION_ID ? plantillasShuvision : plantillasFocus)[tipo];
+export const nombreOpticaLargo = (empresaId?: string | null) => empresaId && empresaId !== SHUVISION_ID ? "Focus Óptica" : "ShuVision Óptica";
 
 export type CumpleanosHoy = { paciente_id: string; nombre: string; nombres: string; telefono: string | null; fecha_nacimiento: string; edad: number | null; enviado_en: string | null; enviado_auto: boolean };
-export type ControlPendiente = { paciente_id: string; nombre: string; nombres: string; telefono: string | null; consulta_id: string; ultima_revision: string; vence: string; programado: boolean; meses: number; make_ya_envio: boolean; enviado_en: string | null; enviado_auto: boolean };
+export type ControlPendiente = { paciente_id: string; nombre: string; nombres: string; telefono: string | null; consulta_id: string; ultima_revision: string; vence: string; programado: boolean; tipo: "programado" | "aniversario"; anios: number; meses: number; make_ya_envio: boolean; enviado_en: string | null; enviado_auto: boolean };
 export type MensajesDia = { empresa_id: string; hoy: string; cumpleanos: CumpleanosHoy[]; controles: ControlPendiente[] };
-export type ConfigMensajesAutomaticos = { activo: boolean; cumpleanos: boolean; control_anual: boolean; actualizado_en: string | null };
+export type ConfigMensajesAutomaticos = { activo: boolean; cumpleanos: boolean; control_anual: boolean; cobros: boolean; actualizado_en: string | null };
 export type NumeroSucursal = { sucursal_id: string; nombre: string; numero: string | null; conectado: boolean };

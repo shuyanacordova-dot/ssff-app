@@ -44,9 +44,9 @@ export default function MensajesBoard(props: MensajesDiaData) {
         motivo="cumpleanos" {...props} />}
       {tab === "controles" && <Lista
         titulo={`Controles · ${props.sucursalNombre}`}
-        ayuda="Pacientes a quienes ya les toca su control de 3, 6 o 12 meses (hasta 60 días de atraso). El mensaje cambia según el plazo."
+        ayuda="Controles programados (3, 6 o 12 meses) y, cada año, el aniversario de la última revisión (también las importadas de Optox) para mantener la relación con el paciente."
         vacio="No hay controles por avisar hoy en esta sucursal."
-        items={dia.controles.map((c: ControlPendiente) => ({ id: c.paciente_id, nombre: c.nombre, telefono: c.telefono, enviadoEn: c.enviado_en, auto: c.enviado_auto, referencia: c.consulta_id, detalle: `Última revisión: ${fecha(c.ultima_revision)} · ${c.programado ? "Control programado" : "Tocaba"} el ${fecha(c.vence)}`, badges: [c.meses >= 10 ? "Control anual" : `Control de ${c.meses} meses`, ...(c.make_ya_envio ? ["Make ya le escribió"] : [])], mensaje: mensajeControl(c.nombres || c.nombre, c.meses, props.empresaId) }))}
+        items={dia.controles.map((c: ControlPendiente) => ({ id: c.paciente_id, nombre: c.nombre, telefono: c.telefono, enviadoEn: c.enviado_en, auto: c.enviado_auto, referencia: c.consulta_id, detalle: c.tipo === "aniversario" ? `Última revisión: ${fecha(c.ultima_revision)} · cumple ${c.anios} ${c.anios === 1 ? "año" : "años"} el ${fecha(c.vence)}` : `Última revisión: ${fecha(c.ultima_revision)} · control programado el ${fecha(c.vence)}`, badges: [c.tipo === "aniversario" ? "Control anual" : c.meses >= 10 ? "Control anual" : `Control de ${c.meses} meses`, ...(c.make_ya_envio ? ["Make ya le escribió"] : [])], mensaje: mensajeControl(c.nombres || c.nombre, c.meses, props.empresaId) }))}
         motivo="control" {...props} />}
     </section>
   </div></main>;
@@ -104,22 +104,24 @@ function AutomaticosPanel({ config, esSuperadmin, empresaId, empresaNombre, what
   const [error, setError] = useState("");
   const [cumple, setCumple] = useState(config?.cumpleanos ?? true);
   const [control, setControl] = useState(config?.control_anual ?? true);
+  const [cobros, setCobros] = useState(config?.cobros ?? true);
   if (!config || !empresaId) return null;
   const numeroConectado = numeros.some((n) => n.conectado);
   const listo = whatsappConectado && numeroConectado;
-  const guardar = (activo: boolean, c = cumple, k = control) => start(async () => {
+  const guardar = (activo: boolean, c = cumple, k = control, b = cobros) => start(async () => {
     setError("");
-    try { await configurarMensajesAutomaticos({ empresaId, activo, cumpleanos: c, control: k }); router.refresh(); }
+    try { await configurarMensajesAutomaticos({ empresaId, activo, cumpleanos: c, control: k, cobros: b }); router.refresh(); }
     catch (err) { setError(err instanceof Error ? err.message : "No se pudo guardar."); }
   });
   return <section className="glass agenda-board" style={{ marginBottom: 16 }}>
     <div className="cob-heading"><div><h2><Bot size={18} style={{ verticalAlign: "-3px" }} /> Mensajes automáticos · {empresaNombre}</h2>
-      <p>{config.activo ? <span className="state-pill aprobada">Activos</span> : <span className="state-pill">Pausados</span>} Cada día a las 11:00, cada sucursal envía desde su propio WhatsApp los saludos de cumpleaños y hasta 30 avisos de control anual. Los controles de 3 y 6 meses y los cobros se envían con un toque.</p></div>
+      <p>{config.activo ? <span className="state-pill aprobada">Activos</span> : <span className="state-pill">Pausados</span>} Cada día a las 11:00, cada sucursal envía desde su propio WhatsApp: cumpleaños, controles (hasta 30 por día) y los cobros de los pacientes con “Envío automático” activado en Cuentas por cobrar, según su frecuencia.</p></div>
       {esSuperadmin && <button className={config.activo ? "outline-action" : "new-consultation"} type="button" disabled={pending || (!config.activo && !listo)} onClick={() => guardar(!config.activo)}><Power size={14} /> {config.activo ? "Pausar mensajes automáticos" : "Activar mensajes automáticos"}</button>}
     </div>
     {esSuperadmin && <div className="collection-controls" style={{ marginTop: 8 }}>
-      <label><input type="checkbox" checked={cumple} disabled={pending} onChange={(e) => { setCumple(e.target.checked); if (config.activo) guardar(true, e.target.checked, control); }} /> Cumpleaños</label>
-      <label><input type="checkbox" checked={control} disabled={pending} onChange={(e) => { setControl(e.target.checked); if (config.activo) guardar(true, cumple, e.target.checked); }} /> Controles anuales</label>
+      <label><input type="checkbox" checked={cumple} disabled={pending} onChange={(e) => { setCumple(e.target.checked); if (config.activo) guardar(true, e.target.checked, control, cobros); }} /> Cumpleaños</label>
+      <label><input type="checkbox" checked={control} disabled={pending} onChange={(e) => { setControl(e.target.checked); if (config.activo) guardar(true, cumple, e.target.checked, cobros); }} /> Controles</label>
+      <label><input type="checkbox" checked={cobros} disabled={pending} onChange={(e) => { setCobros(e.target.checked); if (config.activo) guardar(true, cumple, control, e.target.checked); }} /> Cobros con envío automático</label>
     </div>}
     {!whatsappConectado && <p className="notice">Para que se envíen solos falta conectar el WhatsApp oficial (token de Meta). Mientras tanto, envíalos con un toque desde las pestañas de abajo.</p>}
     <p className="field-hint">{numeros.map((n) => `${n.nombre}: ${n.conectado ? `conectado${n.numero ? ` (${n.numero})` : ""}` : "número pendiente de conectar"}`).join(" · ")}</p>

@@ -46,6 +46,15 @@ export async function activarCobroInsistente(pacienteId: string, activo: boolean
   revalidatePath("/cuentas-cobrar");
 }
 
+// Envío automático por WhatsApp según la frecuencia de cobro del paciente (lo hace el servidor cada día a las 11:00).
+export async function cambiarCobroAutomatico(pacienteId: string, activo: boolean) {
+  const supabase = await createSupabaseServerClient();
+  if (!pacienteId) throw new Error("Falta identificar al paciente.");
+  const { error } = await supabase.rpc("configurar_cobro_automatico", { p_paciente: pacienteId, p_activo: activo });
+  if (error) throw new Error(error.message || "No se pudo cambiar el envío automático.");
+  revalidatePath("/cuentas-cobrar");
+}
+
 export async function marcarMensajeCobro(pacienteId: string, sucursalId: string) {
   if (!pacienteId || !sucursalId) throw new Error("Falta identificar al paciente o la sucursal.");
   const supabase = await createSupabaseServerClient();

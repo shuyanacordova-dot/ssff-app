@@ -33,7 +33,7 @@ export async function getMensajesDiaData(): Promise<MensajesDiaData> {
     const sucursalesEmpresa = context.branches.filter((b) => b.empresa_id === context.activeCompany.id);
     const [diaResult, configResult, cobros, numerosResult] = await Promise.all([
       supabase.rpc("mensajes_del_dia", { p_sucursal: context.activeBranch.id }),
-      supabase.from("mensajes_automaticos_config").select("activo,cumpleanos,control_anual,actualizado_en").eq("empresa_id", context.activeCompany.id).maybeSingle(),
+      supabase.from("mensajes_automaticos_config").select("activo,cumpleanos,control_anual,cobros,actualizado_en").eq("empresa_id", context.activeCompany.id).maybeSingle(),
       getCuentasCobrarData(),
       supabase.from("mensajes_numeros_sucursal").select("sucursal_id,whatsapp_phone_id,numero").in("sucursal_id", sucursalesEmpresa.map((b) => b.id)),
     ]);
@@ -50,7 +50,7 @@ export async function getMensajesDiaData(): Promise<MensajesDiaData> {
       dia: diaResult.data as MensajesDia,
       colaHoy: cobros.colaHoy,
       colaHoyError: cobros.status === "ready" ? cobros.colaHoyError : cobros.message,
-      config: (configResult.data as ConfigMensajesAutomaticos | null) ?? { activo: false, cumpleanos: true, control_anual: true, actualizado_en: null },
+      config: (configResult.data as ConfigMensajesAutomaticos | null) ?? { activo: false, cumpleanos: true, control_anual: true, cobros: true, actualizado_en: null },
       numeros,
       whatsappConectado,
     };
