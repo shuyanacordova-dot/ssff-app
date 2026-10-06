@@ -111,6 +111,8 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 
 ## 5. Decisiones tomadas (no cambiar sin preguntar)
 
+- **Sin pagos a Meta ni a Make (Shuyana, 2026-10-06):** los mensajes automáticos por WhatsApp quedan **apagados**; se envía con un toque desde el celular de cada sucursal (gratis). El botón de activar pide confirmación con el costo. Make: todos los escenarios inactivos (la organización de Make está en plan Free).
+
 - **Autorización permanente de publicación (Shuyana, 2026-09-29):** cada cambio terminado y comprobado se sube al GitHub `shuyanacordova-dot/ssff-app` y se publica en producción en el proyecto Vercel `ssff-app`, sin pedir confirmación nuevamente.
 
 - El nombre del sistema es **LumOS** (antes Revelio / SSFF).
