@@ -24,7 +24,7 @@ import {
   Sparkles,
   Users,
   Wallet,
-  X, HeartHandshake, LockKeyhole, ListChecks } from "lucide-react";
+  X, HeartHandshake, LockKeyhole, ListChecks, MessagesSquare } from "lucide-react";
 import { esSuperadminActual } from "./nav-actions";
 
 type NavItem = { href: string; label: string; detail: string; icon: typeof Home; group: "Operación" | "Finanzas" | "Administración"; soloSuperadmin?: boolean };
@@ -43,6 +43,7 @@ const menuItems: NavItem[] = [
   { href: "/agenda/actividades", label: "Actividades", detail: "Agenda de actividades de la óptica", icon: ListChecks, group: "Operación" },
   { href: "/laboratorio", label: "Laboratorio", detail: "Órdenes y entregas", icon: FlaskConical, group: "Operación" },
   { href: "/inventario", label: "Inventario", detail: "Monturas, lunas y stock", icon: Package, group: "Operación" },
+  { href: "/mensajes", label: "Mensajes del día", detail: "Cobros, cumpleaños y controles anuales", icon: MessagesSquare, group: "Operación" },
   { href: "/crm", label: "CRM", detail: "A quién contactar hoy", icon: HeartHandshake, group: "Operación" },
   { href: "/tareas", label: "Tareas", detail: "Seguimiento del equipo", icon: ClipboardList, group: "Operación" },
   { href: "/cuentas-cobrar", label: "Cuentas por cobrar", detail: "Saldos y convenios de pago", icon: Wallet, group: "Finanzas" },

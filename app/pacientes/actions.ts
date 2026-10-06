@@ -110,6 +110,21 @@ function parseComplementaryExams(raw: string) {
   } catch { return []; }
 }
 
+
+// Próximo control: guarda la fecha en la revisión y crea la cita "programada" en la agenda.
+// Se usa al crear y también al editar (antes, al editar no se podía agregar; Shuyana 2026-10-06).
+async function programarProximoControl(supabase: Awaited<ReturnType<typeof currentClinicalProfile>>["supabase"], profile: { id: string; empresa_id: string | null; sucursal_id: string | null }, pacienteId: string, consultaId: string, desde: Date, plazo: string) {
+  const meses = monthsFor[plazo as keyof typeof monthsFor];
+  if (!meses) return;
+  const inicio = new Date(desde); inicio.setMonth(inicio.getMonth() + meses);
+  const proximoControl = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Guayaquil", year: "numeric", month: "2-digit", day: "2-digit" }).format(inicio);
+  const inicioCita = new Date(`${proximoControl}T10:00:00-05:00`);
+  const { error: updateError } = await supabase.from("consultas_optometricas").update({ proximo_control: proximoControl }).eq("id", consultaId);
+  if (updateError) throw new Error(`La consulta se guardó, pero no se pudo guardar el próximo control: ${updateError.message}`);
+  const { error: agendaError } = await supabase.from("citas_agenda").insert({ paciente_id: pacienteId, empresa_atencion_id: profile.empresa_id, sucursal_atencion_id: profile.sucursal_id, responsable_id: profile.id, inicio: inicioCita.toISOString(), duracion_minutos: 30, tipo: "control", motivo: "Próximo control programado desde consulta", estado: "programada", created_by: profile.id });
+  if (agendaError) throw new Error(`La consulta se guardó, pero no se pudo agendar el próximo control: ${agendaError.message}`);
+}
+
 async function crearConsultaInterna(data: FormData) {
   const { supabase, profile } = await currentClinicalProfile();
   const pacienteId = text(data, "paciente_id");
@@ -149,14 +164,7 @@ async function crearConsultaInterna(data: FormData) {
   }).select("id").single();
   if (error || !consulta) throw new Error(`No se pudo guardar la consulta${error?.message ? `: ${error.message}` : "."}`);
 
-  const siguienteControl = text(data, "siguiente_control") as keyof typeof monthsFor | "";
-  if (siguienteControl && monthsFor[siguienteControl]) {
-    const inicio = new Date(); inicio.setMonth(inicio.getMonth() + monthsFor[siguienteControl]); inicio.setHours(10, 0, 0, 0);
-    const proximoControl = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Guayaquil", year: "numeric", month: "2-digit", day: "2-digit" }).format(inicio);
-    await supabase.from("consultas_optometricas").update({ proximo_control: proximoControl }).eq("id", consulta.id);
-    const { error: agendaError } = await supabase.from("citas_agenda").insert({ paciente_id: pacienteId, empresa_atencion_id: profile.empresa_id, sucursal_atencion_id: profile.sucursal_id, responsable_id: profile.id, inicio: inicio.toISOString(), duracion_minutos: 30, tipo: "control", motivo: "Próximo control programado desde consulta", estado: "programada", created_by: profile.id });
-    if (agendaError) throw new Error(`La consulta se guardó, pero no se pudo agendar el próximo control: ${agendaError.message}`);
-  }
+  await programarProximoControl(supabase, profile, pacienteId, consulta.id, new Date(), text(data, "siguiente_control"));
   revalidatePath("/pacientes"); revalidatePath("/agenda");
 }
 
@@ -197,6 +205,12 @@ async function actualizarConsultaInterna(data: FormData) {
     impresion_diagnostica: impresionDiagnostica || null, receta, plan_manejo: text(data, "plan_manejo") || null, observaciones: text(data, "observaciones") || null,
   }).eq("id", consultaId);
   if (error) throw new Error(error.message || "No se pudo actualizar la consulta.");
+  const plazo = text(data, "siguiente_control");
+  if (plazo) {
+    const { data: actual } = await supabase.from("consultas_optometricas").select("fecha_consulta").eq("id", consultaId).single();
+    await programarProximoControl(supabase, profile, text(data, "paciente_id"), consultaId, actual?.fecha_consulta ? new Date(actual.fecha_consulta) : new Date(), plazo);
+    revalidatePath("/agenda");
+  }
   revalidatePath("/pacientes");
 }
 
@@ -233,7 +247,7 @@ export async function obtenerHistorialPaciente(pacienteId: string): Promise<{ co
   const { supabase } = await currentClinicalProfile(folderRoles);
   if (!pacienteId) throw new Error("Falta identificar al paciente.");
   const [consultationsResult, photosResult, salesResult] = await Promise.all([
-    supabase.from("consultas_optometricas").select("id,paciente_id,empresa_atencion_id,sucursal_atencion_id,optometrista_id,fecha_consulta,motivo_consulta,antecedentes,agudeza_visual,lensometria,queratometria,autorefractor,refraccion,examen_binocular,biomicroscopia,impresion_diagnostica,receta,plan_manejo,observaciones").eq("paciente_id", pacienteId).order("fecha_consulta", { ascending: false }).limit(150),
+    supabase.from("consultas_optometricas").select("id,paciente_id,empresa_atencion_id,sucursal_atencion_id,optometrista_id,fecha_consulta,motivo_consulta,antecedentes,agudeza_visual,lensometria,queratometria,autorefractor,refraccion,examen_binocular,biomicroscopia,impresion_diagnostica,receta,plan_manejo,observaciones,proximo_control").eq("paciente_id", pacienteId).order("fecha_consulta", { ascending: false }).limit(150),
     supabase.from("historia_fotos").select("id,paciente_id,consulta_id,tipo,descripcion,storage_path,creado_en").eq("paciente_id", pacienteId).order("creado_en", { ascending: false }).limit(150),
     supabase.from("ventas").select("id,empresa_id,sucursal_id,paciente_id,cliente_nombre,estado,subtotal,descuento,total,pagado,saldo,motivo_anulacion,recibo_token,fecha_entrega_estimada,creado_en,folio,apartado,apartado_hasta,venta_items(id,producto_id,descripcion,cantidad,precio_unitario,descuento,total_linea),pagos_venta(id,metodo,monto,referencia,banco,creado_en)").eq("paciente_id", pacienteId).order("creado_en", { ascending: false }).limit(150),
   ]);

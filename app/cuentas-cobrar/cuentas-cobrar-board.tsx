@@ -129,7 +129,7 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
 }
 
 
-function ColaCobrosHoy({ cola, sucursalId, sucursalNombre, error }: { cola: CobroHoy[]; sucursalId?: string; sucursalNombre?: string; error?: string }) {
+export function ColaCobrosHoy({ cola, sucursalId, sucursalNombre, error }: { cola: CobroHoy[]; sucursalId?: string; sucursalNombre?: string; error?: string }) {
   const [ocultos, setOcultos] = useState<string[]>([]);
   const [enviado, setEnviado] = useState("");
   const [procesando, setProcesando] = useState("");

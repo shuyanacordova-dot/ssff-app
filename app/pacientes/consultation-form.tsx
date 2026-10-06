@@ -134,7 +134,7 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
   const av = initial?.agudeza_visual ?? {};
   const bino = initial?.examen_binocular ?? {};
   const receta0 = initial?.receta;
-  return <div className="modal-backdrop"><section className="new-patient-modal task-modal" role="dialog" aria-modal="true" aria-labelledby="new-consultation-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button><p className="section-label">{initial ? "EDITAR CONSULTA" : "NUEVA CONSULTA"}</p><h2 id="new-consultation-title">Consulta optométrica</h2><form onSubmit={(event) => { event.preventDefault(); submit(event.currentTarget); }}>
+  return <div className="modal-backdrop"><section className="new-patient-modal task-modal" role="dialog" aria-modal="true" aria-labelledby="new-consultation-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button><p className="section-label">{initial ? "EDITAR CONSULTA" : "NUEVA CONSULTA"}</p><h2 id="new-consultation-title">Consulta optométrica</h2><form onKeyDown={(event) => { const target = event.target as HTMLElement; if (event.key === "Enter" && target.tagName === "INPUT") event.preventDefault(); }} onSubmit={(event) => { event.preventDefault(); if (!pending) submit(event.currentTarget); }}>
     <div className="new-patient-form"><label className="task-description">Motivo de consulta<input name="motivo_consulta" defaultValue={initial?.motivo_consulta ?? ""} placeholder="Ej.: Control anual, visión borrosa de lejos" /></label></div>
 
     <p className="section-label">ANTECEDENTES</p>
@@ -218,9 +218,10 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
     <div className="new-patient-form"><label className="task-description">Revisión realizada por<select name="optometrista_id" required defaultValue={optometrists.some((person) => person.id === (initial?.optometrista_id ?? defaultOptometristId)) ? (initial?.optometrista_id ?? defaultOptometristId) : (optometrists[0]?.id ?? "")}><option value="" disabled>Selecciona un optometrista</option>{optometrists.map((person) => <option key={person.id} value={person.id}>{person.nombre}</option>)}</select></label></div>
     {!optometrists.length && <p className="notice">No hay optometristas activos disponibles. Activa o registra uno desde Equipo antes de guardar la revisión.</p>}
 
-    {!initial && <><p className="section-label">SIGUIENTE CONSULTA</p>
-    <div className="new-patient-form"><label>Próximo control<select name="siguiente_control" defaultValue=""><option value="">Sin agendar</option><option value="3m">En 3 meses</option><option value="6m">En 6 meses</option><option value="1a">En 1 año</option></select></label></div>
-    <p className="field-hint">Si eliges un plazo, se crea automáticamente una cita programada en la agenda.</p></>}
+    <p className="section-label">SIGUIENTE CONSULTA</p>
+    {initial?.proximo_control && <p className="field-hint">Próximo control actual: <strong>{new Date(`${initial.proximo_control}T12:00:00`).toLocaleDateString("es-EC", { day: "numeric", month: "long", year: "numeric" })}</strong></p>}
+    <div className="new-patient-form"><label>{initial?.proximo_control ? "Cambiar próximo control" : "Próximo control"}<select name="siguiente_control" defaultValue=""><option value="">{initial?.proximo_control ? "Mantener como está" : "Sin agendar"}</option><option value="3m">En 3 meses</option><option value="6m">En 6 meses</option><option value="1a">En 1 año</option></select></label></div>
+    <p className="field-hint">Si eliges un plazo, se crea automáticamente una cita programada en la agenda{initial ? " (contado desde la fecha de esta revisión)" : ""}.</p>
 
     {saveError && <p className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 700 }}>{saveError}</p>}
     <div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" disabled={pending || !optometrists.length} type="submit">{pending ? "Guardando…" : initial ? "Guardar cambios" : "Guardar consulta"}</button></div>
