@@ -93,6 +93,45 @@ async function prepareDocument(doc: Document, target: HTMLElement, unaHoja = fal
   if (unaHoja) ajustarAUnaHoja(doc, copy);
 }
 
+// Celular / iPad: la impresión se abre en una pestaña nueva. Antes quedaba una hoja "tipo PDF" sin salida;
+// ahora la hoja se ve como quedará impresa, se puede desplazar y ampliar, y tiene barra para volver o reimprimir.
+function prepararVistaMovil(doc: Document, volverA: string) {
+  const viewport = doc.createElement("meta");
+  viewport.name = "viewport";
+  // 840 px de ancho: el celular muestra la hoja A4 completa y se puede ampliar con los dedos.
+  viewport.content = "width=840, user-scalable=yes";
+  doc.head.appendChild(viewport);
+  const vista = doc.createElement("style");
+  vista.textContent = `${reglasDeImpresion()}
+@media screen {
+  html, body { height: auto !important; min-height: 0 !important; overflow: auto !important; -webkit-overflow-scrolling: touch; }
+  html { background: #e9eef3 !important; }
+  body.print-context { width: 210mm !important; margin: 0 auto !important; padding: 130px 0 40px !important; background: transparent !important; }
+  body.print-context > .print-area { background: #fff !important; padding: 12mm !important; max-width: none !important; box-shadow: 0 6px 24px rgba(18,48,46,.16) !important; }
+}
+.lumos-print-bar { position: fixed !important; top: 0; left: 0; right: 0; z-index: 50; display: flex; gap: 12px; justify-content: space-between; align-items: center; padding: 18px 24px; padding-top: max(18px, env(safe-area-inset-top)); background: #fff; border-bottom: 1px solid #d7e0ea; font: 600 28px/1.2 Arial, sans-serif; }
+.lumos-print-bar button { border: 0; border-radius: 999px; padding: 20px 34px; font: 700 28px Arial, sans-serif; cursor: pointer; }
+.lumos-print-bar .volver { background: #eef2f6; color: #1f3b57; }
+.lumos-print-bar .imprimir { background: #1f3b57; color: #fff; }
+@media print { .lumos-print-bar { display: none !important; } }`;
+  doc.head.appendChild(vista);
+  const barra = doc.createElement("div");
+  barra.className = "lumos-print-bar";
+  const volver = doc.createElement("button");
+  volver.type = "button"; volver.className = "volver"; volver.textContent = "← Volver a LumOS";
+  volver.addEventListener("click", () => {
+    const win = doc.defaultView;
+    win?.close();
+    // Si el navegador no deja cerrar la pestaña (app instalada), regresa a la pantalla de donde se imprimió.
+    win?.setTimeout(() => { win.location.href = volverA; }, 250);
+  });
+  const imprimir = doc.createElement("button");
+  imprimir.type = "button"; imprimir.className = "imprimir"; imprimir.textContent = "Imprimir / PDF";
+  imprimir.addEventListener("click", () => doc.defaultView?.print());
+  barra.append(volver, imprimir);
+  doc.body.prepend(barra);
+}
+
 async function printInNewWindow(target: HTMLElement, unaHoja = false) {
   // Open before waiting for assets so iOS retains the user gesture.
   const popup = window.open("", "_blank");
@@ -102,6 +141,7 @@ async function printInNewWindow(target: HTMLElement, unaHoja = false) {
   }
   try {
     await prepareDocument(popup.document, target, unaHoja);
+    prepararVistaMovil(popup.document, window.location.href);
     popup.focus();
     popup.print();
   } catch (error) {
@@ -115,9 +155,10 @@ async function printDocument(target: HTMLElement | null, unaHoja = false) {
   if (!target || printing) return;
   printing = true;
   cleanupPreviousFrame?.();
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  // Celulares y tabletas (iPhone, iPad, Android): imprimir en pestaña nueva con barra para volver.
+  const isMobile = /iPad|iPhone|iPod|Android/.test(navigator.userAgent)
     || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
-  if (isIOS) {
+  if (isMobile) {
     try { await printInNewWindow(target, unaHoja); }
     finally { printing = false; }
     return;
