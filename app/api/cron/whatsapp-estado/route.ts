@@ -27,5 +27,13 @@ export async function GET(request: Request) {
     const r = await fetch(`https://graph.facebook.com/v21.0/${waba}/phone_numbers?fields=id,display_phone_number,verified_name`, { headers: { Authorization: `Bearer ${token}` } }).then((x) => x.json()).catch(() => null);
     if (r?.data) numeros.push({ waba, numeros: r.data });
   }
-  return NextResponse.json({ token: true, sucursales, numeros_del_token: numeros });
+  // Cuentas de WhatsApp asignadas al usuario del sistema y sus plantillas (nombre, estado, texto).
+  const cuentas = await fetch("https://graph.facebook.com/v21.0/me/assigned_whatsapp_business_accounts?fields=id,name", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()).catch(() => null) as { data?: { id: string; name: string }[] } | null;
+  const plantillas = [];
+  for (const cuenta of cuentas?.data ?? []) {
+    const r = await fetch(`https://graph.facebook.com/v21.0/${cuenta.id}/message_templates?fields=name,status,category,language,components&limit=100`, { headers: { Authorization: `Bearer ${token}` } }).then((x) => x.json()).catch(() => null);
+    const tel = await fetch(`https://graph.facebook.com/v21.0/${cuenta.id}/phone_numbers?fields=id,display_phone_number,verified_name`, { headers: { Authorization: `Bearer ${token}` } }).then((x) => x.json()).catch(() => null);
+    plantillas.push({ cuenta, numeros: tel?.data ?? tel, plantillas: r?.data ?? r });
+  }
+  return NextResponse.json({ token: true, sucursales, numeros_del_token: numeros, cuentas: plantillas });
 }
