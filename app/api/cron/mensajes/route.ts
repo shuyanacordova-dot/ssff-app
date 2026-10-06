@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdminClient, hasSupabaseAdminConfiguration } from "@/lib/supabase/admin";
 import { enviarPlantillaWhatsapp } from "@/lib/whatsapp-cloud";
 import { nombreOpticaLargo, plantillaMeta, primerNombre, type MensajesDia, type PlantillaMeta } from "@/lib/mensajes-dia-textos";
+import { sincronizarPlantillas } from "@/lib/plantillas-meta";
 import { plantillasConocidas, type PlantillaMensaje, type TipoPlantilla } from "@/lib/plantillas-mensajes";
 
 // Envío automático diario (Vercel Cron, 16:00 UTC = 11:00 Ecuador). Reemplaza los escenarios de Make.
@@ -35,6 +36,8 @@ export async function GET(request: Request) {
   const { data: configs, error } = await supabase.from("mensajes_automaticos_config").select("empresa_id,activo,cumpleanos,control_anual,cobros,max_controles_dia,actualizado_por").eq("activo", true);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // Antes de enviar, trae de Meta qué plantillas ya se aprobaron (y activa las que falten).
+  await sincronizarPlantillas(supabase).catch(() => undefined);
   const { data: plantillasData } = await supabase.from("plantillas_mensajes").select("empresa_id,tipo,nombre_meta,variables,imagen,estado,activa").eq("activa", true);
   const activas = (plantillasData ?? []) as PlantillaMensaje[];
   const resumen: Record<string, { enviados: number; errores: number }> = {};
