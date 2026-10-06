@@ -7,6 +7,13 @@ const text = (form: FormData, name: string) => typeof form.get(name) === "string
 // Montos: acepta coma o punto como decimal ("25,50" o "25.50").
 const monto = (form: FormData, name: string, vacio = "") => Number((text(form, name) || vacio).replace(",", "."));
 
+export async function crearClaveAtajo(): Promise<string> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("crear_token_atajo");
+  if (error || typeof data !== "string") throw new Error(error?.message || "No se pudo crear la clave del atajo.");
+  return data;
+}
+
 export async function crearGasto(form: FormData) {
   const supabase = await createSupabaseServerClient();
   const empresaId = text(form, "empresa_id"); const sucursalId = text(form, "sucursal_id") || null; const fecha = text(form, "fecha") || null;

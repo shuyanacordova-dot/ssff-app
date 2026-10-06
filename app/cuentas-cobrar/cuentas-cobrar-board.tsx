@@ -107,7 +107,7 @@ export default function CuentasCobrarBoard(props: CuentasCobrarData) {
   });
 
   return <main className="page agenda-page"><div className="container agenda-shell">
-    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN COMERCIAL{props.empresaNombre ? ` · ${props.empresaNombre}` : ""}</p><h1>Cuentas por cobrar</h1><p className="subtitle">Pacientes con saldo pendiente, ordenados por prioridad.</p></div>{activa && <TodasSucursalesToggle todas={todas} onChange={setTodas} sucursalNombre={props.sucursalActivaNombre} />}</header>
+    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN COMERCIAL{props.empresaNombre ? ` · ${props.empresaNombre}` : ""}</p><h1>Cuentas por cobrar</h1></div>{activa && <TodasSucursalesToggle todas={todas} onChange={setTodas} sucursalNombre={props.sucursalActivaNombre} />}</header>
     {props.convenioFiltro && <div className="notice"><strong>{props.convenioFiltro.nombre}</strong><Link className="outline-action" href={`/convenios/${props.convenioFiltro.id}/informe`}>Generar informe mensual</Link><Link href="/convenios">Ver empresas</Link><Link href="/cuentas-cobrar">Quitar filtro</Link></div>}
     <section className="agenda-summary"><article><Wallet size={21} /><strong>{money(totalDeuda)}</strong><span>saldo total pendiente</span></article><article><CircleAlert size={21} /><strong>{deudas.length}</strong><span>pacientes con deuda</span></article></section>
     <div className="notice"><CircleAlert size={18} /><span>{notice || "El saldo se calcula solo desde las ventas completadas; los abonos lo actualizan automáticamente."}</span></div>
@@ -159,7 +159,7 @@ export function ColaCobrosHoy({ cola, sucursalId, sucursalNombre, error }: { col
   useEffect(() => { if (ocultos.length > 0 && !procesando) document.querySelector<HTMLButtonElement>(".cob-next-button")?.focus(); }, [procesando, ocultos]);
   return <section className="cob-queue" aria-label="Cobros de hoy">
     <div className="cob-heading"><div><h2>Cobros de hoy · {sucursalNombre ?? "Sucursal activa"}</h2><p><strong>{pendientes.length}</strong> mensajes pendientes · <strong>{money(total)}</strong> de saldo</p></div><button className="new-consultation" type="button" disabled={!pendientes.length || !sucursalId || !!procesando} onClick={() => { const primero = pendientes[0]; if (primero) enviar(primero, !!enlaceWhatsapp(primero.telefono, "")); }}>Modo seguido · Empezar</button></div>
-    <p className="field-hint">Los mensajes se envían desde el WhatsApp de esta sucursal, sin costo. El sistema recuerda a quién ya se escribió hoy.</p>
+    <p className="field-hint">Usa el WhatsApp de esta sucursal; el sistema registra los contactos de hoy.</p>
     {error && <p className="notice" role="alert">{error}</p>}
     {enviado && <p className="cob-feedback" role="status">{enviado}</p>}
     {pendientes.length ? <div className="cob-list">{pendientes.map((row, index) => {

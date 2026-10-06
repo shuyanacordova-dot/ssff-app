@@ -5,7 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 // Registra que el mensaje (cumpleaños o control) ya se envió por WhatsApp. Queda en el historial
 // de Comunicaciones del paciente y el paciente sale de la lista.
-export async function marcarMensajeDia(input: { pacienteId: string; empresaId: string; sucursalId: string; motivo: "cumpleanos" | "control"; referenciaId?: string | null }) {
+export async function marcarMensajeDia(input: { pacienteId: string; empresaId: string; sucursalId: string; motivo: "cumpleanos" | "control" | "postventa" | "resena"; referenciaId?: string | null }) {
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("registrar_contacto_crm", {
     p_paciente: input.pacienteId,
@@ -14,11 +14,18 @@ export async function marcarMensajeDia(input: { pacienteId: string; empresaId: s
     p_motivo: input.motivo,
     p_canal: "whatsapp",
     p_resultado: "enviado",
-    p_nota: input.motivo === "cumpleanos" ? "Mensaje de cumpleaños (Mensajes del día)" : "Recordatorio de control anual (Mensajes del día)",
+    p_nota: { cumpleanos: "Mensaje de cumpleaños (Mensajes del día)", control: "Recordatorio de control anual (Mensajes del día)", postventa: "Seguimiento de lentes entregados (Mensajes del día)", resena: "Link de reseña de Google (Mensajes del día)" }[input.motivo],
     p_proximo: null,
     p_referencia: input.referenciaId ?? null,
   });
   if (error) throw new Error(error.message || "No se pudo registrar el envío.");
+  revalidatePath("/mensajes");
+}
+
+export async function guardarResenaUrl(sucursalId: string, url: string) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("guardar_resena_url", { p_sucursal: sucursalId, p_url: url.trim() });
+  if (error) throw new Error(error.message || "No se pudo guardar el link de reseñas.");
   revalidatePath("/mensajes");
 }
 

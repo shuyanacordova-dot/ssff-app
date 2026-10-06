@@ -23,7 +23,7 @@ export default async function ConfiguracionSriPage() {
     }
   } catch { mensaje = "No se pudo cargar la configuración SRI."; }
   return <main className="page agenda-page"><div className="container agenda-shell">
-    <header className="agenda-header"><div><Link className="back-link" href="/facturacion">← Facturación</Link><p className="eyebrow">ADMINISTRACIÓN</p><h1>Configuración SRI</h1><p className="subtitle">Datos del emisor y firma electrónica por sucursal.</p></div></header>
+    <header className="agenda-header"><div><Link className="back-link" href="/facturacion">← Facturación</Link><p className="eyebrow">ADMINISTRACIÓN</p><h1>Configuración SRI</h1></div></header>
     {mensaje ? <p className="notice" role="alert">{mensaje}</p> : <ConfigBoard emisores={emisores} hoy={new Intl.DateTimeFormat("en-CA", { timeZone: "America/Guayaquil", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())} />}
   </div></main>;
 }

@@ -46,7 +46,7 @@ export default function CuadreBancosBoard(props: { status: "ready" | "needs_logi
 
   return <main className="page agenda-page"><div className="container agenda-shell">
     <header className="agenda-header">
-      <div><Link className="back-link" href="/mi-espacio">← Mis deudas</Link><p className="eyebrow">ESPACIO PRIVADO · SOLO PARA TI</p><h1>Cuadre de bancos</h1><p className="subtitle">Cada sábado: el saldo real de cada cuenta y el efectivo de cada caja, comparados con lo que LumOS esperaba según ventas, abonos, depósitos y pagos.</p></div>
+      <div><Link className="back-link" href="/mi-espacio">← Mis deudas</Link><p className="eyebrow">ESPACIO PRIVADO · SOLO PARA TI</p><h1>Cuadre de bancos</h1><p className="subtitle">Cada sábado compara saldos bancarios y efectivo con el total esperado.</p></div>
       <label style={{ display: "grid", gap: 4, fontSize: 12, fontWeight: 800, color: "#5d7086" }}>Fecha del cuadre<input type="date" value={fecha} max={hoyEcuador()} onChange={(e) => setFecha(e.target.value || hoyEcuador())} style={{ border: "1px solid #d4e0ea", borderRadius: 10, padding: "8px 10px" }} /></label>
     </header>
     {notice && <div className="notice"><LockKeyhole size={18} /><span>{notice}</span></div>}

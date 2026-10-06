@@ -54,8 +54,17 @@ const plantillasFocus: Record<TipoPlantilla, PlantillaMeta> = {
 export const plantillaMeta = (empresaId: string, tipo: TipoPlantilla) => (empresaId === SHUVISION_ID ? plantillasShuvision : plantillasFocus)[tipo];
 export const nombreOpticaLargo = (empresaId?: string | null) => empresaId && empresaId !== SHUVISION_ID ? "Focus Óptica" : "ShuVision Óptica";
 
+export function mensajePostventa(nombre: string, empresaId?: string | null) {
+  return `Hola ${primerNombre(nombre)} 👋, te saludamos de ${opticaDeEmpresa(empresaId)}. Hace unos días retiraste tus lentes y queremos saber cómo te sientes con ellos. 👓\n\n¿Ves bien de lejos y de cerca? ¿Sientes alguna molestia, mareo o que se te resbalan? Cuéntanos y con gusto te ayudamos; el ajuste es gratis. 💙`;
+}
+
+export function mensajeResena(nombre: string, empresaId: string | null | undefined, url: string) {
+  return `¡Qué gusto saber que estás feliz con tus lentes, ${primerNombre(nombre)}! 😊\n\nNos ayudarías muchísimo dejándonos tu opinión en Google, solo toma un minuto: ${url}\n\n¡Gracias por confiar en ${opticaDeEmpresa(empresaId)}! 💙`;
+}
+
 export type CumpleanosHoy = { paciente_id: string; nombre: string; nombres: string; telefono: string | null; fecha_nacimiento: string; edad: number | null; enviado_en: string | null; enviado_auto: boolean };
 export type ControlPendiente = { paciente_id: string; nombre: string; nombres: string; telefono: string | null; consulta_id: string; ultima_revision: string; vence: string; programado: boolean; tipo: "programado" | "aniversario"; anios: number; meses: number; make_ya_envio: boolean; enviado_en: string | null; enviado_auto: boolean };
+export type EntregaPendiente = { orden_id: string; paciente_id: string; nombre: string; nombres: string; telefono: string | null; entregado: string; postventa_en: string | null; resena_en: string | null };
 export type MensajesDia = { empresa_id: string; hoy: string; cumpleanos: CumpleanosHoy[]; controles: ControlPendiente[] };
 export type ConfigMensajesAutomaticos = { activo: boolean; cumpleanos: boolean; control_anual: boolean; cobros: boolean; actualizado_en: string | null };
 export type NumeroSucursal = { sucursal_id: string; nombre: string; numero: string | null; conectado: boolean };

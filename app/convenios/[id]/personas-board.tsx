@@ -43,7 +43,7 @@ export default function PersonasBoard(props: Props) {
   });
 
   return <main className="page agenda-page"><div className="container agenda-shell">
-    <header className="agenda-header"><div><Link className="back-link" href="/convenios">← Convenios</Link><p className="eyebrow">CLIENTES POTENCIALES · CONVENIO</p><h1>{props.empresaNombre}</h1><p className="subtitle">Personas del convenio aunque todavía no sean pacientes. Si la cédula ya existe como paciente, se enlaza sola.</p></div>
+    <header className="agenda-header"><div><Link className="back-link" href="/convenios">← Convenios</Link><p className="eyebrow">CLIENTES POTENCIALES · CONVENIO</p><h1>{props.empresaNombre}</h1><p className="subtitle">Si la cédula ya existe, se enlaza con el paciente.</p></div>
       <Link className="outline-action" href={`/convenios/${props.empresaConvenioId}/informe`}>Informe mensual</Link>
       <button className="new-task" type="button" onClick={() => setAdding(true)}><UserPlus size={18} /> Agregar persona</button></header>
     {notice && <div className="notice"><span>{notice}</span></div>}

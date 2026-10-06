@@ -30,7 +30,7 @@ export default function ResumenDiaBoard(props: ResumenDiaData & { fecha: string 
 
   return <main className="page agenda-page"><div className="container agenda-shell">
     <header className="agenda-header no-print">
-      <div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN DEL DÍA</p><h1>Resumen del día{props.sucursalNombre ? ` · ${props.sucursalNombre}` : ""}</h1><p className="subtitle">Ventas, abonos y salidas del día — la base para cerrar la <Link href="/caja" className="text-action" style={{ display: "inline" }}>caja diaria</Link>.</p></div>
+      <div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN DEL DÍA</p><h1>Resumen del día{props.sucursalNombre ? ` · ${props.sucursalNombre}` : ""}</h1><p className="subtitle">Datos para cerrar la <Link href="/caja" className="text-action" style={{ display: "inline" }}>caja diaria</Link>.</p></div>
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <input type="date" value={props.fecha} onChange={(event) => irA(event.target.value, sucursalId)} />
         <button className="outline-action" type="button" onClick={() => printDocumentById("daily-summary-print")}><Printer size={15} /> Imprimir</button>

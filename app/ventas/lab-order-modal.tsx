@@ -232,7 +232,7 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
         </div><label>DNP de lejos binocular (mm)<input inputMode="decimal" value={dnpLejos} onChange={(event) => { const value = event.target.value; setDnpLejos(value); setMedidas((m) => ({ ...m, dnp: uso === "cerca" ? dnpCerca(value, true) : value })); }} /></label></details>}
         {(uso === "cerca" || uso === "intermedio") && examen && (["od", "oi"] as const).some((eye) => rx[eye].procesar && !(parseRxNumber(examen[eye].add) ?? 0)) && <p className="notice" role="status">Falta la adición para calcular la visión de cerca</p>}
         <p className="section-label" style={{ marginTop: 14 }}>Rx calculada para el laboratorio</p>
-        <p className="field-hint">Puedes ajustar la receta calculada. Cambiar el uso o el examen vuelve a calcularla.{uso === "intermedio" ? " Intermedio: se aplica la mitad de la adición, redondeada a 0,25 D." : ""}</p>
+        <p className="field-hint">Cambiar el uso o el examen recalcula la receta.{uso === "intermedio" ? " Intermedio: se aplica la mitad de la adición, redondeada a 0,25 D." : ""}</p>
         <div className={rxStyles.cards} style={{ marginTop: 10 }} key={`${consultaId}-${uso}`}><RxEyeCard eye="OD" value={rx.od} cerca={uso === "cerca"} faltan={intentado ? faltanOD : undefined} onChange={(value) => setRx(editarRxLaboratorio(rx, "od", value))} /><RxEyeCard eye="OI" value={rx.oi} cerca={uso === "cerca"} faltan={intentado ? faltanOI : undefined} onChange={(value) => setRx(editarRxLaboratorio(rx, "oi", value))} /></div>
         <LunasStockAlert empresaId={sale.empresa_id} rx={rx} orderId={orderId || null} patientName={patientName} />
 

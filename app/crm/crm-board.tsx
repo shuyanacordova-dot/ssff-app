@@ -48,7 +48,7 @@ export default function CrmBoard(props: CrmData) {
   if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">RELACIÓN CON PACIENTES</p><h1>CRM</h1><p className="subtitle">{props.message ?? "No se pudo abrir el CRM."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/crm">Iniciar sesión</Link>}</header></div></main>;
 
   return <main className="page agenda-page"><div className="container agenda-shell">
-    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">RELACIÓN CON PACIENTES · {props.empresaNombre}</p><h1>A quién contactar hoy</h1><p className="subtitle">Abre el WhatsApp con el mensaje listo, envíalo tú y registra el contacto. Nada se envía solo.</p></div></header>
+    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">RELACIÓN CON PACIENTES · {props.empresaNombre}</p><h1>A quién contactar hoy</h1><p className="subtitle">Nada se envía solo.</p></div></header>
     <section className="agenda-summary"><article><Users size={21} /><strong>{props.items.length}</strong><span>pacientes por contactar</span></article><article><CalendarHeart size={21} /><strong>{counts.cumpleanos}</strong><span>cumpleaños esta semana</span></article></section>
     {notice && <div className="notice"><span>{notice}</span></div>}
     <section className="glass agenda-board">

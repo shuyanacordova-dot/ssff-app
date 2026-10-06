@@ -176,7 +176,7 @@ export default function EquipoBoard(props: EquipoData) {
   const activos = props.colaboradores.filter((colaborador) => colaborador.activo).length;
 
   return <main className="page agenda-page team-page"><div className="container agenda-shell">
-    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">CONFIGURACIÓN</p><h1>Equipo y accesos</h1><p className="subtitle">Crea usuarios, define su rol y sucursal, cambia contraseñas o desactiva accesos.</p></div><button className="new-task" type="button" disabled={!props.canManageAuth} title={!props.canManageAuth ? "Requiere la clave administrativa en el servidor" : undefined} onClick={() => setNuevoAbierto(true)}><UserPlus size={17} /> Añadir integrante</button></header>
+    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">CONFIGURACIÓN</p><h1>Equipo y accesos</h1></div><button className="new-task" type="button" disabled={!props.canManageAuth} title={!props.canManageAuth ? "Requiere la clave administrativa en el servidor" : undefined} onClick={() => setNuevoAbierto(true)}><UserPlus size={17} /> Añadir integrante</button></header>
 
     <div className="team-summary">
       <article><strong>{props.colaboradores.length}</strong><span>Integrantes registrados</span></article>

@@ -42,7 +42,7 @@ export default function InformesBoard(props: InformesData) {
   const cumplimientoTotal = informe ? pct(informe.totales.ingresos_total ?? informe.totales.cobrado_total ?? 0, informe.totales.meta_total) : 0;
 
   return <main className="page agenda-page"><div className="container agenda-shell">
-    <header className="agenda-header no-print"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">DIRECCIÓN</p><h1>Informes</h1><p className="subtitle">Metas, ventas por sucursal e informe mensual del negocio.</p></div>
+    <header className="agenda-header no-print"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">DIRECCIÓN</p><h1>Informes</h1></div>
       <div className="tabs">{props.companies.map((c) => <button key={c.id} className={c.id === empresaId ? "active" : ""} onClick={() => setEmpresaId(c.id)}>{c.nombre}</button>)}{isSuperadmin && <button className={todoElNegocio ? "active" : ""} onClick={() => setEmpresaId("__todo__")}>Todo el negocio</button>}</div>
     </header>
     <div className="new-patient-form no-print" style={{ maxWidth: 220, marginBottom: 12 }}><label>Mes del informe<input type="month" value={mes} onChange={(event) => setMes(event.target.value)} /></label></div>

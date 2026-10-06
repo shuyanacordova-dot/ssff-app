@@ -105,7 +105,7 @@ export default function ConteoBoard(props: { status: "ready" | "needs_login"; br
   const clasifsVisibles = q ? clasifs.filter((c) => normalizar(c.clasificacion).includes(q) || (itemsPorClasif.get(c.clasificacion) ?? []).some((i) => normalizar(`${i.nombre} ${i.codigo_barra ?? ""}`).includes(q))) : clasifs;
 
   return <main className="page agenda-page"><div className="container agenda-shell">
-    <header className="agenda-header"><div><Link className="back-link" href="/inventario">← Inventario</Link><p className="eyebrow">OPERACIÓN</p><h1>Hacer inventario</h1><p className="subtitle">Cuenta lo que hay en la vitrina. El sistema compara con lo esperado y el ajuste se aplica solo cuando Shuyana (o Joao en Sacha, Erick en Focus) lo aprueba.</p></div></header>
+    <header className="agenda-header"><div><Link className="back-link" href="/inventario">← Inventario</Link><p className="eyebrow">OPERACIÓN</p><h1>Hacer inventario</h1><p className="subtitle">El ajuste se aplica solo tras la aprobación de Shuyana, Joao en Sacha o Erick en Focus.</p></div></header>
     {notice && <p className="notice" role="status">{notice}</p>}
 
     {porAprobar.length > 0 && <section className="glass agenda-board" style={{ marginBottom: 18 }}>

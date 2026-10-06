@@ -155,7 +155,7 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
     </div>
 
     <p className="section-label">CON CORRECCIÓN · RX ANTIGUA (LENSOMETRÍA)</p>
-    <p className="field-hint">Mide la fórmula de los lentes que trae el paciente y su agudeza visual, lejos y cerca, con esa corrección.</p>
+    <p className="field-hint">Registra la fórmula actual y la agudeza visual con esa corrección.</p>
     {ultimaRx && <p className="field-hint">{lensDesdeUltima ? <>Cargada la RX final de la última revisión ({formatRecordDate(ultimaRx.fecha_consulta)}). Confírmala con el lensómetro. <button type="button" className="link-button" onClick={() => cambiarLens(false)}>Dejar en blanco</button></> : <button type="button" className="link-button" onClick={() => cambiarLens(true)}>Cargar la RX final de la última revisión ({formatRecordDate(ultimaRx.fecha_consulta)})</button>}</p>}
     <div className={rxStyles.cards} key={lensKey}><EyeRxCard eye="OD" prefix="lens_od" defaults={lensDefaults("od")} /><EyeRxCard eye="OI" prefix="lens_oi" defaults={lensDefaults("oi")} /></div>
 
@@ -178,11 +178,11 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
     <div className="new-patient-form" style={{ marginTop: 10 }}><label className="task-description" style={{ gridColumn: "1 / -1" }}>Otros detalles<textarea name="biom_otros" defaultValue={initial?.biomicroscopia?.otros_detalles ?? ""} placeholder="Otros hallazgos de la biomicroscopía" /></label></div>
 
     <p className="section-label">EXÁMENES COMPLEMENTARIOS</p>
-    <p className="field-hint">Añade tantos exámenes como necesites y registra el resultado de cada uno.</p>
+    
     <ComplementaryExams initialValue={bino.complementarios} />
 
     <p className="section-label">RX FINAL</p>
-    <p className="field-hint">Usa el botón de signo para la esfera y los botones −/+ para ajustar 0,25. El cilindro se registra negativo. La RX sugiere miopía, hipermetropía, astigmatismo y presbicia con su CIE-10; el profesional puede corregir el texto.</p>
+    <p className="field-hint">El cilindro se registra negativo; revisa y corrige el diagnóstico sugerido.</p>
     <div className={rxStyles.cards}><EyeRxCard eye="OD" prefix="ref_od" showDnp defaults={initial?.refraccion ? { esfera: initial.refraccion.od_esfera, cilindro: initial.refraccion.od_cilindro, eje: initial.refraccion.od_eje, av_lejos: initial.refraccion.od_av_lejos, add: initial.refraccion.od_add, av_cerca: initial.refraccion.od_av_cerca, dnp: initial.refraccion.od_dnp } : undefined} onRxChange={(field, value) => updateFinalRx("od", field, value)} /><EyeRxCard eye="OI" prefix="ref_oi" showDnp defaults={initial?.refraccion ? { esfera: initial.refraccion.oi_esfera, cilindro: initial.refraccion.oi_cilindro, eje: initial.refraccion.oi_eje, av_lejos: initial.refraccion.oi_av_lejos, add: initial.refraccion.oi_add, av_cerca: initial.refraccion.oi_av_cerca, dnp: initial.refraccion.oi_dnp } : undefined} onRxChange={(field, value) => updateFinalRx("oi", field, value)} /></div>
 
     <p className="section-label">DIAGNÓSTICO</p>

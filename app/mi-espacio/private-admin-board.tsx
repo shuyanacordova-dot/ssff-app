@@ -50,7 +50,7 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
 
   return <main className="page agenda-page"><div className="container agenda-shell">
     <header className="agenda-header">
-      <div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">ESPACIO PRIVADO · SOLO PARA TI</p><h1>Mis deudas</h1><p className="subtitle">Pagos y deudas de Shuvisión y personales.</p></div>
+      <div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">ESPACIO PRIVADO · SOLO PARA TI</p><h1>Mis deudas</h1></div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><Link className="outline-action" href="/mi-espacio/bancos" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Landmark size={16} /> Cuadre de bancos</Link><button className="new-task" type="button" onClick={() => setNueva({ destino: vista === "personal" ? "personal" : "optica" })}><Plus size={18} /> Nueva deuda</button></div>
     </header>
     {notice && <div className="notice"><LockKeyhole size={18} /><span>{notice}</span></div>}

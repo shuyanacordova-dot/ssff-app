@@ -32,7 +32,7 @@ export default function LunasBoard(props: Props) {
   if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/inventario">← Inventario</Link><h1>Banco de lunas</h1><p className="subtitle">{props.message}</p></div></header></div></main>;
 
   return <main className="page agenda-page"><div className="container agenda-shell">
-    <header className="agenda-header"><div><Link className="back-link" href="/inventario">← Inventario</Link><p className="eyebrow">INVENTARIO · {props.empresaNombre}</p><h1>Banco de lunas</h1><p className="subtitle">Lunas en bodega y lunas nuevas de garantías. Cuando una orden de laboratorio coincide, el sistema avisa.</p></div>
+    <header className="agenda-header"><div><Link className="back-link" href="/inventario">← Inventario</Link><p className="eyebrow">INVENTARIO · {props.empresaNombre}</p><h1>Banco de lunas</h1><p className="subtitle">La orden de laboratorio avisa cuando hay una luna disponible.</p></div>
       {props.canEdit && <button className="new-consultation" type="button" onClick={() => setEditing("new")}><PackagePlus size={17} /> Agregar luna</button>}</header>
     <section className="agenda-summary"><article><Glasses size={21} /><strong>{unidades("bodega")}</strong><span>unidades en bodega</span></article><article><Glasses size={21} /><strong>{unidades("garantia")}</strong><span>unidades de garantía</span></article></section>
     <section className="glass agenda-board">
