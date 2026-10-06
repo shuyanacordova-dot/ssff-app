@@ -69,7 +69,7 @@ export default function InformeConvenio(props: Props) {
       {opticas.length > 1 && <label className="new-patient-form">Óptica<select value={opticaId} onChange={(e) => cambiarFiltro(mes, e.target.value)}>
         {opticas.map((opcion) => <option key={opcion.id} value={opcion.id}>{opcion.nombre}</option>)}
       </select></label>}
-      <button type="button" className="new-consultation" disabled={excedeSaldo} onClick={() => printDocumentById("informe-convenio-print")}>Imprimir / Guardar PDF</button>
+      <button type="button" className="new-consultation" disabled={excedeSaldo} onClick={() => printDocumentById("informe-convenio-print", { unaHoja: true })}>Imprimir / Guardar PDF</button>
       <Link className="outline-action" href={`/cuentas-cobrar?convenio=${convenioId}`}>Ver cuentas por cobrar</Link>
       <p className="field-hint" style={{ flexBasis: "100%" }}>Revisa los valores antes de imprimir; puedes cambiar el valor a descontar o quitar a alguien.</p>
     </div>

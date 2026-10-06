@@ -17,7 +17,40 @@ function waitForAsset(element: HTMLLinkElement | HTMLImageElement): Promise<void
   });
 }
 
-async function prepareDocument(doc: Document, target: HTMLElement) {
+// A4 con márgenes de 12 mm (ver @page en globals.css): área útil 186 × 273 mm.
+const MM = 96 / 25.4;
+const A4_UTIL_ALTO_PX = 273 * MM;
+
+// Reglas de @media print del sistema, para simular en pantalla cómo quedará la hoja y medirla.
+function reglasDeImpresion() {
+  let css = "";
+  for (const sheet of Array.from(document.styleSheets)) {
+    let rules: CSSRuleList;
+    try { rules = sheet.cssRules; } catch { continue; }
+    for (const rule of Array.from(rules)) {
+      if (rule instanceof CSSMediaRule && /\bprint\b/.test(rule.media.mediaText)) css += Array.from(rule.cssRules, (r) => r.cssText).join("\n");
+    }
+  }
+  return css;
+}
+
+// Reduce el documento lo justo para que quepa en una sola hoja A4 (recetas, revisiones, informes de convenio).
+function ajustarAUnaHoja(doc: Document, copy: HTMLElement) {
+  const sim = doc.createElement("style");
+  sim.textContent = `${reglasDeImpresion()}\nbody.print-context { width: 186mm !important; }`;
+  doc.head.appendChild(sim);
+  copy.style.zoom = "";
+  void doc.body.offsetHeight;
+  const alto = copy.getBoundingClientRect().height;
+  sim.remove();
+  if (alto > A4_UTIL_ALTO_PX) {
+    // 2 % de margen de seguridad por diferencias de redondeo entre pantalla e impresora.
+    copy.style.zoom = String(Math.max(0.4, (A4_UTIL_ALTO_PX / alto) * 0.98));
+  }
+  copy.style.breakInside = "avoid";
+}
+
+async function prepareDocument(doc: Document, target: HTMLElement, unaHoja = false) {
   doc.open();
   doc.write("<!doctype html><html lang='es'><head></head><body class='print-context'></body></html>");
   doc.close();
@@ -57,9 +90,10 @@ async function prepareDocument(doc: Document, target: HTMLElement) {
   window.clearTimeout(fontTimeout);
   // Force layout after fonts and images have settled, before opening preview.
   void doc.body.offsetHeight;
+  if (unaHoja) ajustarAUnaHoja(doc, copy);
 }
 
-async function printInNewWindow(target: HTMLElement) {
+async function printInNewWindow(target: HTMLElement, unaHoja = false) {
   // Open before waiting for assets so iOS retains the user gesture.
   const popup = window.open("", "_blank");
   if (!popup) {
@@ -67,7 +101,7 @@ async function printInNewWindow(target: HTMLElement) {
     return;
   }
   try {
-    await prepareDocument(popup.document, target);
+    await prepareDocument(popup.document, target, unaHoja);
     popup.focus();
     popup.print();
   } catch (error) {
@@ -77,14 +111,14 @@ async function printInNewWindow(target: HTMLElement) {
   // Leave the document available: Safari can return before preview opens.
 }
 
-async function printDocument(target: HTMLElement | null) {
+async function printDocument(target: HTMLElement | null, unaHoja = false) {
   if (!target || printing) return;
   printing = true;
   cleanupPreviousFrame?.();
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
     || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
   if (isIOS) {
-    try { await printInNewWindow(target); }
+    try { await printInNewWindow(target, unaHoja); }
     finally { printing = false; }
     return;
   }
@@ -106,7 +140,7 @@ async function printDocument(target: HTMLElement | null) {
     const doc = frame.contentDocument;
     const printWindow = frame.contentWindow;
     if (!doc || !printWindow) throw new Error("No se pudo preparar la impresión.");
-    await prepareDocument(doc, target);
+    await prepareDocument(doc, target, unaHoja);
     printWindow.addEventListener("afterprint", cleanup, { once: true });
     printWindow.focus();
     printWindow.print();
@@ -116,7 +150,7 @@ async function printDocument(target: HTMLElement | null) {
   } catch (error) {
     cleanup();
     console.error("Error al imprimir el documento; intentando una ventana nueva", error);
-    await printInNewWindow(target);
+    await printInNewWindow(target, unaHoja);
   } finally {
     printing = false;
   }
@@ -127,4 +161,5 @@ export const printCurrentDocument = (source?: HTMLElement) => {
   const target = source?.closest<HTMLElement>(".print-area") ?? (areas.length === 1 ? areas[0] : null);
   return printDocument(target);
 };
-export const printDocumentById = (targetId: string) => printDocument(document.getElementById(targetId));
+// unaHoja: el documento se reduce para que siempre quepa en una sola hoja A4.
+export const printDocumentById = (targetId: string, opciones?: { unaHoja?: boolean }) => printDocument(document.getElementById(targetId), opciones?.unaHoja ?? false);
