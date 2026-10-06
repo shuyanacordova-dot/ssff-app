@@ -12,7 +12,7 @@ import { BranchDirectory } from "./branch-selector";
 const money = (value: number) => new Intl.NumberFormat("es-EC", { style: "currency", currency: "USD" }).format(value);
 const pct = (actual: number, meta: number) => meta > 0 ? Math.round((actual / meta) * 100) : 0;
 
-export type ResumenHoy = { sucursal: string; ventas_brutas: number; cobro_efectivo: number; cobro_tarjeta: number; cobro_transferencia_pichincha: number; cobro_transferencia_guayaquil: number; cobro_transferencia_internacional: number; cobro_credito: number; cobro_otro: number; egresos_efectivo: number; caja_anterior: number; ya_existe: boolean };
+export type ResumenHoy = { sucursal: string; ventas_brutas: number; cobro_efectivo: number; cobro_tarjeta: number; cobro_transferencia_pichincha: number; cobro_transferencia_guayaquil: number; cobro_transferencia_internacional: number; cobro_credito: number; cobro_otro: number; egresos_efectivo: number; egresos_banco: number; caja_anterior: number; ya_existe: boolean };
 
 function ResumenDelDia({ r }: { r: ResumenHoy }) {
   const transferencias = r.cobro_transferencia_pichincha + r.cobro_transferencia_guayaquil + r.cobro_transferencia_internacional;
@@ -23,6 +23,8 @@ function ResumenDelDia({ r }: { r: ResumenHoy }) {
     <div className="consultation-stats dashboard-today-stats">
       <span><strong>Ventas del día</strong>{money(r.ventas_brutas)}</span>
       <span><strong>Cobrado hoy</strong>{money(cobrado)}</span>
+      <span><strong>Egresos en efectivo</strong>{money(r.egresos_efectivo)}</span>
+      <span><strong>Egresos por transferencia</strong>{money(r.egresos_banco ?? 0)}</span>
       <span><strong>Efectivo esperado en caja</strong>{money(cajaEsperada)}</span>
     </div>
     <p className="field-hint">{r.ya_existe ? "Caja cerrada" : "Caja abierta"}</p>
