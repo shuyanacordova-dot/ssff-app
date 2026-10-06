@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient, hasSupabaseAdminConfiguration } from "@/lib/supabase/admin";
 import { enviarPlantillaWhatsapp } from "@/lib/whatsapp-cloud";
-import { nombreOpticaLargo, plantillaMeta, primerNombre, type MensajesDia, type TipoPlantilla } from "@/lib/mensajes-dia-textos";
+import { nombreOpticaLargo, plantillaMeta, primerNombre, type MensajesDia, type PlantillaMeta } from "@/lib/mensajes-dia-textos";
+import { plantillasConocidas, type PlantillaMensaje, type TipoPlantilla } from "@/lib/plantillas-mensajes";
 
 // Envío automático diario (Vercel Cron, 16:00 UTC = 11:00 Ecuador). Reemplaza los escenarios de Make.
 // Envía si la empresa tiene "Mensajes automáticos" activado, la sucursal tiene número oficial y existe WHATSAPP_TOKEN:
@@ -12,7 +13,16 @@ export const maxDuration = 300;
 
 type Config = { empresa_id: string; activo: boolean; cumpleanos: boolean; control_anual: boolean; cobros: boolean; max_controles_dia: number; actualizado_por: string | null };
 type Cobro = { paciente_id: string; nombres: string; telefono: string | null; empresa_id: string; saldo: number; dias_deuda: number; cobro_insistente: boolean; frecuencia: string | null; apartado: boolean; fecha_cobro_acordada: string | null };
-type Envio = { paciente_id: string; telefono: string | null; tipo: "cumpleanos" | "control" | "cobro"; plantilla: TipoPlantilla; parametros: string[]; referencia: string | null; saldo?: number };
+type Envio = { paciente_id: string; telefono: string | null; tipo: "cumpleanos" | "control" | "cobro"; plantilla: TipoPlantilla; valores: Record<string, string>; referencia: string | null; saldo?: number };
+
+// Usa la plantilla activa elegida en "Mensajes del día → Plantillas"; si no hay, la de siempre.
+function resolverPlantilla(activas: PlantillaMensaje[], empresaId: string, tipo: TipoPlantilla, valores: Record<string, string>): { plantilla: PlantillaMeta; parametros: string[] } {
+  const activa = activas.find((p) => p.empresa_id === empresaId && p.tipo === tipo && p.activa && p.estado === "APPROVED");
+  if (activa) return { plantilla: { nombre: activa.nombre_meta, idioma: "es_EC", imagen: activa.imagen ?? undefined }, parametros: activa.variables.map((v) => valores[v] ?? "") };
+  const plantilla = plantillaMeta(empresaId, tipo);
+  const variables = plantillasConocidas.find((c) => c.nombre === plantilla.nombre)?.variables ?? ["nombre"];
+  return { plantilla, parametros: variables.map((v) => valores[v] ?? "") };
+}
 
 const fechaEc = (ymd?: string | null) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "2-digit", year: "numeric" }).format(ymd ? new Date(`${ymd}T12:00:00-05:00`) : new Date());
 
@@ -25,6 +35,8 @@ export async function GET(request: Request) {
   const { data: configs, error } = await supabase.from("mensajes_automaticos_config").select("empresa_id,activo,cumpleanos,control_anual,cobros,max_controles_dia,actualizado_por").eq("activo", true);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  const { data: plantillasData } = await supabase.from("plantillas_mensajes").select("empresa_id,tipo,nombre_meta,variables,imagen,estado,activa").eq("activa", true);
+  const activas = (plantillasData ?? []) as PlantillaMensaje[];
   const resumen: Record<string, { enviados: number; errores: number }> = {};
   for (const config of (configs ?? []) as Config[]) {
     if (!config.actualizado_por) continue;
@@ -41,29 +53,27 @@ export async function GET(request: Request) {
       if (!diaError && data) {
         const dia = data as MensajesDia;
         if (config.cumpleanos) for (const c of dia.cumpleanos) if (!c.enviado_en && !c.enviado_auto && c.telefono)
-          cola.push({ paciente_id: c.paciente_id, telefono: c.telefono, tipo: "cumpleanos", plantilla: "cumpleanos", parametros: [primerNombre(c.nombres || c.nombre)], referencia: null });
+          cola.push({ paciente_id: c.paciente_id, telefono: c.telefono, tipo: "cumpleanos", plantilla: "cumpleanos", valores: { nombre: primerNombre(c.nombres || c.nombre), optica }, referencia: null });
         if (config.control_anual) dia.controles.filter((c) => !c.enviado_en && !c.enviado_auto && !c.make_ya_envio && c.telefono).slice(0, config.max_controles_dia)
-          .forEach((c) => cola.push(c.meses >= 10
-            ? { paciente_id: c.paciente_id, telefono: c.telefono, tipo: "control", plantilla: "control_anual", parametros: [primerNombre(c.nombres || c.nombre)], referencia: c.consulta_id }
-            : { paciente_id: c.paciente_id, telefono: c.telefono, tipo: "control", plantilla: "control_periodico", parametros: [primerNombre(c.nombres || c.nombre), optica, String(c.meses)], referencia: c.consulta_id }));
+          .forEach((c) => cola.push({ paciente_id: c.paciente_id, telefono: c.telefono, tipo: "control", plantilla: c.meses >= 10 ? "control_anual" : "control_periodico", valores: { nombre: primerNombre(c.nombres || c.nombre), optica, meses: String(c.meses) }, referencia: c.consulta_id }));
       }
 
       if (config.cobros) {
         const { data: cobros } = await supabase.rpc("cola_cobros_automaticos_sistema", { p_sucursal: sucursal.id });
         for (const c of (cobros ?? []) as Cobro[]) {
           if (!c.telefono) continue;
-          const nombre = primerNombre(c.nombres);
+          const valores = { nombre: primerNombre(c.nombres), optica, saldo: Number(c.saldo).toFixed(2), fecha: fechaEc(c.fecha_cobro_acordada) };
           // Misma regla que "Cobros de hoy": insistente o > 90 días sin plan = firme; apartado = recordatorio de apartado.
           const firme = c.cobro_insistente || (!c.frecuencia && !c.apartado && c.dias_deuda > 90);
-          if (firme) cola.push({ paciente_id: c.paciente_id, telefono: c.telefono, tipo: "cobro", plantilla: "cobro_insistente", parametros: [nombre], referencia: null, saldo: Number(c.saldo) });
-          else if (c.apartado && !c.frecuencia) cola.push({ paciente_id: c.paciente_id, telefono: c.telefono, tipo: "cobro", plantilla: "cobro_apartado", parametros: [nombre], referencia: null, saldo: Number(c.saldo) });
-          else cola.push({ paciente_id: c.paciente_id, telefono: c.telefono, tipo: "cobro", plantilla: "cobro", parametros: [nombre, Number(c.saldo).toFixed(2), fechaEc(c.fecha_cobro_acordada)], referencia: null, saldo: Number(c.saldo) });
+          const plantilla: TipoPlantilla = firme ? "cobro_insistente" : c.apartado && !c.frecuencia ? "cobro_apartado" : "cobro";
+          cola.push({ paciente_id: c.paciente_id, telefono: c.telefono, tipo: "cobro", plantilla, valores, referencia: null, saldo: Number(c.saldo) });
         }
       }
 
       const r = resumen[sucursal.nombre] ??= { enviados: 0, errores: 0 };
       for (const item of cola) {
-        const envio = await enviarPlantillaWhatsapp({ phoneId, telefono: item.telefono, plantilla: plantillaMeta(config.empresa_id, item.plantilla), parametros: item.parametros });
+        const elegida = resolverPlantilla(activas, config.empresa_id, item.plantilla, item.valores);
+        const envio = await enviarPlantillaWhatsapp({ phoneId, telefono: item.telefono, plantilla: elegida.plantilla, parametros: elegida.parametros });
         await supabase.from("mensajes_automaticos_envios").insert({ empresa_id: config.empresa_id, sucursal_id: sucursal.id, paciente_id: item.paciente_id, tipo: item.tipo, telefono: item.telefono, estado: envio.ok ? "enviado" : "error", error: envio.ok ? null : `${item.plantilla}: ${envio.error}`, wa_message_id: envio.ok ? envio.id : null });
         if (!envio.ok) { r.errores++; continue; }
         r.enviados++;

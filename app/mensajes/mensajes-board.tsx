@@ -9,8 +9,10 @@ import { mensajeControl, mensajeCumpleanos, type ControlPendiente, type Cumplean
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import { ColaCobrosHoy } from "@/app/cuentas-cobrar/cuentas-cobrar-board";
 import { configurarMensajesAutomaticos, marcarMensajeDia } from "./actions";
+import PlantillasPanel from "./plantillas-panel";
+import { renderPlantilla } from "@/lib/plantillas-mensajes";
 
-type Tab = "cobros" | "cumpleanos" | "controles";
+type Tab = "cobros" | "cumpleanos" | "controles" | "plantillas";
 const fecha = (ymd: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "numeric", month: "short", year: "numeric" }).format(new Date(`${ymd.slice(0, 10)}T12:00:00-05:00`));
 
 export default function MensajesBoard(props: MensajesDiaData) {
@@ -18,6 +20,12 @@ export default function MensajesBoard(props: MensajesDiaData) {
   if (props.status !== "ready" || !props.dia) return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">CONTACTO CON PACIENTES</p><h1>Mensajes del día</h1><p className="subtitle">{props.message ?? "No se pudo abrir esta sección."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/mensajes">Iniciar sesión</Link>}</header></div></main>;
 
   const { dia } = props;
+  // El envío con un toque usa el mismo texto de la plantilla activa (si existe) que el envío automático.
+  const optica = /focus/i.test(props.empresaNombre ?? "") ? "Focus Óptica" : "ShuVision Óptica";
+  const activa = (tipo: string) => props.plantillas.find((p) => p.tipo === tipo && p.activa)?.texto;
+  const primer = (n: string) => { const x = n.trim().split(/\s+/)[0] ?? ""; return x ? x.charAt(0).toUpperCase() + x.slice(1).toLowerCase() : ""; };
+  const textoCumple = (n: string) => { const t = activa("cumpleanos"); return t ? renderPlantilla(t, { nombre: primer(n), optica }) : mensajeCumpleanos(n, props.empresaId); };
+  const textoControl = (n: string, meses: number) => { const t = activa(meses >= 10 ? "control_anual" : "control_periodico"); return t ? renderPlantilla(t, { nombre: primer(n), optica, meses: String(meses) }) : mensajeControl(n, meses, props.empresaId); };
   const cumplePend = dia.cumpleanos.filter((c) => !c.enviado_en && !c.enviado_auto).length;
   const controlPend = dia.controles.filter((c) => !c.enviado_en && !c.enviado_auto).length;
 
@@ -34,19 +42,21 @@ export default function MensajesBoard(props: MensajesDiaData) {
         <button role="tab" type="button" className={tab === "cobros" ? "active" : ""} onClick={() => setTab("cobros")}>Cobros ({props.colaHoy.length})</button>
         <button role="tab" type="button" className={tab === "cumpleanos" ? "active" : ""} onClick={() => setTab("cumpleanos")}>Cumpleaños de hoy ({dia.cumpleanos.length})</button>
         <button role="tab" type="button" className={tab === "controles" ? "active" : ""} onClick={() => setTab("controles")}>Controles ({dia.controles.length})</button>
+        {props.esSuperadmin && <button role="tab" type="button" className={tab === "plantillas" ? "active" : ""} onClick={() => setTab("plantillas")}>Plantillas</button>}
       </div>
+      {tab === "plantillas" && props.esSuperadmin && props.empresaId && <PlantillasPanel plantillas={props.plantillas} empresaId={props.empresaId} empresaNombre={props.empresaNombre} />}
       {tab === "cobros" && <ColaCobrosHoy cola={props.colaHoy} sucursalId={props.sucursalId} sucursalNombre={props.sucursalNombre} error={props.colaHoyError} />}
       {tab === "cumpleanos" && <Lista
         titulo={`Cumpleaños de hoy · ${props.sucursalNombre}`}
         ayuda="Saludo con regalo: ajuste gratis y 15 % de descuento durante un mes."
         vacio="Hoy no cumple años ningún paciente de esta sucursal."
-        items={dia.cumpleanos.map((c: CumpleanosHoy) => ({ id: c.paciente_id, nombre: c.nombre, telefono: c.telefono, enviadoEn: c.enviado_en, auto: c.enviado_auto, referencia: null, detalle: c.edad ? `Cumple ${c.edad} años` : "Cumple años hoy", badges: [], mensaje: mensajeCumpleanos(c.nombres || c.nombre, props.empresaId) }))}
+        items={dia.cumpleanos.map((c: CumpleanosHoy) => ({ id: c.paciente_id, nombre: c.nombre, telefono: c.telefono, enviadoEn: c.enviado_en, auto: c.enviado_auto, referencia: null, detalle: c.edad ? `Cumple ${c.edad} años` : "Cumple años hoy", badges: [], mensaje: textoCumple(c.nombres || c.nombre) }))}
         motivo="cumpleanos" {...props} />}
       {tab === "controles" && <Lista
         titulo={`Controles · ${props.sucursalNombre}`}
         ayuda="Controles programados (3, 6 o 12 meses) y, cada año, el aniversario de la última revisión (también las importadas de Optox) para mantener la relación con el paciente."
         vacio="No hay controles por avisar hoy en esta sucursal."
-        items={dia.controles.map((c: ControlPendiente) => ({ id: c.paciente_id, nombre: c.nombre, telefono: c.telefono, enviadoEn: c.enviado_en, auto: c.enviado_auto, referencia: c.consulta_id, detalle: c.tipo === "aniversario" ? `Última revisión: ${fecha(c.ultima_revision)} · cumple ${c.anios} ${c.anios === 1 ? "año" : "años"} el ${fecha(c.vence)}` : `Última revisión: ${fecha(c.ultima_revision)} · control programado el ${fecha(c.vence)}`, badges: [c.tipo === "aniversario" ? "Control anual" : c.meses >= 10 ? "Control anual" : `Control de ${c.meses} meses`, ...(c.make_ya_envio ? ["Make ya le escribió"] : [])], mensaje: mensajeControl(c.nombres || c.nombre, c.meses, props.empresaId) }))}
+        items={dia.controles.map((c: ControlPendiente) => ({ id: c.paciente_id, nombre: c.nombre, telefono: c.telefono, enviadoEn: c.enviado_en, auto: c.enviado_auto, referencia: c.consulta_id, detalle: c.tipo === "aniversario" ? `Última revisión: ${fecha(c.ultima_revision)} · cumple ${c.anios} ${c.anios === 1 ? "año" : "años"} el ${fecha(c.vence)}` : `Última revisión: ${fecha(c.ultima_revision)} · control programado el ${fecha(c.vence)}`, badges: [c.tipo === "aniversario" ? "Control anual" : c.meses >= 10 ? "Control anual" : `Control de ${c.meses} meses`, ...(c.make_ya_envio ? ["Make ya le escribió"] : [])], mensaje: textoControl(c.nombres || c.nombre, c.meses) }))}
         motivo="control" {...props} />}
     </section>
   </div></main>;

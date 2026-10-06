@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { mensajeControlAnual, mensajeCumpleanos } from "@/lib/mensajes-dia-textos";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { sincronizarPlantillas } from "@/lib/plantillas-meta";
 
 // Crea en Meta (cuenta de WhatsApp de ShuVision) las plantillas que faltan para el envío automático y devuelve
 // su estado de aprobación. Protegido con CRON_SECRET. Se puede llamar varias veces: solo crea las que no existen.
@@ -41,5 +43,7 @@ export async function GET(request: Request) {
     });
     resultado[def.name] = await res.json().catch(() => res.status);
   }
+  // Importa a LumOS (Mensajes del día → Plantillas) las plantillas y su estado.
+  await sincronizarPlantillas(createSupabaseAdminClient());
   return NextResponse.json(resultado);
 }

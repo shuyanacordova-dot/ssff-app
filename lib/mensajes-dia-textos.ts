@@ -1,3 +1,5 @@
+import type { TipoPlantilla } from "@/lib/plantillas-mensajes";
+
 // Textos de "Mensajes del día": los mismos que enviaba Make (plantillas aprobadas en Meta
 // "feliz_cumpleanos" y "recordatorio_control_anual", idioma es_EC). Se usan para el envío con un toque
 // (wa.me) y como referencia del envío automático.
@@ -30,7 +32,6 @@ export function mensajeControlAnual(nombre: string, empresaId?: string | null) {
 
 // Plantillas de Meta (WhatsApp Cloud API) del envío automático. Shuvisión usa las aprobadas en tiempo de Make;
 // Focus usa las suyas ("_focus") y el control de 3/6 meses usa "recordatorio_control_periodico" (creadas 2026-10-06).
-export type TipoPlantilla = "cumpleanos" | "control_anual" | "control_periodico" | "cobro" | "cobro_insistente" | "cobro_apartado";
 export type PlantillaMeta = { nombre: string; idioma: string; imagen?: string };
 const IMG_CUMPLE = "https://res.cloudinary.com/ip1jz9eg/image/upload/v1787675996/ChatGPT_Image_23_ago_2026_23_43_46.png";
 const IMG_CONTROL = "https://res.cloudinary.com/ip1jz9eg/image/upload/v1787676005/ChatGPT_Image_23_ago_2026_23_53_31.png";
