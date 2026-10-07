@@ -78,12 +78,11 @@ function AtajoEgresos() {
   const [aviso, setAviso] = useState("");
   const copiar = async (valor: string) => { try { await navigator.clipboard.writeText(valor); setAviso("Copiado."); } catch { setAviso("No se pudo copiar. Mantén presionado el texto para copiarlo."); } };
   return <details style={{ marginBottom: 16 }}><summary>Registrar egresos desde el iPhone</summary><div style={{ paddingTop: 12 }}>
-    <p><strong>Opción 1 · Ícono en la pantalla de inicio</strong></p>
-    <ol><li>En el iPhone abre en Safari: <a href="/egreso">{egresoUrl}</a></li><li>Toca Compartir → “Añadir a pantalla de inicio”.</li></ol>
-    <p><strong>Opción 2 · Atajo con Siri (iOS 27)</strong></p>
-    <p className="field-hint">Abre Atajos, crea uno nuevo y pega esta frase:</p>
+    <p><strong>1 · Ícono “Egreso” en el iPhone</strong></p>
+    <ol><li>Abre en Safari: <a href="/egreso">{egresoUrl}</a></li><li>Compartir → “Añadir a pantalla de inicio” → Añadir.</li><li>Abre el ícono e inicia sesión una vez.</li></ol>
+    <p className="field-hint">Con Siri: «Oye Siri, abre Egreso». Igual para tareas con {egresoUrl.replace("/egreso", "/tareas?nueva=1")} (ícono “Tarea”).</p>
+    <p><strong>2 · Atajo con IA (opcional)</strong></p>
     <div className="cob-row"><code style={{ overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>{promptAtajo}</code><button className="text-action" type="button" onClick={() => void copiar(promptAtajo)}>Copiar</button></div>
-    <p className="field-hint">Luego di «Oye Siri, registrar egreso», revisa y toca Guardar egreso.</p>
     {aviso && <p className="notice" role="status">{aviso}</p>}
   </div></details>;
 }

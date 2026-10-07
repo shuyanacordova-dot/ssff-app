@@ -3,6 +3,8 @@ import TaskBoard from "./task-board";
 
 export const dynamic = "force-dynamic";
 
-export default async function TareasPage() {
-  return <TaskBoard {...await getTaskData()} />;
+// ?nueva=1 abre directo el formulario de nueva tarea (ícono "Tarea" en el iPhone).
+export default async function TareasPage({ searchParams }: { searchParams: Promise<{ nueva?: string }> }) {
+  const query = await searchParams;
+  return <TaskBoard {...await getTaskData()} autoNueva={query.nueva === "1"} />;
 }

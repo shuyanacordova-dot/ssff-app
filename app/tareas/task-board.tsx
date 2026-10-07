@@ -12,9 +12,9 @@ const pretty = (text: string) => text.charAt(0).toUpperCase() + text.slice(1).re
 const pendingStates: TaskStatus[] = ["pendiente", "en_proceso", "devuelta"];
 const reviewStates: TaskStatus[] = ["completada", "en_revision"];
 
-export default function TaskBoard(props: TaskData & { embedded?: boolean }) {
+export default function TaskBoard(props: TaskData & { embedded?: boolean; autoNueva?: boolean }) {
   const router = useRouter();
-  const [showNew, setShowNew] = useState(false); const [showMore, setShowMore] = useState(false); const [view, setView] = useState<"asignadas" | "revision" | "completadas">("asignadas"); const [notice, setNotice] = useState(props.message ?? ""); const [pending, startTransition] = useTransition();
+  const [showNew, setShowNew] = useState(!!props.autoNueva); const [showMore, setShowMore] = useState(false); const [view, setView] = useState<"asignadas" | "revision" | "completadas">("asignadas"); const [notice, setNotice] = useState(props.message ?? ""); const [pending, startTransition] = useTransition();
   const [tasks, setTasks] = useState(props.tasks);
   useEffect(() => setTasks(props.tasks), [props.tasks]);
   const supervisorIds = new Set(props.supervisorTaskIds);
