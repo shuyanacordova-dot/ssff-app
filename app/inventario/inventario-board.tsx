@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { AlertTriangle, ArrowLeftRight, Calculator, ClipboardList, Glasses, Package, Plus, ShoppingBag, Upload, X } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import type { InventarioData, MovimientoInventario, Producto } from "@/lib/inventario";
-import { actualizarProductoInventario, actualizarStockMinimo, crearArmazonesMasivo, crearMovimientoInventario, crearProductoInventario, transferirInventario, type ArmazonMasivo } from "./actions";
+import { actualizarProductoInventario, actualizarStockMinimo, crearArmazonesMasivo, crearMovimientoInventario, crearProductoInventario, sucursalesParaIngreso, transferirInventario, type ArmazonMasivo } from "./actions";
 
 const normalizeSearch = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
@@ -132,7 +132,7 @@ export default function InventarioBoard(props: InventarioData & { grupoInicial?:
     {editingProducto && <ProductoModal empresaId={empresaId} categoriaInicial={editingProducto.categoria} companies={props.companies} branches={branches} producto={editingProducto} pending={pending} onClose={() => setEditingProducto(null)} onSubmit={(form) => startTransition(async () => { try { await actualizarProductoInventario(form); setNotice("Producto actualizado."); setEditingProducto(null); } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo actualizar el producto."); } })} />}
     {showMovimiento && <MovimientoModal productos={productosGrupo.filter((p) => p.controla_inventario)} branches={branches} pending={pending} onClose={() => setShowMovimiento(false)} onSubmit={(form) => runAction(() => crearMovimientoInventario(form), "Movimiento registrado.")} />}
     {showTransfer && <TransferModal productos={productosGrupo.filter((p) => p.controla_inventario)} branches={branches} pending={pending} onClose={() => setShowTransfer(false)} onSubmit={(form) => runAction(() => transferirInventario(form), "Transferencia registrada.")} />}
-    {showMasivo && <MasivoModal empresaId={empresaId} branches={branches} pending={pending} onClose={() => setShowMasivo(false)} onSubmit={(sucursalId, items) => runAction(() => crearArmazonesMasivo(empresaId, sucursalId, items), "Armazones creados.")} />}
+    {showMasivo && <MasivoModal branches={branches} pending={pending} onClose={() => setShowMasivo(false)} onSubmit={(sucursalId, items) => startTransition(async () => { try { const result = await crearArmazonesMasivo(sucursalId, items); setNotice(`${result.creados} armazón(es) creados.${result.errores.length ? ` Errores: ${result.errores.join(" · ")}` : ""}`); setShowMasivo(false); } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudieron crear los armazones."); } })} />}
     </>}
   </div></main>;
 }
@@ -224,34 +224,60 @@ function TransferModal({ productos, branches, pending, onClose, onSubmit }: { pr
   </div><div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" disabled={pending} type="submit">{pending ? "Guardando…" : "Registrar transferencia"}</button></div></form></section></div>;
 }
 
-const filaVacia = (): ArmazonMasivo => ({ nombre: "", categoria: "montura", clasificacion: "", codigo: "", codigo_barra: "", proveedor: "", precio_venta: "", costo_referencial: "", cantidad_inicial: "" });
+const filaVacia = (): ArmazonMasivo => ({ nombre: "", marca: "", modelo: "", color: "", material: "", categoria: "montura", clasificacion: "", proveedor: "", codigo: "", codigo_barra: "", medida_puente: "", precio_venta: "", precio_venta_2: "", precio_venta_3: "", costo_referencial: "", cantidad_inicial: "" });
 
-function MasivoModal({ empresaId, branches, pending, onClose, onSubmit }: { empresaId: string; branches: InventarioData["branches"]; pending: boolean; onClose: () => void; onSubmit: (sucursalId: string, items: ArmazonMasivo[]) => void }) {
+function MasivoModal({ branches, pending, onClose, onSubmit }: { branches: InventarioData["branches"]; pending: boolean; onClose: () => void; onSubmit: (sucursalId: string, items: ArmazonMasivo[]) => void }) {
   const [sucursalId, setSucursalId] = useState("");
+  const [opciones, setOpciones] = useState<InventarioData["branches"]>(branches);
   const [filas, setFilas] = useState<ArmazonMasivo[]>([filaVacia(), filaVacia(), filaVacia()]);
-  const update = (index: number, patch: Partial<ArmazonMasivo>) => setFilas(filas.map((f, i) => i === index ? { ...f, ...patch } : f));
+  const [estado, setEstado] = useState("");
+  useEffect(() => { let activo = true; sucursalesParaIngreso().then((rows) => { if (activo) setOpciones(rows); }).catch(() => setEstado("No se pudieron cargar las sucursales.")); return () => { activo = false; }; }, []);
+  const update = (index: number, patch: Partial<ArmazonMasivo>) => setFilas((actuales) => actuales.map((f, i) => i === index ? { ...f, ...patch } : f));
+  const quitar = (index: number) => setFilas((actuales) => actuales.filter((_, i) => i !== index));
   const validas = filas.filter((f) => f.nombre.trim()).length;
-  return <div className="modal-backdrop"><section className="new-patient-modal sale-modal-shell" role="dialog" aria-modal="true" aria-labelledby="masivo-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button><p className="section-label">SUBIDA MASIVA</p><h2 id="masivo-title">Añadir varios armazones</h2><p>Completa las filas que necesites; las vacías se ignoran. La cantidad inicial se carga en la sucursal elegida abajo.</p>
-    <div className="new-patient-form" style={{ marginBottom: 12 }}><label>Sucursal para el stock inicial<select value={sucursalId} onChange={(event) => setSucursalId(event.target.value)}><option value="">Sin cargar stock (solo crear catálogo)</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label></div>
-    <div style={{ display: "grid", gap: 10 }}>
+  const cargarArchivo = async (file?: File) => {
+    if (!file) return;
+    try {
+      const XLSX = await import("xlsx");
+      const libro = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const hoja = libro.Sheets[libro.SheetNames.includes("Armazones") ? "Armazones" : libro.SheetNames[0]];
+      if (!hoja) throw new Error("Hoja vacía");
+      const nombres: Record<string, keyof ArmazonMasivo> = { nombre: "nombre", marca: "marca", modelo: "modelo", color: "color", material: "material", tipo: "categoria", clasificacion: "clasificacion", proveedor: "proveedor", codigo: "codigo", "codigo de la varilla": "codigo_barra", "medida puente": "medida_puente", "precio de venta": "precio_venta", "precio 2": "precio_venta_2", "precio 3": "precio_venta_3", costo: "costo_referencial", cantidad: "cantidad_inicial" };
+      const normalizar = (value: string) => value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      const leidas = XLSX.utils.sheet_to_json<Record<string, unknown>>(hoja, { defval: "", raw: false }).map((row) => {
+        const item = filaVacia();
+        for (const [header, value] of Object.entries(row)) { const campo = nombres[normalizar(header)]; if (campo) item[campo] = String(value ?? "").trim(); }
+        return item;
+      }).filter((item) => item.nombre.trim());
+      if (!leidas.length) throw new Error("Sin armazones");
+      setFilas(leidas);
+      setEstado(`Se leyeron ${leidas.length} armazones de ${file.name}. Revisa y toca Crear.`);
+    } catch { setEstado("No se pudo leer el archivo. Usa la plantilla."); }
+  };
+  return <div className="modal-backdrop"><section className="new-patient-modal sale-modal-shell" role="dialog" aria-modal="true" aria-labelledby="masivo-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button><p className="section-label">SUBIDA MASIVA</p><h2 id="masivo-title">Añadir varios armazones</h2><p>Descarga la plantilla, llénala en Excel o Numbers y cárgala aquí, o escribe las filas.</p>
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}><a className="outline-action" href="/plantillas/plantilla_armazones.xlsx" download>Descargar plantilla de Excel</a><label className="outline-action" style={{ cursor: "pointer" }}>Cargar Excel o Numbers<input type="file" accept=".xlsx,.xls,.csv,.numbers" style={{ display: "none" }} onChange={(event) => { void cargarArchivo(event.target.files?.[0]); event.target.value = ""; }} /></label></div>
+    {estado && <p role="status" className="field-hint">{estado}</p>}
+    <div className="new-patient-form" style={{ marginBottom: 12 }}><label>Sucursal donde entran<select required value={sucursalId} onChange={(event) => setSucursalId(event.target.value)}><option value="" disabled>Selecciona una sucursal</option>{opciones.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label></div>
+    {filas.length > 15 ? <div style={{ overflowX: "auto" }}><table><thead><tr><th>Nombre</th><th>Marca</th><th>Precio</th><th>Cantidad</th><th></th></tr></thead><tbody>{filas.map((fila, index) => <tr key={index}><td>{fila.nombre}</td><td>{fila.marca}</td><td>{fila.precio_venta}</td><td>{fila.cantidad_inicial}</td><td><button type="button" className="text-action" onClick={() => quitar(index)}>Quitar</button></td></tr>)}</tbody></table></div> : <div style={{ display: "grid", gap: 10 }}>
       {filas.map((fila, index) => <div key={index} className="glass clinical-card" style={{ minHeight: "auto", padding: 12 }}>
         <div className="new-patient-form">
           <label>Nombre<input value={fila.nombre} onChange={(event) => update(index, { nombre: event.target.value })} placeholder="Ej.: Ray-Ban RB2140" /></label>
+          {([ ["Marca", "marca"], ["Modelo", "modelo"], ["Color", "color"], ["Material", "material"] ] as const).map(([label, campo]) => <label key={campo}>{label}<input value={fila[campo]} onChange={(event) => update(index, { [campo]: event.target.value })} /></label>)}
           <label>Tipo<select value={fila.categoria} onChange={(event) => update(index, { categoria: event.target.value })}><option value="montura">Montura</option><option value="gafas_sol">Gafas de sol</option></select></label>
           <label>Clasificación<input value={fila.clasificacion} onChange={(event) => update(index, { clasificacion: event.target.value })} placeholder="Ej.: Fino, Exclusivo" /></label>
           <label>Proveedor<input value={fila.proveedor} onChange={(event) => update(index, { proveedor: event.target.value })} /></label>
           <label>Código<input value={fila.codigo} onChange={(event) => update(index, { codigo: event.target.value })} /></label>
           <label>Código de la varilla<input value={fila.codigo_barra} onChange={(event) => update(index, { codigo_barra: event.target.value })} /></label>
-          <label>Precio de venta<input type="number" min="0" step="0.01" value={fila.precio_venta} onChange={(event) => update(index, { precio_venta: event.target.value })} /></label>
-          <label>Costo referencial<input type="number" min="0" step="0.01" value={fila.costo_referencial} onChange={(event) => update(index, { costo_referencial: event.target.value })} /></label>
-          <label>Cantidad inicial<input type="number" min="0" step="1" value={fila.cantidad_inicial} onChange={(event) => update(index, { cantidad_inicial: event.target.value })} disabled={!sucursalId} placeholder={sucursalId ? "0" : "Elige sucursal"} /></label>
+          <label>Medida puente<input value={fila.medida_puente} onChange={(event) => update(index, { medida_puente: event.target.value })} /></label>
+          {([ ["Precio de venta", "precio_venta"], ["Precio 2", "precio_venta_2"], ["Precio 3", "precio_venta_3"], ["Costo referencial", "costo_referencial"] ] as const).map(([label, campo]) => <label key={campo}>{label}<input type="text" inputMode="decimal" value={fila[campo]} onChange={(event) => update(index, { [campo]: event.target.value })} /></label>)}
+          <label>Cantidad inicial<input type="number" min="0" step="1" value={fila.cantidad_inicial} onChange={(event) => update(index, { cantidad_inicial: event.target.value })} placeholder="0" /></label>
         </div>
-        {filas.length > 1 && <button type="button" className="text-action" style={{ marginTop: 8 }} onClick={() => setFilas(filas.filter((_, i) => i !== index))}>Quitar fila</button>}
+        {filas.length > 1 && <button type="button" className="text-action" style={{ marginTop: 8 }} onClick={() => quitar(index)}>Quitar fila</button>}
       </div>)}
-    </div>
+    </div>}
     <div className="modal-actions" style={{ justifyContent: "space-between", marginTop: 14 }}>
-      <button type="button" className="outline-action" onClick={() => setFilas([...filas, filaVacia()])}><Plus size={15} /> Agregar fila</button>
-      <div style={{ display: "flex", gap: 8 }}><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" disabled={pending || validas === 0} type="button" onClick={() => onSubmit(sucursalId, filas)}>{pending ? "Guardando…" : `Crear ${validas || ""} armazón(es)`}</button></div>
+      <button type="button" className="outline-action" onClick={() => setFilas((actuales) => [...actuales, filaVacia()])}><Plus size={15} /> Agregar fila</button>
+      <div style={{ display: "flex", gap: 8 }}><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" disabled={pending || !sucursalId || validas === 0} type="button" onClick={() => onSubmit(sucursalId, filas)}>{pending ? "Guardando…" : `Crear ${validas || ""} armazón(es)`}</button></div>
     </div>
   </section></div>;
 }
