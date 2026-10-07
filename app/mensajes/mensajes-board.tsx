@@ -5,7 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Bot, Cake, CalendarClock, Coins, Eye, FolderOpen, MessageCircle, Power } from "lucide-react";
 import type { MensajesDiaData } from "@/lib/mensajes-dia";
-import { mensajeControl, mensajeCumpleanos, mensajePostventa, mensajeResena, plantillaMeta, type ControlPendiente, type CumpleanosHoy, type EntregaPendiente } from "@/lib/mensajes-dia-textos";
+import { conTarjeta, limpiarWhatsapp, mensajeControl, mensajeCumpleanos, mensajePostventa, mensajeResena, plantillaMeta, type ControlPendiente, type CumpleanosHoy, type EntregaPendiente } from "@/lib/mensajes-dia-textos";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import { ColaCobrosHoy } from "@/app/cuentas-cobrar/cuentas-cobrar-board";
 import { configurarMensajesAutomaticos, guardarResenaUrl, marcarMensajeDia } from "./actions";
@@ -24,8 +24,8 @@ export default function MensajesBoard(props: MensajesDiaData) {
   const optica = /focus/i.test(props.empresaNombre ?? "") ? "Focus Óptica" : "ShuVision Óptica";
   const activa = (tipo: string) => props.plantillas.find((p) => p.tipo === tipo && p.activa)?.texto;
   const primer = (n: string) => { const x = n.trim().split(/\s+/)[0] ?? ""; return x ? x.charAt(0).toUpperCase() + x.slice(1).toLowerCase() : ""; };
-  const textoCumple = (n: string) => { const t = activa("cumpleanos"); return t ? renderPlantilla(t, { nombre: primer(n), optica }) : mensajeCumpleanos(n, props.empresaId); };
-  const textoControl = (n: string, meses: number) => { const t = activa(meses >= 10 ? "control_anual" : "control_periodico"); return t ? renderPlantilla(t, { nombre: primer(n), optica, meses: String(meses) }) : mensajeControl(n, meses, props.empresaId); };
+  const textoCumple = (n: string) => { const t = activa("cumpleanos"); return conTarjeta(t ? renderPlantilla(t, { nombre: primer(n), optica }) : mensajeCumpleanos(n, props.empresaId), "cumple", props.empresaId); };
+  const textoControl = (n: string, meses: number) => { const t = activa(meses >= 10 ? "control_anual" : "control_periodico"); return conTarjeta(t ? renderPlantilla(t, { nombre: primer(n), optica, meses: String(meses) }) : mensajeControl(n, meses, props.empresaId), "control", props.empresaId); };
   const cumplePend = dia.cumpleanos.filter((c) => !c.enviado_en && !c.enviado_auto).length;
   const controlPend = dia.controles.filter((c) => !c.enviado_en && !c.enviado_auto).length;
   const imagen = (tipo: "cumpleanos" | "control_anual") => props.plantillas.find((p) => p.tipo === tipo && p.activa)?.imagen || (props.empresaId ? plantillaMeta(props.empresaId, tipo).imagen : undefined);
@@ -140,7 +140,7 @@ function EntregasLista({ entregas, resenaUrl, esSuperadmin, empresaId, sucursalI
   const registrar = (item: EntregaPendiente, motivo: "postventa" | "resena", abrir: boolean) => {
     if (!empresaId || !sucursalId) return;
     if (abrir) {
-      const mensaje = motivo === "postventa" ? mensajePostventa(item.nombres || item.nombre, empresaId) : mensajeResena(item.nombres || item.nombre, empresaId, resenaUrl ?? "");
+      const mensaje = limpiarWhatsapp(motivo === "postventa" ? mensajePostventa(item.nombres || item.nombre, empresaId) : mensajeResena(item.nombres || item.nombre, empresaId, resenaUrl ?? ""));
       const destino = enlaceWhatsapp(item.telefono, mensaje);
       if (!destino) return;
       const ventana = window.open(destino, "_blank");

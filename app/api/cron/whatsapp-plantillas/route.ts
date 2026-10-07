@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { mensajeControlAnual, mensajeCumpleanos } from "@/lib/mensajes-dia-textos";
+import { limpiarWhatsapp, mensajeControlAnual, mensajeCumpleanos } from "@/lib/mensajes-dia-textos";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { sincronizarPlantillas } from "@/lib/plantillas-meta";
 
@@ -16,8 +16,8 @@ const conVariable = (texto: string) => texto.replace("María", "{{1}}");
 const definiciones: Definicion[] = [
   { name: "recordatorio_control_periodico", category: "UTILITY", ejemplo: ["María", "ShuVision Óptica", "6"],
     text: "Hola {{1}} 👋, te saludamos de {{2}}.\n\nEn tu última revisión te indicamos un control visual a los {{3}} meses y ya es momento de hacerlo. 👁️\n\nRevisaremos cómo va tu visión y si tu graduación sigue siendo la adecuada.\n\n📅 Agenda tu control respondiendo a este mensaje. ¡Te esperamos! 💙" },
-  { name: "feliz_cumpleanos_focus", category: "MARKETING", ejemplo: ["María"], text: conVariable(mensajeCumpleanos("María", FOCUS)) },
-  { name: "recordatorio_control_anual_focus", category: "MARKETING", ejemplo: ["María"], text: conVariable(mensajeControlAnual("María", FOCUS)) },
+  { name: "feliz_cumpleanos_focus2", category: "MARKETING", ejemplo: ["María"], text: conVariable(limpiarWhatsapp(mensajeCumpleanos("María", FOCUS))) },
+  { name: "recordatorio_control_anual_focus2", category: "MARKETING", ejemplo: ["María"], text: conVariable(limpiarWhatsapp(mensajeControlAnual("María", FOCUS))) },
   { name: "recordatorio_cobro_focus", category: "UTILITY", ejemplo: ["María", "45.00", "15/10/2026"],
     text: "Hola {{1}}, te recordamos que tienes un saldo pendiente de ${{2}} en Focus Óptica, con fecha de pago {{3}}.\nSi ya realizaste el pago, ignora este mensaje. Si necesitas información sobre tu saldo, responde a este mensaje." },
   { name: "cobranza_insistente_focus", category: "UTILITY", ejemplo: ["María"],
