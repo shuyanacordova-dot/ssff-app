@@ -33,12 +33,14 @@ export async function registrarVenta(form: FormData) {
     const productIds = items.map((item: { producto_id?: string }) => item.producto_id).filter(Boolean);
     const { data: products, error: productsError } = await supabase.from("productos_catalogo").select("id,categoria,empresa_id").in("id", productIds);
     if (productsError || (products?.length ?? 0) !== productIds.length || products?.some((product) => product.empresa_id !== empresaId)) throw new Error("Uno de los productos no pertenece al catálogo seleccionado.");
-    if (!new Set(["rapida", "lentes"]).has(tipoVenta)) throw new Error("Selecciona el tipo de venta.");
-    const allowed = tipoVenta === "rapida" ? new Set(["accesorio", "gafas_sol", "servicio"]) : new Set(["montura", "lente"]);
-    if (products?.some((product) => !allowed.has(product.categoria))) throw new Error(tipoVenta === "rapida" ? "La venta rápida solo admite accesorios, gafas de sol y exámenes." : "La venta de lentes solo admite armazones y lunas.");
+    if (!new Set(["rapida", "lentes", "traspaso"]).has(tipoVenta)) throw new Error("Selecciona el tipo de venta.");
+    // Traspaso: solo armazones (el paciente trae sus lunas).
+    const allowed = tipoVenta === "rapida" ? new Set(["accesorio", "gafas_sol", "servicio"]) : tipoVenta === "traspaso" ? new Set(["montura"]) : new Set(["montura", "lente"]);
+    if (products?.some((product) => !allowed.has(product.categoria))) throw new Error(tipoVenta === "rapida" ? "La venta rápida solo admite accesorios, gafas de sol y exámenes." : tipoVenta === "traspaso" ? "El traspaso solo admite armazones." : "La venta de lentes solo admite armazones y lunas.");
     const { data, error } = await supabase.rpc("registrar_venta", { p_empresa: empresaId, p_sucursal: sucursalId, p_cliente: cliente, p_items: items, p_pagos: payments, p_paciente: pacienteId });
     if (error) throw new Error(error.message);
     ventaId = data as string;
+    await supabase.from("ventas").update({ tipo_venta: tipoVenta }).eq("id", ventaId);
   } catch (error) { throw new Error(error instanceof Error && error.message ? error.message : "No se pudo cerrar la venta."); }
   revalidatePath("/ventas"); revalidatePath("/pacientes");
   return ventaId;
