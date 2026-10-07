@@ -14,7 +14,7 @@ const pct = (actual: number, meta: number) => meta > 0 ? Math.round((actual / me
 
 export type ResumenHoy = { sucursal: string; ventas_brutas: number; cobro_efectivo: number; cobro_tarjeta: number; cobro_transferencia_pichincha: number; cobro_transferencia_guayaquil: number; cobro_transferencia_internacional: number; cobro_credito: number; cobro_otro: number; egresos_efectivo: number; egresos_banco: number; caja_anterior: number; ya_existe: boolean };
 
-function ResumenDelDia({ r }: { r: ResumenHoy }) {
+function ResumenDelDia({ r, faltantes }: { r: ResumenHoy; faltantes: string[] }) {
   const transferencias = r.cobro_transferencia_pichincha + r.cobro_transferencia_guayaquil + r.cobro_transferencia_internacional;
   const cobrado = r.cobro_efectivo + r.cobro_tarjeta + transferencias + r.cobro_credito + r.cobro_otro;
   const cajaEsperada = r.caja_anterior + r.cobro_efectivo - r.egresos_efectivo;
@@ -28,10 +28,11 @@ function ResumenDelDia({ r }: { r: ResumenHoy }) {
       <span><strong>Efectivo esperado en caja</strong>{money(cajaEsperada)}</span>
     </div>
     <p className="field-hint">{r.ya_existe ? "Caja cerrada" : "Caja abierta"}</p>
+    {faltantes.length > 0 && <Link href="/caja" className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 700, textDecoration: "none" }}>Falta el cuadre de: {faltantes.map((dia) => new Intl.DateTimeFormat("es-EC", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${dia}T12:00:00Z`))).join(", ")} · Hacer cuadre</Link>}
   </section>;
 }
 
-export default function DashboardShell({ taskData, informeMensual, metasMessage, resumenHoy, cobrosHoy, acumulado }: { taskData: TaskData; informeMensual: InformeMensual | null; metasMessage?: string; resumenHoy?: ResumenHoy | null; cobrosHoy: { cantidad: number; total: number }; acumulado?: DineroDisponible[] | null }) {
+export default function DashboardShell({ taskData, informeMensual, metasMessage, resumenHoy, cobrosHoy, acumulado, cuadresFaltantes = [] }: { taskData: TaskData; informeMensual: InformeMensual | null; metasMessage?: string; resumenHoy?: ResumenHoy | null; cobrosHoy: { cantidad: number; total: number }; acumulado?: DineroDisponible[] | null; cuadresFaltantes?: string[] }) {
   const role = taskData.profile?.rol;
   const canVerInformes = role === "superadmin" || role === "admin_sucursal";
 
@@ -52,7 +53,7 @@ export default function DashboardShell({ taskData, informeMensual, metasMessage,
     </section>
 
     {cobrosHoy.cantidad > 0 && <section className="glass cob-dashboard-banner"><span>Hoy hay <strong>{cobrosHoy.cantidad}</strong> mensajes de cobro por enviar ({money(cobrosHoy.total)})</span><Link className="outline-action" href="/cuentas-cobrar">Ver cobros de hoy</Link></section>}
-    {resumenHoy && <ResumenDelDia r={resumenHoy} />}
+    {resumenHoy && <ResumenDelDia r={resumenHoy} faltantes={cuadresFaltantes} />}
     {acumulado && acumulado.length > 0 && <AcumuladoOpticas filas={acumulado} />}
     <section className="dashboard-main dashboard-main-wide">
       {canVerInformes && <MetasDashboard informe={informeMensual} message={metasMessage} />}

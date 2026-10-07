@@ -19,12 +19,13 @@ const formatDate = formatRecordDate;
 const bancoLabel: Record<string, string> = { pichincha: "Banco Pichincha", guayaquil: "Banco Guayaquil", internacional: "Banco Internacional" };
 const clasificacionLabel: Record<string, string> = { salarios: "Salarios", pago_proveedor: "Pago a proveedor", gastos_mensuales: "Gastos mensuales", gastos_operacion: "Gastos de operación", ajuste: "Ajuste" };
 
-export default function CajaBoard(props: CajaData & { autoGasto?: boolean }) {
+export default function CajaBoard(props: CajaData & { autoGasto?: boolean; faltantes?: Record<string, string[]> }) {
   const [notice, setNotice] = useState(props.message ?? "");
   const [sucursalVista, setSucursalVista] = useState(() => props.branches.some((b) => b.id === props.profile?.sucursal_id) ? props.profile?.sucursal_id ?? "" : props.branches[0]?.id ?? "");
   const [showGasto, setShowGasto] = useState(!!props.autoGasto);
   const [showCierre, setShowCierre] = useState(false);
   const [cierreSucursalId, setCierreSucursalId] = useState("");
+  const [cierreFecha, setCierreFecha] = useState("");
   const [pending, startTransition] = useTransition();
   const role = props.profile?.rol;
   const canSaldos = role === "superadmin" || role === "admin_sucursal" || role === "caja";
@@ -54,6 +55,7 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean }) {
   return <main className="page agenda-page"><div className="container agenda-shell">
     <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">FINANZAS</p><h1>Cuadre de caja</h1><p className="subtitle">Cuadre diario y gastos de {branchVista?.nombre ?? "la sucursal"}. Cada sucursal tiene su propia caja.</p></div><SucursalTabs branches={props.branches} value={sucursalVista} onChange={setSucursalVista} /></header>
     <section className="agenda-summary"><article><Receipt size={21} /><strong>{gastos.length}</strong><span>gastos registrados</span></article><article><Banknote size={21} /><strong>{cierres.filter((c) => c.cuadre_correcto).length}/{cierres.length}</strong><span>cuadres correctos</span></article></section>
+    {(props.faltantes?.[sucursalVista] ?? []).length > 0 && <div className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 700, flexWrap: "wrap", gap: 8 }}><AlertCircle size={18} /><span>Falta el cuadre de {branchVista?.nombre}:</span>{(props.faltantes?.[sucursalVista] ?? []).map((dia) => <button key={dia} type="button" className="outline-action" onClick={() => { setCierreSucursalId(sucursalVista); setCierreFecha(dia); setShowCierre(true); }}>{new Intl.DateTimeFormat("es-EC", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${dia}T12:00:00Z`))}</button>)}</div>}
     <div className="notice"><AlertCircle size={18} /><span>{notice || "Un cuadre solo puede registrarse una vez por sucursal y fecha; verifica los datos antes de guardar."}</span></div>
 
     <ResumenCajaHoy key={sucursalVista} empresaId={empresaVista} branches={branches} cierres={cierres} defaultSucursalId={sucursalVista} onNuevoCuadre={(sucursalId) => { setCierreSucursalId(sucursalId); setShowCierre(true); }} />
@@ -65,7 +67,7 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean }) {
     {editandoGasto && <EditarGastoModal gasto={editandoGasto} cuentas={props.cuentas.filter((c) => c.sucursal_id === editandoGasto.sucursal_id || (!editandoGasto.sucursal_id && c.empresa_id === editandoGasto.empresa_id))} cuadreGuardado={props.cierres.some((c) => c.sucursal_id === editandoGasto.sucursal_id && c.fecha === editandoGasto.fecha)} onClose={() => setEditandoGasto(null)} onSaved={(m) => { setEditandoGasto(null); setNotice(m); router.refresh(); }} />}
     {borrandoGasto && <BorrarGastoModal gasto={borrandoGasto} cuadreGuardado={props.cierres.some((c) => c.sucursal_id === borrandoGasto.sucursal_id && c.fecha === borrandoGasto.fecha)} onClose={() => setBorrandoGasto(null)} onSaved={(m) => { setBorrandoGasto(null); setNotice(m); router.refresh(); }} />}
     {showGasto && <GastoModal empresaId={empresaVista} branches={branches} cuentas={cuentas} canSaldos={canSaldos} pending={pending} onClose={() => setShowGasto(false)} onSubmit={(form) => runAction(() => crearGasto(form), "Gasto registrado.")} />}
-    {showCierre && <CierreModal key={`${empresaVista}:${cierreSucursalId}`} empresaId={empresaVista} branches={branches} initialSucursalId={cierreSucursalId || sucursalVista} onClose={(message) => { setShowCierre(false); if (message) setNotice(message); }} />}
+    {showCierre && <CierreModal key={`${empresaVista}:${cierreSucursalId}:${cierreFecha}`} empresaId={empresaVista} branches={branches} initialSucursalId={cierreSucursalId || sucursalVista} initialFecha={cierreFecha || undefined} onClose={(message) => { setShowCierre(false); setCierreFecha(""); if (message) { setNotice(message); router.refresh(); } }} />}
   </div></main>;
 }
 
@@ -152,9 +154,9 @@ function GastoModal({ empresaId, branches, cuentas, canSaldos, pending, onClose,
   </div><div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" disabled={pending} type="submit">{pending ? "Guardando…" : "Registrar gasto"}</button></div></form></section></div>;
 }
 
-function CierreModal({ empresaId, branches, initialSucursalId, onClose }: { empresaId: string; branches: CajaData["branches"]; initialSucursalId: string; onClose: (message?: string) => void }) {
+function CierreModal({ empresaId, branches, initialSucursalId, initialFecha, onClose }: { empresaId: string; branches: CajaData["branches"]; initialSucursalId: string; initialFecha?: string; onClose: (message?: string) => void }) {
   const [sucursalId, setSucursalId] = useState(branches.some((b) => b.id === initialSucursalId) ? initialSucursalId : branches[0]?.id ?? "");
-  const [fecha, setFecha] = useState(today());
+  const [fecha, setFecha] = useState(initialFecha ?? today());
   const [declaradoEfectivo, setDeclaradoEfectivo] = useState("");
   const [declaradoTarjeta, setDeclaradoTarjeta] = useState("");
   const [declaradoPichincha, setDeclaradoPichincha] = useState("");
