@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import type { CajaData, CajaBranch, CierreCaja, Gasto } from "@/lib/caja";
 import { useRouter } from "next/navigation";
 import { SucursalTabs } from "@/app/sucursal-tabs";
-import { crearCierreCaja, crearClaveAtajo, crearGasto, editarGasto, eliminarGasto, registrarAperturaCaja, previsualizarCierre, type ResultadoCierre, type VistaCierre } from "./actions";
+import { crearCierreCaja, crearGasto, editarGasto, eliminarGasto, registrarAperturaCaja, previsualizarCierre, type ResultadoCierre, type VistaCierre } from "./actions";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
 // Acepta coma o punto como decimal (teclados en español) y deja solo números.
@@ -69,20 +69,22 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean }) {
   </div></main>;
 }
 
-const atajoUrl = "https://ssff-app-shuyanacordova-5372.vercel.app/api/atajos/egreso";
 
+const egresoUrl = "https://ssff-app-shuyanacordova-5372.vercel.app/egreso";
+const promptAtajo = `Crea un atajo llamado "Registrar egreso" que me pregunte el monto y el concepto, y luego abra en Safari esta dirección poniendo lo que respondí: ${egresoUrl}?monto=[monto]&concepto=[concepto]`;
+
+// Egresos desde el iPhone (Shuyana 2026-10-07): pantalla /egreso como ícono, o un atajo que la abre con monto y concepto.
 function AtajoEgresos() {
-  const [clave, setClave] = useState("");
   const [aviso, setAviso] = useState("");
-  const [pending, start] = useTransition();
   const copiar = async (valor: string) => { try { await navigator.clipboard.writeText(valor); setAviso("Copiado."); } catch { setAviso("No se pudo copiar. Mantén presionado el texto para copiarlo."); } };
-  return <details style={{ marginBottom: 16 }}><summary>Atajo de iPhone para registrar egresos</summary><div style={{ paddingTop: 12 }}>
-    <button className="outline-action" type="button" disabled={pending} onClick={() => start(async () => { try { setClave(await crearClaveAtajo()); setAviso(""); } catch (err) { setAviso(err instanceof Error ? err.message : "No se pudo crear la clave."); } })}>Crear clave del atajo</button>
-    {clave && <><p className="field-hint">Guárdala ahora: no se vuelve a mostrar. Crear una nueva anula la anterior.</p><div className="cob-row"><code style={{ overflowWrap: "anywhere" }}>{clave}</code><button className="text-action" type="button" onClick={() => void copiar(clave)}>Copiar</button></div></>}
+  return <details style={{ marginBottom: 16 }}><summary>Registrar egresos desde el iPhone</summary><div style={{ paddingTop: 12 }}>
+    <p><strong>Opción 1 · Ícono en la pantalla de inicio</strong></p>
+    <ol><li>En el iPhone abre en Safari: <a href="/egreso">{egresoUrl}</a></li><li>Toca Compartir → “Añadir a pantalla de inicio”.</li></ol>
+    <p><strong>Opción 2 · Atajo con Siri (iOS 27)</strong></p>
+    <p className="field-hint">Abre Atajos, crea uno nuevo y pega esta frase:</p>
+    <div className="cob-row"><code style={{ overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>{promptAtajo}</code><button className="text-action" type="button" onClick={() => void copiar(promptAtajo)}>Copiar</button></div>
+    <p className="field-hint">Luego di «Oye Siri, registrar egreso», revisa y toca Guardar egreso.</p>
     {aviso && <p className="notice" role="status">{aviso}</p>}
-    <ol><li>Abre la app Atajos → toca + → nómbralo “Registrar egreso”.</li><li>Agrega “Solicitar entrada” (Número): “¿Monto?”.</li><li>Agrega “Solicitar entrada” (Texto): “¿Concepto?”.</li><li>Agrega “Elegir de la lista” con: efectivo, pichincha, guayaquil, internacional.</li><li>Agrega “Obtener contenido de URL”: Método POST, Cuerpo JSON con: clave = (tu clave), sucursal = shuvision (o sacha / focus), monto = Entrada proporcionada (monto), concepto = Entrada proporcionada (concepto), metodo = Elemento elegido.</li><li>Agrega “Obtener valor del diccionario” clave <code>mensaje</code> y luego “Mostrar resultado”.</li></ol>
-    <div className="cob-row"><code style={{ overflowWrap: "anywhere" }}>{atajoUrl}</code><button className="text-action" type="button" onClick={() => void copiar(atajoUrl)}>Copiar URL</button></div>
-    <p className="field-hint">Listo: di «Oye Siri, registrar egreso». Se registra hoy en la sucursal indicada; efectivo descuenta de caja, bancos solo para administración.</p>
   </div></details>;
 }
 

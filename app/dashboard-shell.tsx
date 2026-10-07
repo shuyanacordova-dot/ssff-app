@@ -46,7 +46,7 @@ export default function DashboardShell({ taskData, informeMensual, metasMessage,
     <section className="operations-quick-grid" aria-label="Acciones rápidas">
       <Link href="/pacientes?new=1"><span className="quick-icon teal"><UserPlus size={21} /></span><span><strong>Nuevo paciente</strong><small>Crear ficha clínica</small></span></Link>
       <Link href="/ventas"><span className="quick-icon blue"><Banknote size={21} /></span><span><strong>Nueva venta</strong><small>Cobrar o registrar pedido</small></span></Link>
-      <Link href="/caja?gasto=1"><span className="quick-icon teal"><Receipt size={21} /></span><span><strong>Registrar egreso</strong><small>Gasto o pago de caja</small></span></Link>
+      <Link href="/egreso"><span className="quick-icon teal"><Receipt size={21} /></span><span><strong>Registrar egreso</strong><small>Gasto o pago de caja</small></span></Link>
       <Link href="/cuentas-cobrar"><span className="quick-icon teal"><Coins size={21} /></span><span><strong>Cobros de hoy</strong><small>Mensajes por enviar</small></span></Link>
       <Link href="/agenda"><span className="quick-icon teal"><CalendarDays size={21} /></span><span><strong>Agenda</strong><small>Ver citas de hoy</small></span></Link>
     </section>
