@@ -31,7 +31,11 @@ export async function crearProductoInventario(form: FormData) {
   const fechaCompra = text(form, "fecha_compra");
   if (!nombre || !Number.isFinite(precio) || precio < 0 || (costo !== null && (!Number.isFinite(costo) || costo < 0))) throw new Error("Completa nombre y precios válidos.");
   const { data: producto, error } = await supabase.from("productos_catalogo").insert({ empresa_id: empresaId, nombre, categoria, clasificacion: clasificacion || null, codigo: codigo || null, codigo_barra: codigoBarra || null, precio_venta: precio, costo_referencial: costo, proveedor: proveedor || null, controla_inventario: controlaInventario, marca: marca || null, modelo: modelo || null, color: color || null, material: material || null, consignacion, precio_venta_2: precioVenta2, precio_venta_3: precioVenta3, precio_convenio: precioConvenio, medida_puente: medidaPuente, fecha_compra: fechaCompra || null }).select("id").single();
-  if (error || !producto) throw new Error(error?.message.includes("productos_catalogo_empresa_id_codigo_key") ? "Ese código ya existe en esta empresa." : "No se pudo crear el producto.");
+  if (error?.message.includes("productos_catalogo_empresa_id_codigo_key")) {
+    const { data: existente } = await supabase.from("productos_catalogo").select("nombre").eq("empresa_id", empresaId).eq("codigo", codigo).maybeSingle();
+    throw new Error(`El código ${codigo} ya está registrado${existente?.nombre ? ` en "${existente.nombre}"` : ""}. Si no tiene existencia, búscalo en "Armazones en cero", ábrelo y usa "Sumar unidades".`);
+  }
+  if (error || !producto) throw new Error("No se pudo crear el producto.");
   const sucursalId = text(form, "sucursal_id"); const cantidadInicial = Number(text(form, "cantidad_inicial"));
   if (sucursalId && controlaInventario && Number.isFinite(cantidadInicial) && cantidadInicial > 0) {
     const { error: movError } = await supabase.rpc("registrar_movimiento_inventario", { p_producto: producto.id, p_sucursal: sucursalId, p_tipo: "entrada", p_cantidad: cantidadInicial, p_motivo: "Carga inicial" });
