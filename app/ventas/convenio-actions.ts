@@ -96,3 +96,19 @@ export async function actualizarCuotasConvenio(empresaConvenioId: string, cuotas
   if (error) throw new Error(error.message || "No se pudo guardar.");
   revalidatePath("/convenios"); revalidatePath("/ventas"); revalidatePath("/cuentas-cobrar"); revalidatePath("/pacientes");
 }
+
+// Empresa de convenio del paciente (para mostrar los precios de convenio al vender):
+// primero la lista de personas del convenio; si no está, el último acuerdo de descuento a rol que firmó o recibió.
+export async function convenioDelPaciente(pacienteId: string): Promise<{ id: string; nombre: string } | null> {
+  if (!pacienteId) return null;
+  const supabase = await createSupabaseServerClient();
+  const { data: persona } = await supabase.from("convenio_personas").select("empresas_convenio(id,nombre)").eq("paciente_id", pacienteId).limit(1).maybeSingle();
+  const desdePersona = persona?.empresas_convenio as unknown as { id: string; nombre: string } | null;
+  if (desdePersona?.id) return desdePersona;
+  const [{ data: comoTitular }, { data: comoPaciente }] = await Promise.all([
+    supabase.from("acuerdos_pago").select("empresas_convenio(id,nombre)").eq("titular_paciente_id", pacienteId).order("firmado_en", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("acuerdos_pago").select("empresas_convenio(id,nombre),ventas!inner(paciente_id)").eq("ventas.paciente_id", pacienteId).order("firmado_en", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  const desdeAcuerdo = (comoTitular?.empresas_convenio ?? comoPaciente?.empresas_convenio) as unknown as { id: string; nombre: string } | null;
+  return desdeAcuerdo?.id ? desdeAcuerdo : null;
+}

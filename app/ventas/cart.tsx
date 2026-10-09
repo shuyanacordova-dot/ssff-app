@@ -1,10 +1,10 @@
 "use client";
 import { bancos } from "@/lib/bancos";
 import { paymentMethods as methods } from "@/lib/payment-methods";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Search, X } from "lucide-react";
 import { registrarVenta } from "./actions";
-import { crearAcuerdoPago, crearEmpresaConvenio, type AcuerdoPago } from "./convenio-actions";
+import { convenioDelPaciente, crearAcuerdoPago, crearEmpresaConvenio, type AcuerdoPago } from "./convenio-actions";
 import AcuerdoPagoView from "./acuerdo-pago-view";
 import type { EmpresaConvenio, PaymentMethod, SaleBranch, SaleCompany, SalePatient, SaleProduct, SaleStock } from "@/lib/ventas";
 
@@ -17,7 +17,9 @@ type CartItem = { producto_id: string; cantidad: number; descuento: number; prec
 // Todos los precios se pueden editar en la venta; armazones y lunas además tienen precio mínimo recomendado (aviso).
 const precioEditable = (p?: SaleProduct) => !!p && (p.categoria === "montura" || p.categoria === "lente");
 // Precio mínimo recomendado: el más bajo de los precios del catálogo (precio 1, 2 y 3).
+// Lunas (lista oficial 2026-10-09): precio_venta = Mayor, precio_venta_2 = Menor, precio_convenio = Convenio (Menor + 8 %).
 const precioMinimo = (p: SaleProduct) => Math.min(...[p.precio_venta, p.precio_venta_2, p.precio_venta_3].map(Number).filter((v) => Number.isFinite(v) && v > 0));
+const precioConvenio = (p: SaleProduct) => { const n = Number(p.precio_convenio); return Number.isFinite(n) && n > 0 ? n : null; };
 type CartPayment = { metodo: PaymentMethod; monto: string; referencia: string; banco: string };
 type Modo = "" | "rapida" | "lentes" | "traspaso";
 
@@ -41,6 +43,15 @@ export default function Cart({ products, stock, branches, patients, empresasConv
   const [nuevaConvenioNombre, setNuevaConvenioNombre] = useState("");
   const [acuerdo, setAcuerdo] = useState<AcuerdoPago | null>(null);
   const [buscando, setBuscando] = useState<"" | "rapida" | "montura" | "lunas">("");
+  // Paciente de convenio: se muestran y usan los precios de convenio (se puede quitar a mano).
+  const [convenioPaciente, setConvenioPaciente] = useState<{ id: string; nombre: string } | null>(null);
+  const [tarifaConvenio, setTarifaConvenio] = useState(false);
+  useEffect(() => {
+    let vigente = true; setConvenioPaciente(null); setTarifaConvenio(false);
+    if (!pacienteId) return;
+    void convenioDelPaciente(pacienteId).then((c) => { if (!vigente || !c) return; setConvenioPaciente(c); setTarifaConvenio(true); setEmpresaConvenioId((actual) => actual || c.id); }).catch(() => undefined);
+    return () => { vigente = false; };
+  }, [pacienteId]);
 
   const stockFor = (productoId: string, sucursalId: string) => stock.find((s) => s.producto_id === productoId && s.sucursal_id === sucursalId)?.cantidad ?? 0;
   const empresaProducts = products.filter((p) => p.empresa_id === company);
@@ -50,14 +61,19 @@ export default function Cart({ products, stock, branches, patients, empresasConv
   const availableLunas = empresaProducts.filter((p) => p.categoria === "lente");
   const available = modo === "lentes" ? [...availableArmazon, ...availableLunas] : modo === "traspaso" ? availableArmazon : availableRapida;
 
+  const precioBase = (p: SaleProduct) => (tarifaConvenio && precioConvenio(p)) || Number(p.precio_venta || 0);
+  // Con precios de convenio, el mínimo de la luna es su precio de convenio.
+  const minimoDe = (p: SaleProduct) => (tarifaConvenio && precioConvenio(p)) || precioMinimo(p);
+  // Al cambiar la tarifa (normal ↔ convenio) se recalcula el precio de las lunas ya agregadas.
+  useEffect(() => { setItems((list) => list.map((item) => { const product = products.find((p) => p.id === item.producto_id); return product && precioConvenio(product) ? { ...item, precio: String(precioBase(product)) } : item; })); }, [tarifaConvenio]); // eslint-disable-line react-hooks/exhaustive-deps
   const precioItem = (item: CartItem) => { const product = available.find((p) => p.id === item.producto_id); if (!product) return 0; if (item.precio !== undefined) { const n = Number(item.precio.replace(",", ".")); return Number.isFinite(n) ? n : 0; } return Number(product.precio_venta || 0); };
   const lineTotal = (item: CartItem) => Math.max(0, item.cantidad * precioItem(item) - item.descuento);
   const subtotal = useMemo(() => items.reduce((sum, item) => sum + lineTotal(item), 0), [items, available]);
   // Mínimo recomendado de la venta: armazones y lunas a su precio mínimo (el menor de precio 1/2/3); el resto a precio de catálogo.
-  const minimoVenta = items.reduce((sum, item) => { const product = available.find((p) => p.id === item.producto_id); if (!product) return sum; const minimo = precioEditable(product) && Number.isFinite(precioMinimo(product)) ? precioMinimo(product) : Number(product.precio_venta || 0); return sum + item.cantidad * minimo; }, 0);
+  const minimoVenta = items.reduce((sum, item) => { const product = available.find((p) => p.id === item.producto_id); if (!product) return sum; const minimo = precioEditable(product) && Number.isFinite(minimoDe(product)) ? minimoDe(product) : Number(product.precio_venta || 0); return sum + item.cantidad * minimo; }, 0);
   const tieneEditables = items.some((item) => precioEditable(available.find((p) => p.id === item.producto_id)));
   // Precio mínimo de la venta por tipo: cada armazón y luna a su mínimo recomendado (el menor de precio 1/2/3) por la cantidad.
-  const minimoPor = (categoria: string) => items.reduce((sum, item) => { const product = available.find((p) => p.id === item.producto_id); if (!product || product.categoria !== categoria || !Number.isFinite(precioMinimo(product))) return sum; return sum + item.cantidad * precioMinimo(product); }, 0);
+  const minimoPor = (categoria: string) => items.reduce((sum, item) => { const product = available.find((p) => p.id === item.producto_id); if (!product || product.categoria !== categoria || !Number.isFinite(minimoDe(product))) return sum; return sum + item.cantidad * minimoDe(product); }, 0);
   const minimoArmazon = minimoPor("montura"); const minimoLunas = minimoPor("lente");
   const totalEditables = items.reduce((sum, item) => precioEditable(available.find((p) => p.id === item.producto_id)) ? sum + lineTotal(item) : sum, 0);
   const bajoMinimo = totalEditables < minimoArmazon + minimoLunas - 0.004;
@@ -66,7 +82,7 @@ export default function Cart({ products, stock, branches, patients, empresasConv
 
   const elegirModo = (value: Modo) => { setModo(value); setItems([]); };
   const resetBranch = (value: string) => { setBranch(value); setItems([]); };
-  const addProduct = (id: string) => { if (id && available.some((product) => product.id === id) && !items.some((item) => item.producto_id === id)) setItems([...items, { producto_id: id, cantidad: 1, descuento: 0, precio: String(Number(available.find((p) => p.id === id)?.precio_venta || 0)) }]); };
+  const addProduct = (id: string) => { if (id && available.some((product) => product.id === id) && !items.some((item) => item.producto_id === id)) setItems([...items, { producto_id: id, cantidad: 1, descuento: 0, precio: String(precioBase(available.find((p) => p.id === id)!)) }]); };
   const updateItem = (id: string, patch: Partial<CartItem>) => setItems(items.map((item) => item.producto_id === id ? { ...item, ...patch } : item));
   const addPayment = () => setPayments([...payments, { metodo: "efectivo", monto: "", referencia: "", banco: "" }]);
   const updatePayment = (index: number, patch: Partial<CartPayment>) => setPayments(payments.map((payment, i) => i === index ? { ...payment, ...patch } : payment));
@@ -121,10 +137,11 @@ export default function Cart({ products, stock, branches, patients, empresasConv
         <label>Cliente<input name="cliente_nombre" placeholder="Opcional" value={pacienteId ? "" : cliente} disabled={!!pacienteId} onChange={(event) => setCliente(event.target.value)} /></label>
         {(modo === "rapida" || modo === "traspaso") && <label>{modo === "traspaso" ? "Agregar armazón" : "Agregar producto"}<select defaultValue="" onChange={(event) => { addProduct(event.target.value); event.currentTarget.value = ""; }}><option value="">{modo === "traspaso" ? "Selecciona un armazón" : "Selecciona un producto"}</option>{(modo === "traspaso" ? availableArmazon : availableRapida).map((p) => <option key={p.id} value={p.id}>{p.nombre} · {money(Number(p.precio_venta))}</option>)}</select></label>}
       </div>
+      {(convenioPaciente || convenioActivo) && <div className="notice" role="status" style={{ fontWeight: 700 }}><label style={{ display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={tarifaConvenio} onChange={(event) => setTarifaConvenio(event.target.checked)} /> Usar precios de convenio{convenioPaciente ? ` · paciente de convenio: ${convenioPaciente.nombre}` : ""}</label></div>}
       <div className="sale-search-actions">
         {modo === "rapida" ? <button type="button" className="outline-action" onClick={() => setBuscando("rapida")}><Search size={15} /> Buscar accesorios, gafas o exámenes</button> : modo === "traspaso" ? <button type="button" className="outline-action" onClick={() => setBuscando("montura")}><Search size={15} /> Buscar armazón</button> : <><button type="button" className="outline-action" onClick={() => setBuscando("montura")}><Search size={15} /> Buscar armazón</button><button type="button" className="outline-action" onClick={() => setBuscando("lunas")}><Search size={15} /> Buscar lunas</button></>}
       </div>
-      <div className="task-list">{items.map((item) => { const product = available.find((p) => p.id === item.producto_id); if (!product) return null; return <article className="task-card" key={item.producto_id}><div className="task-status" /><div className="task-main"><h2>{product.nombre}</h2><div className="task-meta">{item.precio !== undefined ? <label>Precio $<input type="text" inputMode="decimal" autoComplete="off" value={item.precio} onChange={(event) => updateItem(item.producto_id, { precio: event.target.value.replace(/,/g, ".").replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1") })} style={{ width: 76 }} /></label> : <span>{money(Number(product.precio_venta))} c/u</span>}<label>Cant. <input type="number" min={1} step={1} value={item.cantidad} onChange={(event) => updateItem(item.producto_id, { cantidad: Math.max(1, Number(event.target.value) || 1) })} style={{ width: 52 }} /></label><label>Desc. $<input type="number" min={0} step={0.01} value={item.descuento} onChange={(event) => updateItem(item.producto_id, { descuento: Math.max(0, Number(event.target.value) || 0) })} style={{ width: 68 }} /></label></div>{precioEditable(product) && Number.isFinite(precioMinimo(product)) && <p className="field-hint" style={{ margin: "4px 0 0" }}>Precio de catálogo {money(Number(product.precio_venta))} · mínimo recomendado {money(precioMinimo(product))}</p>}{precioEditable(product) && item.precio !== undefined && Number.isFinite(precioMinimo(product)) && precioItem(item) < precioMinimo(product) - 0.004 && <p className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 800, margin: "6px 0" }}>⚠ Estás colocando un precio menor al del recomendado ({money(precioMinimo(product))}).</p>}<p>Subtotal línea: {money(lineTotal(item))}</p></div><div className="task-actions"><button type="button" className="outline-action" onClick={() => setItems(items.filter((x) => x.producto_id !== item.producto_id))}>Quitar</button></div></article>; })}</div>
+      <div className="task-list">{items.map((item) => { const product = available.find((p) => p.id === item.producto_id); if (!product) return null; return <article className="task-card" key={item.producto_id}><div className="task-status" /><div className="task-main"><h2>{product.nombre}</h2><div className="task-meta">{item.precio !== undefined ? <label>Precio $<input type="text" inputMode="decimal" autoComplete="off" value={item.precio} onChange={(event) => updateItem(item.producto_id, { precio: event.target.value.replace(/,/g, ".").replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1") })} style={{ width: 76 }} /></label> : <span>{money(Number(product.precio_venta))} c/u</span>}<label>Cant. <input type="number" min={1} step={1} value={item.cantidad} onChange={(event) => updateItem(item.producto_id, { cantidad: Math.max(1, Number(event.target.value) || 1) })} style={{ width: 52 }} /></label><label>Desc. $<input type="number" min={0} step={0.01} value={item.descuento} onChange={(event) => updateItem(item.producto_id, { descuento: Math.max(0, Number(event.target.value) || 0) })} style={{ width: 68 }} /></label></div>{product.categoria === "lente" && product.precio_venta_2 ? <p className="field-hint" style={{ margin: "4px 0 0" }}>Rango de venta: menor {money(Number(product.precio_venta_2))} · mayor {money(Number(product.precio_venta))}{precioConvenio(product) ? ` · convenio ${money(precioConvenio(product)!)}` : ""}{tarifaConvenio && precioConvenio(product) ? " (precio de convenio aplicado)" : ""}</p> : precioEditable(product) && Number.isFinite(minimoDe(product)) && <p className="field-hint" style={{ margin: "4px 0 0" }}>Precio de catálogo {money(Number(product.precio_venta))} · mínimo recomendado {money(minimoDe(product))}</p>}{precioEditable(product) && item.precio !== undefined && Number.isFinite(minimoDe(product)) && precioItem(item) < minimoDe(product) - 0.004 && <p className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 800, margin: "6px 0" }}>⚠ Estás colocando un precio menor al del recomendado ({money(minimoDe(product))}).</p>}<p>Subtotal línea: {money(lineTotal(item))}</p></div><div className="task-actions"><button type="button" className="outline-action" onClick={() => setItems(items.filter((x) => x.producto_id !== item.producto_id))}>Quitar</button></div></article>; })}</div>
       <p className="subtitle">Total: <strong>{money(subtotal)}</strong></p>
       {(minimoArmazon > 0 || minimoLunas > 0) && <p className="notice" role="status" style={bajoMinimo ? { background: "#ffe5e8", color: "#a24150", fontWeight: 800 } : { fontWeight: 700 }}>Precio mínimo de esta venta es de: {[minimoArmazon > 0 && `Armazón ${money(minimoArmazon)}`, minimoLunas > 0 && `Lunas ${money(minimoLunas)}`].filter(Boolean).join(" · ")}{minimoArmazon > 0 && minimoLunas > 0 ? ` (total ${money(minimoArmazon + minimoLunas)})` : ""}{bajoMinimo ? " — estás por debajo del mínimo." : ""}</p>}
       {tieneEditables && <p className="notice" role="status" style={subtotal < minimoVenta - 0.004 ? { background: "#ffe5e8", color: "#a24150", fontWeight: 800 } : { fontWeight: 700 }}>El precio mínimo recomendado de esta venta es: {money(minimoVenta)}{subtotal < minimoVenta - 0.004 ? ` · el total actual (${money(subtotal)}) está por debajo.` : ""}</p>}
@@ -132,7 +149,7 @@ export default function Cart({ products, stock, branches, patients, empresasConv
       {payments.map((payment, index) => <div className="new-patient-form" key={index}><label>Método<select value={payment.metodo} onChange={(event) => updatePayment(index, { metodo: event.target.value as PaymentMethod, banco: event.target.value === "transferencia" ? payment.banco : "" })}>{methods.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}{(saldosFavor[company] ?? 0) > 0.004 && <option value="saldo_favor">Saldo a favor (disponible ${(saldosFavor[company] ?? 0).toFixed(2)})</option>}</select></label><label>Monto<input type="number" min={0} step={0.01} value={payment.monto} onChange={(event) => updatePayment(index, { monto: event.target.value })} /></label><label>Referencia<input value={payment.referencia} onChange={(event) => updatePayment(index, { referencia: event.target.value })} placeholder="Opcional" /></label>{payment.metodo === "transferencia" && <label>Banco<select value={payment.banco} onChange={(event) => updatePayment(index, { banco: event.target.value })}><option value="">Selecciona el banco</option>{bancos.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}</select></label>}<button type="button" className="outline-action" onClick={() => removePayment(index)}>Quitar abono</button></div>)}
 
       <div className="receta-option" style={{ marginTop: 12 }}>
-        <label className="receta-option-header"><input type="checkbox" checked={convenioActivo} onChange={(event) => setConvenioActivo(event.target.checked)} /> Convenio por descuento a rol de pagos</label>
+        <label className="receta-option-header"><input type="checkbox" checked={convenioActivo} onChange={(event) => { setConvenioActivo(event.target.checked); if (event.target.checked) setTarifaConvenio(true); }} /> Convenio por descuento a rol de pagos</label>
         {convenioActivo && <div className="receta-option-body">
           <div className="new-patient-form">
             <label>Empresa<span style={{ display: "flex", gap: 6 }}><select value={empresaConvenioId} onChange={(event) => { setEmpresaConvenioId(event.target.value); const conv = convenios.find((c) => c.id === event.target.value) as { cuotas_predeterminadas?: number } | undefined; if (conv?.cuotas_predeterminadas) setCuotas(String(conv.cuotas_predeterminadas)); }} style={{ flex: 1 }}><option value="">Selecciona la empresa</option>{convenios.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select><button type="button" className="outline-action" onClick={() => setShowNuevaConvenio(true)}>+</button></span></label>
@@ -146,11 +163,11 @@ export default function Cart({ products, stock, branches, patients, empresasConv
       <button disabled={!items.length || pending || items.some((item) => item.precio !== undefined && !item.precio.trim())} className="new-consultation" type="submit">{pending ? "Guardando…" : convenioActivo ? "Firmar acuerdo de pago" : "Cerrar venta"}</button>
     </form>
     {showNuevaConvenio && <div className="modal-backdrop"><section className="new-patient-modal" role="dialog" aria-modal="true"><p className="section-label">NUEVA EMPRESA DE CONVENIO</p><h2>Agregar empresa</h2><div className="new-patient-form"><label className="task-description">Nombre<input value={nuevaConvenioNombre} onChange={(event) => setNuevaConvenioNombre(event.target.value)} placeholder="Ej.: Municipio de Shushufindi" /></label></div><div className="modal-actions"><button className="outline-action" type="button" onClick={() => setShowNuevaConvenio(false)}>Cancelar</button><button className="new-consultation" type="button" disabled={pending || !nuevaConvenioNombre.trim()} onClick={crearConvenio}>{pending ? "Guardando…" : "Guardar empresa"}</button></div></section></div>}
-    {buscando && <ProductSearchModal title={buscando === "rapida" ? "BUSCAR ACCESORIOS, GAFAS O EXÁMENES" : buscando === "montura" ? "BUSCAR ARMAZÓN" : "BUSCAR LUNAS"} products={buscando === "rapida" ? availableRapida : buscando === "montura" ? availableArmazon : availableLunas} branch={branch} stockFor={stockFor} onSelect={addProduct} onClose={() => setBuscando("")} />}
+    {buscando && <ProductSearchModal title={buscando === "rapida" ? "BUSCAR ACCESORIOS, GAFAS O EXÁMENES" : buscando === "montura" ? "BUSCAR ARMAZÓN" : "BUSCAR LUNAS"} products={buscando === "rapida" ? availableRapida : buscando === "montura" ? availableArmazon : availableLunas} branch={branch} stockFor={stockFor} tarifaConvenio={tarifaConvenio} onSelect={addProduct} onClose={() => setBuscando("")} />}
   </section>;
 }
 
-function ProductSearchModal({ title, products, branch, stockFor, onSelect, onClose }: { title: string; products: SaleProduct[]; branch: string; stockFor: (productoId: string, sucursalId: string) => number; onSelect: (id: string) => void; onClose: () => void }) {
+function ProductSearchModal({ title, products, branch, stockFor, tarifaConvenio, onSelect, onClose }: { tarifaConvenio: boolean; title: string; products: SaleProduct[]; branch: string; stockFor: (productoId: string, sucursalId: string) => number; onSelect: (id: string) => void; onClose: () => void }) {
   const [query, setQuery] = useState("");
   const normalizar = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const palabras = normalizar(query).split(/\s+/).filter(Boolean);
@@ -158,7 +175,7 @@ function ProductSearchModal({ title, products, branch, stockFor, onSelect, onClo
   const visible = products.filter((p) => { const texto = normalizar([p.nombre, p.codigo_barra, p.codigo, p.marca, p.modelo, p.color].filter(Boolean).join(" ")); return palabras.every((w) => texto.includes(w)); });
   return <div className="modal-backdrop"><section className="new-patient-modal product-search-modal" role="dialog" aria-modal="true" aria-labelledby="product-search-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button><p className="section-label">{title}</p><h2 id="product-search-title">Buscar producto</h2>
     <label className="patient-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre, código de barras, marca o color" autoFocus /></label>
-    <div className="product-search-list">{visible.map((p) => <button key={p.id} type="button" className="product-search-row" onClick={() => { onSelect(p.id); onClose(); }} title={p.nombre}><strong>{p.nombre}</strong><span className="product-category-pill">{productCategoryLabel[p.categoria] ?? "Producto"}</span><span className="product-result-price">{money(Number(p.precio_venta))}</span><span className="product-result-stock">{p.controla_inventario && branch ? `${stockFor(p.id, branch)} disponibles` : "Disponible"}</span></button>)}
+    <div className="product-search-list">{visible.map((p) => <button key={p.id} type="button" className="product-search-row" onClick={() => { onSelect(p.id); onClose(); }} title={p.nombre}><strong>{p.nombre}</strong><span className="product-category-pill">{productCategoryLabel[p.categoria] ?? "Producto"}</span><span className="product-result-price">{p.categoria === "lente" && p.precio_venta_2 ? <>{tarifaConvenio && precioConvenio(p) ? <>Convenio {money(precioConvenio(p)!)}<br /></> : null}<small>Mayor {money(Number(p.precio_venta))} · Menor {money(Number(p.precio_venta_2))}</small></> : money(Number(p.precio_venta))}</span><span className="product-result-stock">{p.controla_inventario && branch ? `${stockFor(p.id, branch)} disponibles` : "Disponible"}</span></button>)}
     {visible.length === 0 && <p className="empty-patients">No se encontraron productos.</p>}</div>
   </section></div>;
 }

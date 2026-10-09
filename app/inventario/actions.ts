@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseAdminClient, hasSupabaseAdminConfiguration } from "@/lib/supabase/admin";
 
 const text = (form: FormData, name: string) => typeof form.get(name) === "string" ? String(form.get(name)).trim() : "";
 
@@ -27,10 +27,10 @@ export async function crearProductoInventario(form: FormData) {
   const controlaInventario = text(form, "controla_inventario") !== "no";
   const marca = text(form, "marca"); const modelo = text(form, "modelo"); const color = text(form, "color"); const material = text(form, "material");
   const consignacion = text(form, "consignacion") === "si";
-  const precioVenta2 = num(form, "precio_venta_2"); const precioVenta3 = num(form, "precio_venta_3"); const medidaPuente = num(form, "medida_puente");
+  const precioVenta2 = num(form, "precio_venta_2"); const precioVenta3 = num(form, "precio_venta_3"); const precioConvenio = num(form, "precio_convenio"); const medidaPuente = num(form, "medida_puente");
   const fechaCompra = text(form, "fecha_compra");
   if (!nombre || !Number.isFinite(precio) || precio < 0 || (costo !== null && (!Number.isFinite(costo) || costo < 0))) throw new Error("Completa nombre y precios válidos.");
-  const { data: producto, error } = await supabase.from("productos_catalogo").insert({ empresa_id: empresaId, nombre, categoria, clasificacion: clasificacion || null, codigo: codigo || null, codigo_barra: codigoBarra || null, precio_venta: precio, costo_referencial: costo, proveedor: proveedor || null, controla_inventario: controlaInventario, marca: marca || null, modelo: modelo || null, color: color || null, material: material || null, consignacion, precio_venta_2: precioVenta2, precio_venta_3: precioVenta3, medida_puente: medidaPuente, fecha_compra: fechaCompra || null }).select("id").single();
+  const { data: producto, error } = await supabase.from("productos_catalogo").insert({ empresa_id: empresaId, nombre, categoria, clasificacion: clasificacion || null, codigo: codigo || null, codigo_barra: codigoBarra || null, precio_venta: precio, costo_referencial: costo, proveedor: proveedor || null, controla_inventario: controlaInventario, marca: marca || null, modelo: modelo || null, color: color || null, material: material || null, consignacion, precio_venta_2: precioVenta2, precio_venta_3: precioVenta3, precio_convenio: precioConvenio, medida_puente: medidaPuente, fecha_compra: fechaCompra || null }).select("id").single();
   if (error || !producto) throw new Error(error?.message.includes("productos_catalogo_empresa_id_codigo_key") ? "Ese código ya existe en esta empresa." : "No se pudo crear el producto.");
   const sucursalId = text(form, "sucursal_id"); const cantidadInicial = Number(text(form, "cantidad_inicial"));
   if (sucursalId && controlaInventario && Number.isFinite(cantidadInicial) && cantidadInicial > 0) {
@@ -50,11 +50,17 @@ export async function actualizarProductoInventario(form: FormData) {
   const controlaInventario = text(form, "controla_inventario") !== "no";
   const marca = text(form, "marca"); const modelo = text(form, "modelo"); const color = text(form, "color"); const material = text(form, "material");
   const consignacion = text(form, "consignacion") === "si";
-  const precioVenta2 = num(form, "precio_venta_2"); const precioVenta3 = num(form, "precio_venta_3"); const medidaPuente = num(form, "medida_puente");
+  const precioVenta2 = num(form, "precio_venta_2"); const precioVenta3 = num(form, "precio_venta_3"); const precioConvenio = num(form, "precio_convenio"); const medidaPuente = num(form, "medida_puente");
   const fechaCompra = text(form, "fecha_compra");
   if (!nombre || !Number.isFinite(precio) || precio < 0 || (costo !== null && (!Number.isFinite(costo) || costo < 0))) throw new Error("Completa nombre y precios válidos.");
-  const { error } = await supabase.from("productos_catalogo").update({ nombre, categoria, clasificacion: clasificacion || null, codigo: codigo || null, codigo_barra: codigoBarra || null, precio_venta: precio, costo_referencial: costo, proveedor: proveedor || null, controla_inventario: controlaInventario, marca: marca || null, modelo: modelo || null, color: color || null, material: material || null, consignacion, precio_venta_2: precioVenta2, precio_venta_3: precioVenta3, medida_puente: medidaPuente, fecha_compra: fechaCompra || null }).eq("id", productoId);
+  const { error } = await supabase.from("productos_catalogo").update({ nombre, categoria, clasificacion: clasificacion || null, codigo: codigo || null, codigo_barra: codigoBarra || null, precio_venta: precio, costo_referencial: costo, proveedor: proveedor || null, controla_inventario: controlaInventario, marca: marca || null, modelo: modelo || null, color: color || null, material: material || null, consignacion, precio_venta_2: precioVenta2, precio_venta_3: precioVenta3, precio_convenio: precioConvenio, medida_puente: medidaPuente, fecha_compra: fechaCompra || null }).eq("id", productoId);
   if (error) throw new Error(error.message.includes("productos_catalogo_empresa_id_codigo_key") ? "Ese código ya existe en esta empresa." : "No se pudo actualizar el producto.");
+  // Sumar unidades del mismo armazón (ej.: llegaron 2 iguales).
+  const sucursalIngreso = text(form, "sucursal_ingreso"); const cantidadIngreso = Number(text(form, "cantidad_ingreso"));
+  if (sucursalIngreso && controlaInventario && Number.isFinite(cantidadIngreso) && cantidadIngreso > 0) {
+    const { error: movError } = await supabase.rpc("registrar_movimiento_inventario", { p_producto: productoId, p_sucursal: sucursalIngreso, p_tipo: "entrada", p_cantidad: cantidadIngreso, p_motivo: "Ingreso de unidades" });
+    if (movError) throw new Error("Los datos se guardaron, pero no se pudieron sumar las unidades.");
+  }
   revalidatePath("/inventario"); revalidatePath("/ventas");
 }
 
@@ -148,4 +154,22 @@ export async function actualizarStockMinimo(form: FormData) {
   const { error } = await supabase.rpc("actualizar_stock_minimo", { p_producto: productoId, p_sucursal: sucursalId, p_minimo: stockMinimo });
   if (error) throw new Error(error.message || "No se pudo actualizar el mínimo de stock.");
   revalidatePath("/inventario");
+}
+
+export type CompraDeProducto = { producto_id: string; venta_id: string; folio: number | null; fecha: string; cliente: string; sucursal_id: string | null; cantidad: number };
+
+// Quién compró cada producto (ventas vigentes, la más reciente primero). Para ver a quién se vendió un armazón en cero.
+// Las ventas se leen con la sesión (respetan permisos); solo los nombres de esos pacientes con el lector de Ventas.
+export async function compradoresDeProductos(productoIds: string[]): Promise<CompraDeProducto[]> {
+  const ids = Array.from(new Set(productoIds.filter(Boolean))).slice(0, 500);
+  if (!ids.length) return [];
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.from("venta_items").select("producto_id,cantidad,ventas!inner(id,folio,creado_en,estado,cliente_nombre,paciente_id,sucursal_id)").in("producto_id", ids).neq("ventas.estado", "anulada");
+  if (error) throw new Error("No se pudieron cargar las ventas de estos productos.");
+  const filas = (data ?? []) as unknown as { producto_id: string; cantidad: number; ventas: { id: string; folio: number | null; creado_en: string; cliente_nombre: string | null; paciente_id: string | null; sucursal_id: string | null } }[];
+  const pacienteIds = Array.from(new Set(filas.map((f) => f.ventas.paciente_id).filter((id): id is string => !!id)));
+  const { data: pacientes } = pacienteIds.length ? await (hasSupabaseAdminConfiguration() ? createSupabaseAdminClient() : supabase).from("pacientes_clinicos").select("id,nombres,apellidos").in("id", pacienteIds) : { data: [] };
+  const nombre = new Map(((pacientes ?? []) as { id: string; nombres: string | null; apellidos: string | null }[]).map((p) => [p.id, [p.apellidos, p.nombres].filter((x) => x && x.trim()).join(", ")]));
+  return filas.map((f) => ({ producto_id: f.producto_id, venta_id: f.ventas.id, folio: f.ventas.folio, fecha: f.ventas.creado_en, cliente: (f.ventas.paciente_id && nombre.get(f.ventas.paciente_id)) || f.ventas.cliente_nombre || "Cliente sin nombre", sucursal_id: f.ventas.sucursal_id, cantidad: Number(f.cantidad) }))
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
 }

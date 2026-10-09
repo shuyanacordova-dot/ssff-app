@@ -4,7 +4,7 @@ import Link from "next/link";
 import { AlertTriangle, ArrowLeftRight, Calculator, ClipboardList, Glasses, Package, Plus, ShoppingBag, Upload, X } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import type { InventarioData, MovimientoInventario, Producto } from "@/lib/inventario";
-import { actualizarProductoInventario, actualizarStockMinimo, crearArmazonesMasivo, crearMovimientoInventario, crearProductoInventario, sucursalesParaIngreso, transferirInventario, type ArmazonMasivo } from "./actions";
+import { actualizarProductoInventario, actualizarStockMinimo, compradoresDeProductos, crearArmazonesMasivo, type CompraDeProducto, crearMovimientoInventario, crearProductoInventario, sucursalesParaIngreso, transferirInventario, type ArmazonMasivo } from "./actions";
 
 const normalizeSearch = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
@@ -12,6 +12,9 @@ const formatDate = (value: string) => new Intl.DateTimeFormat("es-EC", { timeZon
 const categorias = ["montura", "gafas_sol", "lente", "accesorio", "servicio", "tratamiento", "otro"];
 const categoriaLabel: Record<string, string> = { montura: "Monturas", gafas_sol: "Gafas de sol", lente: "Lunas", accesorio: "Accesorios", servicio: "Servicios", tratamiento: "Tratamientos", otro: "Otros" };
 const tipoLabel: Record<string, string> = { entrada: "Entrada", salida: "Salida", ajuste: "Ajuste", transferencia_salida: "Transferencia (salida)", transferencia_entrada: "Transferencia (entrada)" };
+const formatDateShort = (value: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
+// Tipos de armazón: se eligen de la lista que ya existe (no se escriben) para no crear secciones nuevas por error.
+const listaTipos = (productos: Producto[]) => { const conteo = new Map<string, Map<string, number>>(); for (const p of productos) { const v = p.clasificacion?.trim(); if (!v || !["montura", "gafas_sol"].includes(p.categoria)) continue; const k = normalizeSearch(v); const formas = conteo.get(k) ?? new Map<string, number>(); formas.set(v, (formas.get(v) ?? 0) + 1); conteo.set(k, formas); } return Array.from(conteo.values()).map((formas) => Array.from(formas.entries()).sort((a, b) => b[1] - a[1])[0][0]).sort((a, b) => a.localeCompare(b, "es")); };
 const gruposMonturas: Record<string, string[]> = { monturas_gafas: ["montura", "gafas_sol"], accesorios: ["accesorio", "servicio", "tratamiento", "otro"] };
 
 export default function InventarioBoard(props: InventarioData & { grupoInicial?: "monturas" | "lunas" }) {
@@ -32,9 +35,18 @@ export default function InventarioBoard(props: InventarioData & { grupoInicial?:
   const [showMovimiento, setShowMovimiento] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showMasivo, setShowMasivo] = useState(false);
+  const [verEnCero, setVerEnCero] = useState(false);
+  const [compras, setCompras] = useState<Record<string, CompraDeProducto[]>>({});
   const [pending, startTransition] = useTransition();
   const role = props.profile?.rol;
   const canEdit = role === "superadmin" || role === "admin_sucursal";
+
+  const idsEnCeroClave = verEnCero ? props.productos.filter((p) => p.empresa_id === empresaId && p.categoria === categoriaActiva && p.controla_inventario && props.stock.filter((s) => s.producto_id === p.id && props.branches.some((b) => b.id === s.sucursal_id && b.empresa_id === empresaId)).reduce((sum, s) => sum + Number(s.cantidad || 0), 0) <= 0).map((p) => p.id).join(",") : "";
+  useEffect(() => {
+    if (!idsEnCeroClave) return; let vigente = true;
+    void compradoresDeProductos(idsEnCeroClave.split(",")).then((rows) => { if (!vigente) return; const mapa: Record<string, CompraDeProducto[]> = {}; for (const r of rows) (mapa[r.producto_id] ??= []).push(r); setCompras(mapa); }).catch(() => { if (vigente) setNotice("No se pudo cargar a quién se vendieron los armazones en cero."); });
+    return () => { vigente = false; };
+  }, [idsEnCeroClave]);
 
   if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN</p><h1>Inventario</h1><p className="subtitle">{props.message ?? "No se pudo abrir inventario."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/inventario">Iniciar sesión</Link>}</header></div></main>;
 
@@ -42,7 +54,14 @@ export default function InventarioBoard(props: InventarioData & { grupoInicial?:
   const branches = props.branches.filter((b) => b.empresa_id === empresaId);
   const productos = props.productos.filter((p) => p.empresa_id === empresaId);
   const productosGrupo = productos.filter((p) => categoriasVisibles.includes(p.categoria));
-  const productosCategoriaSinFiltrar = productosGrupo.filter((p) => p.categoria === categoriaActiva);
+  const sucursalIds = new Set(props.branches.filter((b) => b.empresa_id === empresaId).map((b) => b.id));
+  const existencia = (productoId: string) => props.stock.filter((s) => s.producto_id === productoId && sucursalIds.has(s.sucursal_id)).reduce((sum, s) => sum + Number(s.cantidad || 0), 0);
+  // Armazones y gafas: los que quedan en cero (vendidos) salen de la lista; se ven con el botón "Armazones en cero".
+  const separaCero = categoriaActiva === "montura" || categoriaActiva === "gafas_sol";
+  const enCero = (p: Producto) => p.controla_inventario && existencia(p.id) <= 0;
+  const productosDeCategoria = productosGrupo.filter((p) => p.categoria === categoriaActiva);
+  const totalEnCero = separaCero ? productosDeCategoria.filter(enCero).length : 0;
+  const productosCategoriaSinFiltrar = separaCero ? productosDeCategoria.filter((p) => verEnCero ? enCero(p) : !enCero(p)) : productosDeCategoria;
   const clasificacionesVisibles = Array.from(new Set(productosCategoriaSinFiltrar.map((p) => p.clasificacion).filter((c): c is string => !!c))).sort();
   const marcas = Array.from(new Set(productosCategoriaSinFiltrar.map((p) => p.marca?.trim()).filter((marca): marca is string => !!marca))).sort((a, b) => a.localeCompare(b, "es"));
   const palabras = normalizeSearch(busqueda).split(/\s+/).filter(Boolean);
@@ -118,21 +137,21 @@ export default function InventarioBoard(props: InventarioData & { grupoInicial?:
         <label>Buscar por marca, modelo o código<input type="search" value={busqueda} onChange={(event) => setBusqueda(event.target.value)} placeholder="Buscar por marca, modelo o código" /></label>
         <label>Marca<select value={marcaActiva} onChange={(event) => setMarcaActiva(event.target.value)}><option value="">Todas las marcas</option>{marcas.map((marca) => <option key={marca} value={marca}>{marca}</option>)}</select></label>
       </div>
-      <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 10 }}><span role="status">{productosCategoria.length} de {productosCategoriaSinFiltrar.length} productos</span><button type="button" className="outline-action" onClick={() => { setBusqueda(""); setMarcaActiva(""); setClasificacionActiva(""); }}>Limpiar</button></div>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 10 }}><span role="status">{productosCategoria.length} de {productosCategoriaSinFiltrar.length} productos</span><button type="button" className="outline-action" onClick={() => { setBusqueda(""); setMarcaActiva(""); setClasificacionActiva(""); }}>Limpiar</button>{separaCero && <button type="button" className={verEnCero ? "new-task" : "outline-action"} onClick={() => setVerEnCero((v) => !v)}>{verEnCero ? "← Ver armazones con existencia" : `Armazones en cero (${totalEnCero})`}</button>}</div>{verEnCero && <p className="field-hint" style={{ marginTop: 8 }}>Armazones sin existencia. Debajo de cada uno ves a quién se vendió.</p>}
     </section>
     <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
       {categoriasVisibles.length > 1 && <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: "#5d7086" }}>Categoría<select value={categoriaActiva} onChange={(event) => { setCategoriaActiva(event.target.value); setClasificacionActiva(""); setMarcaActiva(""); }} style={{ border: "1px solid #d4e0ea", borderRadius: 9, padding: "8px 10px" }}>{categoriasVisibles.map((cat) => <option key={cat} value={cat}>{categoriaLabel[cat]} ({productos.filter((p) => p.categoria === cat).length})</option>)}</select></label>}
       {clasificacionesVisibles.length > 1 && <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: "#5d7086" }}>Tipo<select value={clasificacionActiva} onChange={(event) => setClasificacionActiva(event.target.value)} style={{ border: "1px solid #d4e0ea", borderRadius: 9, padding: "8px 10px" }}><option value="">Todas ({productosCategoriaSinFiltrar.length})</option>{clasificacionesVisibles.map((clas) => <option key={clas} value={clas}>{clas} ({productosCategoriaSinFiltrar.filter((p) => p.clasificacion === clas).length})</option>)}</select></label>}
     </div>
-    {productosCategoria.length ? <div className="task-list">{productosCategoria.map((producto) => { const detalle = mostrar === "detallado"; const resumenExtra = [producto.marca, producto.modelo, producto.color].filter(Boolean).join(" · "); return <article className="task-card" key={producto.id} style={canEdit ? { cursor: "pointer" } : undefined} onClick={() => canEdit && setEditingProducto(producto)}><div className="task-status" /><div className="task-main">{detalle && <div className="task-meta"><span>{categoriaLabel[producto.categoria] ?? producto.categoria}</span>{producto.clasificacion && <span>{producto.clasificacion}</span>}{producto.material && <span>{producto.material}</span>}{producto.indice != null && <span>Índice {producto.indice}</span>}{producto.tecnologia && <span>{producto.tecnologia}</span>}{producto.proveedor && <span>{producto.proveedor}</span>}{producto.consignacion && <span>Consignación</span>}{!producto.controla_inventario && <span>No controla stock</span>}</div>}<h2>{producto.nombre}{canEdit && <span className="text-action" style={{ marginLeft: 8 }}>Editar</span>}</h2><p>{resumenExtra && `${resumenExtra} · `}Precio: {money(producto.precio_venta)}{detalle && producto.costo_referencial != null ? ` · Costo: ${money(producto.costo_referencial)}` : ""}{detalle && producto.codigo ? ` · Código: ${producto.codigo}` : ""}{detalle && producto.codigo_barra ? ` · Varilla: ${producto.codigo_barra}` : ""}{detalle && producto.rango_esf_pos != null && producto.rango_esf_neg != null ? ` · Esfera ${producto.rango_esf_neg} a ${producto.rango_esf_pos}` : ""}{detalle && producto.rango_cil_pos != null && producto.rango_cil_neg != null ? ` · Cilindro ${producto.rango_cil_neg} a ${producto.rango_cil_pos}` : ""}</p>{detalle && producto.controla_inventario && <div className="stock-rows" onClick={(event) => event.stopPropagation()}>{branches.map((branch) => { const row = stockFor(producto.id, branch.id); const cantidad = row?.cantidad ?? 0; const minimo = row?.stock_minimo ?? 0; const low = minimo > 0 && cantidad <= minimo; return <StockPill key={branch.id} nombre={branch.nombre} cantidad={cantidad} minimo={minimo} low={low} canEdit={canEdit} onSaveMinimo={(value) => saveMinimo(producto.id, branch.id, value)} />; })}</div>}</div><div className="task-actions" /></article>; })}</div> : <section className="empty-state"><Package size={27} /><h3>{productosCategoriaSinFiltrar.length ? "No hay productos que coincidan" : `Aún no hay productos en ${categoriaLabel[categoriaActiva]?.toLowerCase()}`}</h3><p>{productosCategoriaSinFiltrar.length ? "Prueba otra búsqueda o limpia los filtros." : "Crea el primer producto de esta categoría."}</p></section>}</section>
+    {productosCategoria.length ? <div className="task-list">{productosCategoria.map((producto) => { const detalle = mostrar === "detallado"; const resumenExtra = [producto.marca, producto.modelo, producto.color].filter(Boolean).join(" · "); return <article className="task-card" key={producto.id} style={canEdit ? { cursor: "pointer" } : undefined} onClick={() => canEdit && setEditingProducto(producto)}><div className="task-status" /><div className="task-main">{detalle && <div className="task-meta"><span>{categoriaLabel[producto.categoria] ?? producto.categoria}</span>{producto.clasificacion && <span>{producto.clasificacion}</span>}{producto.material && <span>{producto.material}</span>}{producto.indice != null && <span>Índice {producto.indice}</span>}{producto.tecnologia && <span>{producto.tecnologia}</span>}{producto.proveedor && <span>{producto.proveedor}</span>}{producto.consignacion && <span>Consignación</span>}{!producto.controla_inventario && <span>No controla stock</span>}</div>}<h2>{producto.nombre}{canEdit && <span className="text-action" style={{ marginLeft: 8 }}>Editar</span>}</h2><p>{resumenExtra && `${resumenExtra} · `}Precio: {money(producto.precio_venta)}{producto.controla_inventario ? ` · Existencia: ${existencia(producto.id)}` : ""}{detalle && producto.costo_referencial != null ? ` · Costo: ${money(producto.costo_referencial)}` : ""}{detalle && producto.codigo ? ` · Código: ${producto.codigo}` : ""}{detalle && producto.codigo_barra ? ` · Varilla: ${producto.codigo_barra}` : ""}{detalle && producto.rango_esf_pos != null && producto.rango_esf_neg != null ? ` · Esfera ${producto.rango_esf_neg} a ${producto.rango_esf_pos}` : ""}{detalle && producto.rango_cil_pos != null && producto.rango_cil_neg != null ? ` · Cilindro ${producto.rango_cil_neg} a ${producto.rango_cil_pos}` : ""}</p>{verEnCero && <div className="field-hint" style={{ marginTop: 4 }}>{(compras[producto.id] ?? []).length ? (compras[producto.id] ?? []).map((c) => <div key={c.venta_id}>Vendido a <strong>{c.cliente}</strong>{c.folio ? ` · venta N.º ${c.folio}` : ""} · {formatDateShort(c.fecha)}{c.sucursal_id && branchById.get(c.sucursal_id) ? ` · ${branchById.get(c.sucursal_id)!.nombre}` : ""}</div>) : <span>Sin venta registrada (revisar con "Hacer inventario").</span>}</div>}{detalle && producto.controla_inventario && <div className="stock-rows" onClick={(event) => event.stopPropagation()}>{branches.map((branch) => { const row = stockFor(producto.id, branch.id); const cantidad = row?.cantidad ?? 0; const minimo = row?.stock_minimo ?? 0; const low = minimo > 0 && cantidad <= minimo; return <StockPill key={branch.id} nombre={branch.nombre} cantidad={cantidad} minimo={minimo} low={low} canEdit={canEdit} onSaveMinimo={(value) => saveMinimo(producto.id, branch.id, value)} />; })}</div>}</div><div className="task-actions" /></article>; })}</div> : <section className="empty-state"><Package size={27} /><h3>{productosCategoriaSinFiltrar.length ? "No hay productos que coincidan" : `Aún no hay productos en ${categoriaLabel[categoriaActiva]?.toLowerCase()}`}</h3><p>{productosCategoriaSinFiltrar.length ? "Prueba otra búsqueda o limpia los filtros." : "Crea el primer producto de esta categoría."}</p></section>}</section>
 
     {canEdit && <section className="glass agenda-board"><div className="agenda-toolbar"><div><p className="section-label">MOVIMIENTOS</p><h2>Entradas, salidas y transferencias</h2></div><div style={{ display: "flex", gap: 8 }}><button className="outline-action" type="button" onClick={() => setShowTransfer(true)}><ArrowLeftRight size={15} /> Transferencia</button><button className="new-task" type="button" onClick={() => setShowMovimiento(true)}><Plus size={18} /> Nuevo movimiento</button></div></div>{movimientos.length ? <div className="task-list">{movimientos.slice(0, 20).map((mov) => <MovimientoCard key={mov.id} mov={mov} productoNombre={productoById.get(mov.producto_id)?.nombre ?? "Producto"} sucursalNombre={branchById.get(mov.sucursal_id)?.nombre ?? "Sucursal"} />)}</div> : <section className="empty-state"><ArrowLeftRight size={27} /><h3>Sin movimientos</h3><p>Las entradas, salidas y transferencias aparecerán aquí.</p></section>}</section>}
 
-    {showProducto && <ProductoModal empresaId={empresaId} categoriaInicial={categoriaActiva} companies={props.companies} branches={branches} pending={pending} onClose={() => setShowProducto(false)} onSubmit={(form) => runAction(() => crearProductoInventario(form), "Producto creado.")} />}
-    {editingProducto && <ProductoModal empresaId={empresaId} categoriaInicial={editingProducto.categoria} companies={props.companies} branches={branches} producto={editingProducto} pending={pending} onClose={() => setEditingProducto(null)} onSubmit={(form) => startTransition(async () => { try { await actualizarProductoInventario(form); setNotice("Producto actualizado."); setEditingProducto(null); } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo actualizar el producto."); } })} />}
+    {showProducto && <ProductoModal tipos={listaTipos(productos)} empresaId={empresaId} categoriaInicial={categoriaActiva} companies={props.companies} branches={branches} pending={pending} onClose={() => setShowProducto(false)} onSubmit={(form) => runAction(() => crearProductoInventario(form), "Producto creado.")} />}
+    {editingProducto && <ProductoModal tipos={listaTipos(productos)} existencias={branches.map((b) => ({ nombre: b.nombre, cantidad: Number(stockFor(editingProducto.id, b.id)?.cantidad ?? 0) }))} empresaId={empresaId} categoriaInicial={editingProducto.categoria} companies={props.companies} branches={branches} producto={editingProducto} pending={pending} onClose={() => setEditingProducto(null)} onSubmit={(form) => startTransition(async () => { try { await actualizarProductoInventario(form); setNotice("Producto actualizado."); setEditingProducto(null); } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo actualizar el producto."); } })} />}
     {showMovimiento && <MovimientoModal productos={productosGrupo.filter((p) => p.controla_inventario)} branches={branches} pending={pending} onClose={() => setShowMovimiento(false)} onSubmit={(form) => runAction(() => crearMovimientoInventario(form), "Movimiento registrado.")} />}
     {showTransfer && <TransferModal productos={productosGrupo.filter((p) => p.controla_inventario)} branches={branches} pending={pending} onClose={() => setShowTransfer(false)} onSubmit={(form) => runAction(() => transferirInventario(form), "Transferencia registrada.")} />}
-    {showMasivo && <MasivoModal branches={branches} pending={pending} onClose={() => setShowMasivo(false)} onSubmit={(sucursalId, items) => startTransition(async () => { try { const result = await crearArmazonesMasivo(sucursalId, items); setNotice(`${result.creados} armazón(es) creados.${result.errores.length ? ` Errores: ${result.errores.join(" · ")}` : ""}`); setShowMasivo(false); } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudieron crear los armazones."); } })} />}
+    {showMasivo && <MasivoModal tipos={listaTipos(productos)} branches={branches} pending={pending} onClose={() => setShowMasivo(false)} onSubmit={(sucursalId, items) => startTransition(async () => { try { const result = await crearArmazonesMasivo(sucursalId, items); setNotice(`${result.creados} armazón(es) creados.${result.errores.length ? ` Errores: ${result.errores.join(" · ")}` : ""}`); setShowMasivo(false); } catch (err) { setNotice(err instanceof Error ? err.message : "No se pudieron crear los armazones."); } })} />}
     </>}
   </div></main>;
 }
@@ -148,7 +167,7 @@ function MovimientoCard({ mov, productoNombre, sucursalNombre }: { mov: Movimien
   return <article className="task-card"><div className="task-status" /><div className="task-main"><div className="task-meta"><span>{tipoLabel[mov.tipo]}</span><span>{sucursalNombre}</span><span>{formatDate(mov.creado_en)}</span></div><h2>{productoNombre}</h2>{mov.motivo && <p>{mov.motivo}</p>}</div><div className="task-actions"><strong style={{ color: positivo ? "#247658" : "#a24150" }}>{positivo ? "+" : "−"}{Math.abs(mov.cantidad)}</strong></div></article>;
 }
 
-function ProductoModal({ empresaId, categoriaInicial, companies, branches, producto, pending, onClose, onSubmit }: { empresaId: string; categoriaInicial: string; companies: InventarioData["companies"]; branches: InventarioData["branches"]; producto?: Producto; pending: boolean; onClose: () => void; onSubmit: (form: FormData) => void }) {
+function ProductoModal({ tipos, existencias, empresaId, categoriaInicial, companies, branches, producto, pending, onClose, onSubmit }: { tipos: string[]; existencias?: { nombre: string; cantidad: number }[]; empresaId: string; categoriaInicial: string; companies: InventarioData["companies"]; branches: InventarioData["branches"]; producto?: Producto; pending: boolean; onClose: () => void; onSubmit: (form: FormData) => void }) {
   const [categoria, setCategoria] = useState(producto?.categoria ?? categoriaInicial);
   const esMontura = categoria === "montura" || categoria === "gafas_sol";
   const editando = !!producto;
@@ -167,12 +186,19 @@ function ProductoModal({ empresaId, categoriaInicial, companies, branches, produ
     </div>
 
     {esMontura ? <>
+      {!editando ? <><p className="section-label" style={{ marginTop: 14 }}>EXISTENCIA</p><div className="new-patient-form">
+        <label>Sucursal donde entra<select name="sucursal_id" required defaultValue=""><option value="" disabled>Selecciona la sucursal</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label>
+        <label>Cantidad (unidades iguales)<input name="cantidad_inicial" type="number" min="1" step="1" defaultValue={1} required /></label>
+      </div></> : <><p className="section-label" style={{ marginTop: 14 }}>EXISTENCIA</p><p className="field-hint">{(existencias ?? []).map((e) => `${e.nombre}: ${e.cantidad}`).join(" · ") || "Sin existencias"}</p><div className="new-patient-form">
+        <label>Sumar unidades en<select name="sucursal_ingreso" defaultValue=""><option value="">No sumar</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label>
+        <label>Cantidad a sumar<input name="cantidad_ingreso" type="number" min="1" step="1" placeholder="Ej.: 1" /></label>
+      </div></>}
       <div className="new-patient-form" style={{ marginTop: 10 }}>
         <label>Marca<input value={marca} onChange={(event) => setMarca(event.target.value)} /></label>
         <label>Modelo<input value={modelo} onChange={(event) => setModelo(event.target.value)} /></label>
         <label>Color<input value={color} onChange={(event) => setColor(event.target.value)} /></label>
         <label>Material<input name="material" defaultValue={producto?.material ?? ""} placeholder="Ej.: Acetato, Metal, TR90" /></label>
-        <label>Tipo<input name="clasificacion" defaultValue={producto?.clasificacion ?? ""} placeholder="Ej.: Oftálmico, Sol" /></label>
+        <label>Tipo<select name="clasificacion" required defaultValue={producto?.clasificacion ? (tipos.find((t) => normalizeSearch(t) === normalizeSearch(producto.clasificacion!)) ?? producto.clasificacion) : ""}><option value="" disabled>Elige el tipo</option>{tipos.map((t) => <option key={t} value={t}>{t}</option>)}{producto?.clasificacion && !tipos.some((t) => normalizeSearch(t) === normalizeSearch(producto.clasificacion!)) && <option value={producto.clasificacion}>{producto.clasificacion}</option>}</select></label>
         <label>Barcode<input name="codigo_barra" defaultValue={producto?.codigo_barra ?? ""} placeholder="Dejar en blanco para crear uno automático" /></label>
         <label>Código<input name="codigo" defaultValue={producto?.codigo ?? ""} /></label>
         <label className="receta-option-header" style={{ padding: "8px 0" }}><input type="checkbox" name="consignacion" value="si" defaultChecked={producto?.consignacion ?? false} /> Consignación</label>
@@ -180,16 +206,15 @@ function ProductoModal({ empresaId, categoriaInicial, companies, branches, produ
       <p className="section-label" style={{ marginTop: 14 }}>PRECIOS</p>
       <div className="new-patient-form">
         <label>Costo proveedor predeterminado<input name="costo_referencial" defaultValue={producto?.costo_referencial ?? ""} type="number" min="0" step="0.01" /></label>
-        <label>Precio al público<input name="precio_venta" defaultValue={producto?.precio_venta} required type="number" min="0" step="0.01" /></label>
-        <label>Precio al público 2<input name="precio_venta_2" defaultValue={producto?.precio_venta_2 ?? ""} type="number" min="0" step="0.01" /></label>
+        <label>Precio al público (mayor)<input name="precio_venta" defaultValue={producto?.precio_venta} required type="number" min="0" step="0.01" /></label>
+        <label>Precio al público 2 (menor)<input name="precio_venta_2" defaultValue={producto?.precio_venta_2 ?? ""} type="number" min="0" step="0.01" /></label>
         <label>Precio al público 3<input name="precio_venta_3" defaultValue={producto?.precio_venta_3 ?? ""} type="number" min="0" step="0.01" /></label>
+        <label>Precio convenio<input name="precio_convenio" defaultValue={producto?.precio_convenio ?? ""} type="number" min="0" step="0.01" /></label>
       </div>
       <p className="section-label" style={{ marginTop: 14 }}>MEDIDAS Y COMPRA</p>
       <div className="new-patient-form">
         <label>Puente<input name="medida_puente" defaultValue={producto?.medida_puente ?? ""} type="number" min="0" step="0.1" /></label>
         <label>Fecha de compra<input name="fecha_compra" defaultValue={producto?.fecha_compra ?? ""} type="date" /></label>
-        {!editando && <label>Sucursal para el stock inicial<select name="sucursal_id" defaultValue=""><option value="">Sin cargar stock (solo crear catálogo)</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></label>}
-        {!editando && <label>Cantidad inicial<input name="cantidad_inicial" type="number" min="0" step="1" placeholder="0" /></label>}
       </div>
       <input type="hidden" name="controla_inventario" value="si" />
     </> : <div className="new-patient-form" style={{ marginTop: 10 }}>
@@ -224,9 +249,9 @@ function TransferModal({ productos, branches, pending, onClose, onSubmit }: { pr
   </div><div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" disabled={pending} type="submit">{pending ? "Guardando…" : "Registrar transferencia"}</button></div></form></section></div>;
 }
 
-const filaVacia = (): ArmazonMasivo => ({ nombre: "", marca: "", modelo: "", color: "", material: "", categoria: "montura", clasificacion: "", proveedor: "", codigo: "", codigo_barra: "", medida_puente: "", precio_venta: "", precio_venta_2: "", precio_venta_3: "", costo_referencial: "", cantidad_inicial: "" });
+const filaVacia = (): ArmazonMasivo => ({ nombre: "", marca: "", modelo: "", color: "", material: "", categoria: "montura", clasificacion: "", proveedor: "", codigo: "", codigo_barra: "", medida_puente: "", precio_venta: "", precio_venta_2: "", precio_venta_3: "", costo_referencial: "", cantidad_inicial: "1" });
 
-function MasivoModal({ branches, pending, onClose, onSubmit }: { branches: InventarioData["branches"]; pending: boolean; onClose: () => void; onSubmit: (sucursalId: string, items: ArmazonMasivo[]) => void }) {
+function MasivoModal({ tipos, branches, pending, onClose, onSubmit }: { tipos: string[]; branches: InventarioData["branches"]; pending: boolean; onClose: () => void; onSubmit: (sucursalId: string, items: ArmazonMasivo[]) => void }) {
   const [sucursalId, setSucursalId] = useState("");
   const [opciones, setOpciones] = useState<InventarioData["branches"]>(branches);
   const [filas, setFilas] = useState<ArmazonMasivo[]>([filaVacia(), filaVacia(), filaVacia()]);
@@ -264,13 +289,13 @@ function MasivoModal({ branches, pending, onClose, onSubmit }: { branches: Inven
           <label>Nombre<input value={fila.nombre} onChange={(event) => update(index, { nombre: event.target.value })} placeholder="Ej.: Ray-Ban RB2140" /></label>
           {([ ["Marca", "marca"], ["Modelo", "modelo"], ["Color", "color"], ["Material", "material"] ] as const).map(([label, campo]) => <label key={campo}>{label}<input value={fila[campo]} onChange={(event) => update(index, { [campo]: event.target.value })} /></label>)}
           <label>Tipo<select value={fila.categoria} onChange={(event) => update(index, { categoria: event.target.value })}><option value="montura">Montura</option><option value="gafas_sol">Gafas de sol</option></select></label>
-          <label>Clasificación<input value={fila.clasificacion} onChange={(event) => update(index, { clasificacion: event.target.value })} placeholder="Ej.: Fino, Exclusivo" /></label>
+          <label>Clasificación<select value={fila.clasificacion} onChange={(event) => update(index, { clasificacion: event.target.value })}><option value="">Elige el tipo</option>{tipos.map((t) => <option key={t} value={t}>{t}</option>)}{fila.clasificacion && !tipos.includes(fila.clasificacion) && <option value={fila.clasificacion}>{fila.clasificacion} (del archivo)</option>}</select></label>
           <label>Proveedor<input value={fila.proveedor} onChange={(event) => update(index, { proveedor: event.target.value })} /></label>
           <label>Código<input value={fila.codigo} onChange={(event) => update(index, { codigo: event.target.value })} /></label>
           <label>Código de la varilla<input value={fila.codigo_barra} onChange={(event) => update(index, { codigo_barra: event.target.value })} /></label>
           <label>Medida puente<input value={fila.medida_puente} onChange={(event) => update(index, { medida_puente: event.target.value })} /></label>
           {([ ["Precio de venta", "precio_venta"], ["Precio 2", "precio_venta_2"], ["Precio 3", "precio_venta_3"], ["Costo referencial", "costo_referencial"] ] as const).map(([label, campo]) => <label key={campo}>{label}<input type="text" inputMode="decimal" value={fila[campo]} onChange={(event) => update(index, { [campo]: event.target.value })} /></label>)}
-          <label>Cantidad inicial<input type="number" min="0" step="1" value={fila.cantidad_inicial} onChange={(event) => update(index, { cantidad_inicial: event.target.value })} placeholder="0" /></label>
+          <label>Cantidad (unidades iguales)<input type="number" min="0" step="1" value={fila.cantidad_inicial} onChange={(event) => update(index, { cantidad_inicial: event.target.value })} placeholder="0" /></label>
         </div>
         {filas.length > 1 && <button type="button" className="text-action" style={{ marginTop: 8 }} onClick={() => quitar(index)}>Quitar fila</button>}
       </div>)}

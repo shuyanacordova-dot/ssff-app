@@ -7,7 +7,7 @@ import { loadBranchIdentities, type BranchIdentity, type CompanyIdentity } from 
 
 export type SaleStatus = "borrador" | "completada" | "anulada";
 export type PaymentMethod = "efectivo" | "transferencia" | "tarjeta" | "credito" | "otro" | "saldo_favor";
-export type SaleProduct = { id: string; empresa_id: string; nombre: string; categoria: string; precio_venta: number; controla_inventario: boolean; precio_venta_2?: number | null; precio_venta_3?: number | null; codigo?: string | null; codigo_barra?: string | null; marca?: string | null; modelo?: string | null; color?: string | null };
+export type SaleProduct = { id: string; empresa_id: string; nombre: string; categoria: string; precio_venta: number; controla_inventario: boolean; precio_venta_2?: number | null; precio_venta_3?: number | null; precio_convenio?: number | null; codigo?: string | null; codigo_barra?: string | null; marca?: string | null; modelo?: string | null; color?: string | null };
 export type SaleCompany = CompanyIdentity;
 export type SaleBranch = BranchIdentity;
 export type SaleStock = { producto_id: string; sucursal_id: string; cantidad: number };
