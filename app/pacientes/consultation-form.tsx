@@ -169,6 +169,9 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
     <p className="section-label">AUTORREFRACTOR</p>
     <div className={rxStyles.cards}><EyeRxCard eye="OD" prefix="auto_od" showAv={false} showAdd={false}defaults={initial?.autorefractor ? { esfera: initial.autorefractor.od_esfera, cilindro: initial.autorefractor.od_cilindro, eje: initial.autorefractor.od_eje, add: initial.autorefractor.od_add } : undefined} /><EyeRxCard eye="OI" prefix="auto_oi" showAv={false} showAdd={false}defaults={initial?.autorefractor ? { esfera: initial.autorefractor.oi_esfera, cilindro: initial.autorefractor.oi_cilindro, eje: initial.autorefractor.oi_eje, add: initial.autorefractor.oi_add } : undefined} /></div>
 
+    <p className="section-label">RETINOSCOPÍA</p>
+    <div className={rxStyles.cards}><EyeRxCard eye="OD" prefix="retino_od" showAv={false} showAdd={false}defaults={initial?.retinoscopia ? { esfera: initial.retinoscopia.od_esfera, cilindro: initial.retinoscopia.od_cilindro, eje: initial.retinoscopia.od_eje } : undefined} /><EyeRxCard eye="OI" prefix="retino_oi" showAv={false} showAdd={false}defaults={initial?.retinoscopia ? { esfera: initial.retinoscopia.oi_esfera, cilindro: initial.retinoscopia.oi_cilindro, eje: initial.retinoscopia.oi_eje } : undefined} /></div>
+
     <p className="section-label">VISIÓN BINOCULAR</p>
     <div className="new-patient-form"><label>Cover test<input name="bino_cover_test" defaultValue={bino.cover_test ?? ""} /></label><label>Motilidad ocular<input name="bino_motilidad" defaultValue={bino.motilidad ?? ""} /></label><label>Estereopsis<input name="bino_estereopsis" defaultValue={bino.estereopsis ?? ""} /></label></div>
 

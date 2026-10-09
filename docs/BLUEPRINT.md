@@ -2,7 +2,7 @@
 
 > Documento vivo. **Toda IA (Claude o Codex) debe leerlo antes de trabajar y actualizarlo al terminar.**
 > Dueña del producto: Shuyana Córdova (optometrista, gerente de SHUVISION y Focus Óptica). No es programadora: todo se le explica en lenguaje simple.
-> Última actualización: 2026-09-24.
+> Última actualización: 2026-10-09.
 
 ---
 
@@ -54,7 +54,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 | Interfaz interna | ✅ | Estilo blanco de Pacientes extendido a pantallas internas: iris global, tarjetas blancas, acciones azul marino y acentos verde azulado. Login, recibo, recuperación de contraseña y privacidad conservan su fondo. Textos auxiliares redundantes recortados en pantallas internas (2026-10-06). |
 | Pacientes — crear ficha | ✅ | Edad calculada, ocupación, responsable de cuenta |
 | Pacientes — editar ficha | ✅ | Botón "Editar datos" en la carpeta. Todo el equipo puede editar. Cada cambio queda en `pacientes_cambios` (antes/después, quién, cuándo). Falta probar con sesión real. |
-| Historia clínica / revisiones | ✅ | Crear, ver, editar, imprimir. En celular: botones −/+ (pasos de 0,25), chip de signo para esfera, cilindro siempre negativo, botón "Transponer", eje 0–180. Nueva revisión: la lensometría se llena sola con la RX final de la última revisión del paciente (esfera, cilindro, eje, ADD; la AV queda vacía), con opción "Dejar en blanco" (2026-10-02) |
+| Historia clínica / revisiones | ✅ | Crear, ver, editar, imprimir. En celular: botones −/+ (pasos de 0,25), chip de signo para esfera, cilindro siempre negativo, botón "Transponer", eje 0–180. Nueva revisión: la lensometría se llena sola con la RX final de la última revisión del paciente (esfera, cilindro, eje, ADD; la AV queda vacía), con opción "Dejar en blanco" (2026-10-02). **Retinoscopía** (2026-10-09): se llena igual que el autorrefractor (esfera, cilindro, eje por ojo), se ve en la revisión y sale en la impresión |
 | Carpeta del paciente | 🟡 | Rediseño de `/pacientes`: búsqueda superior por sucursal, carpeta en una columna, observaciones generales editables y revisiones resumidas. Pestañas Revisiones, Ventas, Fotos y documentos, Laboratorio y Comunicaciones. Pendientes Citas y Estado de cuenta. |
 | Protección de datos de pacientes | 🟡 | Consentimiento versionado al crear ficha y en carpeta (incluye revocación e impresión), auditoría de apertura para superadmin y aviso público `/privacidad`. Textos borrador pendientes de revisión legal y prueba visual con sesión real. |
 | Ventas y cobros | ✅ | **Traspaso** (2026-10-07): tercer tipo de venta, solo armazones, para montar las lunas que trae el paciente; precio normal, cuenta en metas y descuenta inventario (`ventas.tipo_venta`). Pantalla general: venta rápida y traspaso. Lentes solo desde la carpeta del paciente. El formulario pide **solo sucursal** (la empresa sale de la sucursal). Métodos de pago: Efectivo, Transferencia, Tarjeta de crédito, Otro ("Crédito" solo en historial). Duplicados de importación jul–sep 2026 limpiados |
@@ -229,6 +229,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 
 | Fecha | Qué se entregó | Commit |
 |---|---|---|
+| 2026-10-09 | **Retinoscopía en la historia clínica**: nueva sección después del autorrefractor (OD/OI: esfera, cilindro, eje; mismos botones −/+ y validación de signo), guardada al crear y al editar, visible en la revisión e impresa en "Exploración y pruebas". Migración `20261009120000_consulta_retinoscopia.sql` (columna `consultas_optometricas.retinoscopia`, aplicada). Archivos: `app/pacientes/consultation-form.tsx`, `consultation-detail.tsx`, `clinical-review-print.tsx`, `actions.ts`, `lib/clinical.ts`. `npx tsc --noEmit` y `next build` correctos; prueba con sesión real pendiente. | (este commit) |
 | 2026-10-06 | Recorte de textos auxiliares redundantes en pantallas de ventas, cobros, CRM, pacientes, inventario, agenda, laboratorio, informes, convenios, tareas, equipo, facturación y configuración. Se conservaron reglas, advertencias, validaciones y textos de impresión. `npx tsc --noEmit` correcto. | Sin commit por instrucción de esta tarea |
 | 2026-10-02 | Orden de laboratorio: las **medidas del armazón** (vertical, horizontal mayor, puente, altura de montaje) ya no bloquean ni se marcan en rojo; solo la receta (esfera, eje si hay cilindro, DNP, ADD en progresivo/bifocal). Se quitó la validación `validarAlturaMontaje` de la pantalla (la función sigue en `lib/laboratorio.ts`). Archivo: `app/ventas/lab-order-modal.tsx`. Sin cambios de base de datos. | (este commit) |
 | 2026-10-02 | Historia clínica: en una **nueva revisión**, la lensometría (RX antigua) se carga automáticamente con la RX final de la última revisión que tenga graduación (esfera, cilindro, eje y ADD; AV lejos/cerca se mide de nuevo). Aviso con la fecha de esa revisión y botón "Dejar en blanco" / "Cargar…". Al editar una revisión no cambia nada. Archivos: `app/pacientes/consultation-form.tsx`, `app/pacientes/patient-clinical-client.tsx`, `app/globals.css` (`.link-button`). Sin cambios de base de datos. `npx tsc --noEmit` correcto; prueba con sesión real pendiente. | (este commit) |

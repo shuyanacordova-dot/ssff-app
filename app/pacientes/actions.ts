@@ -94,11 +94,11 @@ const astigmatismo = (k1: string, k2: string) => { const a = Number(k1); const b
 const monthsFor = { "3m": 3, "6m": 6, "1a": 12 } as const;
 const rxFieldLabel = (field: string) => {
   const [seccion, ojo, campo] = field.split("_");
-  const secciones: Record<string, string> = { lens: "Lensometría", auto: "Autorrefractómetro", ref: "Refracción final" };
+  const secciones: Record<string, string> = { lens: "Lensometría", auto: "Autorrefractómetro", retino: "Retinoscopía", ref: "Refracción final" };
   const campos: Record<string, string> = { esfera: "Esfera", cilindro: "Cilindro", add: "Adición" };
   return `${campos[campo] ?? campo} ${ojo === "od" ? "OD" : "OI"} (${secciones[seccion] ?? seccion})`;
 };
-const signedRxFields = ["lens_od_esfera", "lens_od_cilindro", "lens_od_add", "lens_oi_esfera", "lens_oi_cilindro", "lens_oi_add", "auto_od_esfera", "auto_od_cilindro", "auto_od_add", "auto_oi_esfera", "auto_oi_cilindro", "auto_oi_add", "ref_od_esfera", "ref_od_cilindro", "ref_od_add", "ref_oi_esfera", "ref_oi_cilindro", "ref_oi_add"];
+const signedRxFields = ["lens_od_esfera", "lens_od_cilindro", "lens_od_add", "lens_oi_esfera", "lens_oi_cilindro", "lens_oi_add", "auto_od_esfera", "auto_od_cilindro", "auto_od_add", "auto_oi_esfera", "auto_oi_cilindro", "auto_oi_add", "retino_od_esfera", "retino_od_cilindro", "retino_oi_esfera", "retino_oi_cilindro", "ref_od_esfera", "ref_od_cilindro", "ref_od_add", "ref_oi_esfera", "ref_oi_cilindro", "ref_oi_add"];
 // Valores con signo (+/-); el cero ("0.00", plano) se acepta sin signo.
 const signedRxPattern = /^(?:[+-]?(?:0+(?:[.,]0*)?|[.,]0+)|[+-](?:\d+(?:[.,]\d*)?|[.,]\d+))$/;
 
@@ -143,6 +143,7 @@ async function crearConsultaInterna(data: FormData) {
   const odK1 = text(data, "quera_od_k1"); const odK2 = text(data, "quera_od_k2"); const oiK1 = text(data, "quera_oi_k1"); const oiK2 = text(data, "quera_oi_k2");
   const queratometria = { od_k1: odK1, od_k2: odK2, od_eje: text(data, "quera_od_eje"), od_astigmatismo: astigmatismo(odK1, odK2), oi_k1: oiK1, oi_k2: oiK2, oi_eje: text(data, "quera_oi_eje"), oi_astigmatismo: astigmatismo(oiK1, oiK2) };
   const autorefractor = { od_esfera: text(data, "auto_od_esfera"), od_cilindro: text(data, "auto_od_cilindro"), od_eje: text(data, "auto_od_eje"), od_add: text(data, "auto_od_add"), oi_esfera: text(data, "auto_oi_esfera"), oi_cilindro: text(data, "auto_oi_cilindro"), oi_eje: text(data, "auto_oi_eje"), oi_add: text(data, "auto_oi_add") };
+  const retinoscopia = { od_esfera: text(data, "retino_od_esfera"), od_cilindro: text(data, "retino_od_cilindro"), od_eje: text(data, "retino_od_eje"), oi_esfera: text(data, "retino_oi_esfera"), oi_cilindro: text(data, "retino_oi_cilindro"), oi_eje: text(data, "retino_oi_eje") };
   const refraccion = { od_esfera: text(data, "ref_od_esfera"), od_cilindro: text(data, "ref_od_cilindro"), od_eje: text(data, "ref_od_eje"), od_add: text(data, "ref_od_add"), od_av_lejos: text(data, "ref_od_av_lejos"), od_av_cerca: text(data, "ref_od_av_cerca"), od_dnp: text(data, "ref_od_dnp"), oi_esfera: text(data, "ref_oi_esfera"), oi_cilindro: text(data, "ref_oi_cilindro"), oi_eje: text(data, "ref_oi_eje"), oi_add: text(data, "ref_oi_add"), oi_av_lejos: text(data, "ref_oi_av_lejos"), oi_av_cerca: text(data, "ref_oi_av_cerca"), oi_dnp: text(data, "ref_oi_dnp") };
   const examenBinocular = { cover_test: text(data, "bino_cover_test"), motilidad: text(data, "bino_motilidad"), estereopsis: text(data, "bino_estereopsis"), complementarios: JSON.stringify(parseComplementaryExams(text(data, "examenes_complementarios"))) };
   const biomicroscopia = { od: text(data, "biom_od"), oi: text(data, "biom_oi"), otros_detalles: text(data, "biom_otros") };
@@ -158,7 +159,7 @@ async function crearConsultaInterna(data: FormData) {
   const { data: consulta, error } = await supabase.from("consultas_optometricas").insert({
     paciente_id: pacienteId, empresa_atencion_id: profile.empresa_id, sucursal_atencion_id: profile.sucursal_id, optometrista_id: optometristaId,
     motivo_consulta: text(data, "motivo_consulta") || null, antecedentes,
-    agudeza_visual: agudezaVisual, lensometria, queratometria, autorefractor, refraccion, examen_binocular: examenBinocular, biomicroscopia,
+    agudeza_visual: agudezaVisual, lensometria, queratometria, autorefractor, retinoscopia, refraccion, examen_binocular: examenBinocular, biomicroscopia,
     impresion_diagnostica: impresionDiagnostica || null, receta, plan_manejo: text(data, "plan_manejo") || null, observaciones: text(data, "observaciones") || null,
     created_by: profile.id,
   }).select("id").single();
@@ -186,6 +187,7 @@ async function actualizarConsultaInterna(data: FormData) {
   const odK1 = text(data, "quera_od_k1"); const odK2 = text(data, "quera_od_k2"); const oiK1 = text(data, "quera_oi_k1"); const oiK2 = text(data, "quera_oi_k2");
   const queratometria = { od_k1: odK1, od_k2: odK2, od_eje: text(data, "quera_od_eje"), od_astigmatismo: astigmatismo(odK1, odK2), oi_k1: oiK1, oi_k2: oiK2, oi_eje: text(data, "quera_oi_eje"), oi_astigmatismo: astigmatismo(oiK1, oiK2) };
   const autorefractor = { od_esfera: text(data, "auto_od_esfera"), od_cilindro: text(data, "auto_od_cilindro"), od_eje: text(data, "auto_od_eje"), od_add: text(data, "auto_od_add"), oi_esfera: text(data, "auto_oi_esfera"), oi_cilindro: text(data, "auto_oi_cilindro"), oi_eje: text(data, "auto_oi_eje"), oi_add: text(data, "auto_oi_add") };
+  const retinoscopia = { od_esfera: text(data, "retino_od_esfera"), od_cilindro: text(data, "retino_od_cilindro"), od_eje: text(data, "retino_od_eje"), oi_esfera: text(data, "retino_oi_esfera"), oi_cilindro: text(data, "retino_oi_cilindro"), oi_eje: text(data, "retino_oi_eje") };
   const refraccion = { od_esfera: text(data, "ref_od_esfera"), od_cilindro: text(data, "ref_od_cilindro"), od_eje: text(data, "ref_od_eje"), od_add: text(data, "ref_od_add"), od_av_lejos: text(data, "ref_od_av_lejos"), od_av_cerca: text(data, "ref_od_av_cerca"), od_dnp: text(data, "ref_od_dnp"), oi_esfera: text(data, "ref_oi_esfera"), oi_cilindro: text(data, "ref_oi_cilindro"), oi_eje: text(data, "ref_oi_eje"), oi_add: text(data, "ref_oi_add"), oi_av_lejos: text(data, "ref_oi_av_lejos"), oi_av_cerca: text(data, "ref_oi_av_cerca"), oi_dnp: text(data, "ref_oi_dnp") };
   const examenBinocular = { cover_test: text(data, "bino_cover_test"), motilidad: text(data, "bino_motilidad"), estereopsis: text(data, "bino_estereopsis"), complementarios: JSON.stringify(parseComplementaryExams(text(data, "examenes_complementarios"))) };
   const biomicroscopia = { od: text(data, "biom_od"), oi: text(data, "biom_oi"), otros_detalles: text(data, "biom_otros") };
@@ -201,7 +203,7 @@ async function actualizarConsultaInterna(data: FormData) {
   const { error } = await supabase.from("consultas_optometricas").update({
     optometrista_id: optometristaId,
     motivo_consulta: text(data, "motivo_consulta") || null, antecedentes,
-    agudeza_visual: agudezaVisual, lensometria, queratometria, autorefractor, refraccion, examen_binocular: examenBinocular, biomicroscopia,
+    agudeza_visual: agudezaVisual, lensometria, queratometria, autorefractor, retinoscopia, refraccion, examen_binocular: examenBinocular, biomicroscopia,
     impresion_diagnostica: impresionDiagnostica || null, receta, plan_manejo: text(data, "plan_manejo") || null, observaciones: text(data, "observaciones") || null,
   }).eq("id", consultaId);
   if (error) throw new Error(error.message || "No se pudo actualizar la consulta.");
@@ -247,7 +249,7 @@ export async function obtenerHistorialPaciente(pacienteId: string): Promise<{ co
   const { supabase } = await currentClinicalProfile(folderRoles);
   if (!pacienteId) throw new Error("Falta identificar al paciente.");
   const [consultationsResult, photosResult, salesResult] = await Promise.all([
-    supabase.from("consultas_optometricas").select("id,paciente_id,empresa_atencion_id,sucursal_atencion_id,optometrista_id,fecha_consulta,motivo_consulta,antecedentes,agudeza_visual,lensometria,queratometria,autorefractor,refraccion,examen_binocular,biomicroscopia,impresion_diagnostica,receta,plan_manejo,observaciones,proximo_control").eq("paciente_id", pacienteId).order("fecha_consulta", { ascending: false }).limit(150),
+    supabase.from("consultas_optometricas").select("id,paciente_id,empresa_atencion_id,sucursal_atencion_id,optometrista_id,fecha_consulta,motivo_consulta,antecedentes,agudeza_visual,lensometria,queratometria,autorefractor,retinoscopia,refraccion,examen_binocular,biomicroscopia,impresion_diagnostica,receta,plan_manejo,observaciones,proximo_control").eq("paciente_id", pacienteId).order("fecha_consulta", { ascending: false }).limit(150),
     supabase.from("historia_fotos").select("id,paciente_id,consulta_id,tipo,descripcion,storage_path,creado_en").eq("paciente_id", pacienteId).order("creado_en", { ascending: false }).limit(150),
     supabase.from("ventas").select("id,empresa_id,sucursal_id,paciente_id,cliente_nombre,estado,subtotal,descuento,total,pagado,saldo,motivo_anulacion,recibo_token,fecha_entrega_estimada,creado_en,folio,apartado,apartado_hasta,venta_items(id,producto_id,descripcion,cantidad,precio_unitario,descuento,total_linea),pagos_venta(id,metodo,monto,referencia,banco,creado_en)").eq("paciente_id", pacienteId).order("creado_en", { ascending: false }).limit(150),
   ]);

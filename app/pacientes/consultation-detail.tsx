@@ -65,6 +65,7 @@ export default function ConsultationDetailModal({ consultation, patient, company
       <Section title="LENSOMETRÍA · RX ANTERIOR"><EyeTable data={consultation.lensometria} columns={RX_COLUMNS} /></Section>
       <Section title="QUERATOMETRÍA"><EyeTable data={consultation.queratometria} columns={QUERA_COLUMNS} /></Section>
       <Section title="AUTORREFRACTOR"><EyeTable data={consultation.autorefractor} columns={AUTO_COLUMNS} /></Section>
+      <Section title="RETINOSCOPÍA"><EyeTable data={consultation.retinoscopia} columns={AUTO_COLUMNS} /></Section>
       <Section title="RX FINAL"><EyeTable data={consultation.refraccion} columns={RX_COLUMNS} /></Section>
       <Section title="VISIÓN BINOCULAR"><FieldGrid data={consultation.examen_binocular} /></Section>
       <Section title="EXÁMENES COMPLEMENTARIOS">{complementaryExams.length ? <div className="consultation-stats">{complementaryExams.map((exam, index) => <span key={`${exam.name}-${index}`}><strong>{exam.name || "Examen"}</strong>{exam.result || "Sin resultado"}</span>)}</div> : <p className="field-hint">Sin exámenes complementarios registrados.</p>}</Section>
