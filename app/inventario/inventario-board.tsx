@@ -23,8 +23,17 @@ const modelosShuvision: OpcionModelo[] = [
   { valor: "EXCLUSIVO", etiqueta: "Exclusivo", clasificacion: "Exclusivo" },
   { valor: "PLUS", etiqueta: "Plus", clasificacion: "Plus" },
 ];
+const modelosFocus: OpcionModelo[] = [
+  { valor: "BASICO", etiqueta: "Básico", clasificacion: "Básico" },
+  { valor: "PREMIUM", etiqueta: "Premium", clasificacion: "Premium" },
+  { valor: "PLUS", etiqueta: "Plus", clasificacion: "Plus" },
+  { valor: "EXCLUSIVO", etiqueta: "Exclusivo", clasificacion: "Exclusivo" },
+  { valor: "ESTANDAR", etiqueta: "Estándar", clasificacion: "Estándar" },
+  { valor: "PROMO", etiqueta: "Promo", clasificacion: "Promoción" },
+];
 const listaModelos = (empresaNombre: string, productos: Producto[]): OpcionModelo[] => {
   if (normalizeSearch(empresaNombre).includes("shuvision")) return modelosShuvision;
+  if (normalizeSearch(empresaNombre).includes("focus")) return modelosFocus;
   // Otras ópticas: los modelos que ya tienen sus armazones, con la sección más usada de cada uno.
   const conteo = new Map<string, Map<string, number>>();
   for (const p of productos) { const v = p.modelo?.trim().toUpperCase(); if (!v || !p.clasificacion || !["montura", "gafas_sol"].includes(p.categoria)) continue; const m = conteo.get(v) ?? new Map<string, number>(); m.set(p.clasificacion, (m.get(p.clasificacion) ?? 0) + 1); conteo.set(v, m); }
