@@ -16,7 +16,7 @@ const tipoLabel: Record<string, string> = { entrada: "Entrada", salida: "Salida"
 const formatDateShort = (value: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
 // Modelo del armazón (Económico, Fino…): se elige de una lista, no se escribe, para no crear secciones nuevas por error.
 // Se guarda en "modelo" (como venía de Optox) y en "clasificacion" (la sección del filtro).
-type OpcionModelo = { valor: string; etiqueta: string; clasificacion: string };
+type OpcionModelo = { valor: string; etiqueta: string; clasificacion: string; categoria?: string };
 const modelosShuvision: OpcionModelo[] = [
   { valor: "ECONOMICO", etiqueta: "Económico", clasificacion: "Económico" },
   { valor: "FINO", etiqueta: "Fino", clasificacion: "Fino" },
@@ -32,14 +32,49 @@ const modelosFocus: OpcionModelo[] = [
   { valor: "ESTANDAR", etiqueta: "Estándar", clasificacion: "Estándar" },
   { valor: "PROMO", etiqueta: "Promo", clasificacion: "Promoción" },
 ];
+// Gafas (sol, polarizadas, deporte, seguridad, niño…): también se eligen como modelo (Shuyana 2026-10-12).
+const modelosGafas: OpcionModelo[] = [
+  { valor: "GAFA ECONOMICA", etiqueta: "Gafa económica", clasificacion: "Económico", categoria: "gafas_sol" },
+  { valor: "GAFA BASICA", etiqueta: "Gafa básica", clasificacion: "Básico", categoria: "gafas_sol" },
+  { valor: "GAFA EXCLUSIVA", etiqueta: "Gafa exclusiva", clasificacion: "Exclusivo", categoria: "gafas_sol" },
+  { valor: "GAFA POLARIZADA ECONOMICA", etiqueta: "Gafa polarizada económica", clasificacion: "Polarizada económica", categoria: "gafas_sol" },
+  { valor: "GAFA POLARIZADA BASICA", etiqueta: "Gafa polarizada básica", clasificacion: "Polarizada básica", categoria: "gafas_sol" },
+  { valor: "GAFA POLARIZADA FINO", etiqueta: "Gafa polarizada fina", clasificacion: "Polarizada fino", categoria: "gafas_sol" },
+  { valor: "POLARIZADA PREMIUM", etiqueta: "Gafa polarizada premium", clasificacion: "Polarizada premium", categoria: "gafas_sol" },
+  { valor: "GAFA NIÑO", etiqueta: "Gafa niño", clasificacion: "Niño", categoria: "gafas_sol" },
+  { valor: "GAFA DEPORTE", etiqueta: "Gafa deporte", clasificacion: "Deporte", categoria: "montura" },
+  { valor: "GAFA INDUSTRIAL", etiqueta: "Gafa de seguridad (industrial)", clasificacion: "Industrial", categoria: "montura" },
+  { valor: "GAFA INDUSTRIAL ECONOMICA", etiqueta: "Gafa de seguridad económica", clasificacion: "Industrial económico", categoria: "montura" },
+  { valor: "GAFA POST OPERATORIO", etiqueta: "Gafa post operatorio", clasificacion: "Post operatorio", categoria: "gafas_sol" },
+];
+const esModeloGafa = (valor: string) => /^(GAFA|POLARIZADA)/.test(valor);
+// Lentes de lectura y bifocales terminados van en Accesorios, no como modelo de armazón.
+const esLecturaOBifocal = (texto: string) => /LECTURA|BIFOCAL/.test(normalizeSearch(texto).toUpperCase());
+// Nombre visible: la sección si es el mismo texto (conserva tildes); si no, el modelo en minúsculas con mayúscula inicial.
+const etiquetaModelo = (valor: string, clasificacion: string) => { if (normalizeSearch(clasificacion) === normalizeSearch(valor)) return clasificacion; const t = valor.toLowerCase().replace(/\bnino\b/g, "niño").replace(/economic([ao])/g, "económic$1").replace(/basic([ao])/g, "básic$1"); return t.charAt(0).toUpperCase() + t.slice(1); };
 const listaModelos = (empresaNombre: string, productos: Producto[]): OpcionModelo[] => {
-  if (normalizeSearch(empresaNombre).includes("shuvision")) return modelosShuvision;
-  if (normalizeSearch(empresaNombre).includes("focus")) return modelosFocus;
-  // Otras ópticas: los modelos que ya tienen sus armazones, con la sección más usada de cada uno.
-  const conteo = new Map<string, Map<string, number>>();
-  for (const p of productos) { const v = p.modelo?.trim().toUpperCase(); if (!v || !p.clasificacion || !["montura", "gafas_sol"].includes(p.categoria)) continue; const m = conteo.get(v) ?? new Map<string, number>(); m.set(p.clasificacion, (m.get(p.clasificacion) ?? 0) + 1); conteo.set(v, m); }
-  return Array.from(conteo.entries()).map(([valor, m]) => { const clasificacion = Array.from(m.entries()).sort((a, b) => b[1] - a[1])[0][0]; return { valor, etiqueta: clasificacion === valor ? valor : valor.charAt(0) + valor.slice(1).toLowerCase(), clasificacion }; }).sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, "es"));
+  const base = normalizeSearch(empresaNombre).includes("shuvision") ? modelosShuvision : normalizeSearch(empresaNombre).includes("focus") ? modelosFocus : [];
+  // Más los modelos que ya tienen los armazones y gafas de la óptica (con la sección y el tipo más usados).
+  const conteo = new Map<string, { clas: Map<string, number>; cat: Map<string, number> }>();
+  for (const p of productos) {
+    const v = p.modelo?.trim().toUpperCase(); if (!v || !p.clasificacion || !["montura", "gafas_sol"].includes(p.categoria) || esLecturaOBifocal(`${v} ${p.clasificacion}`)) continue;
+    const m = conteo.get(v) ?? { clas: new Map<string, number>(), cat: new Map<string, number>() };
+    m.clas.set(p.clasificacion, (m.clas.get(p.clasificacion) ?? 0) + 1); m.cat.set(p.categoria, (m.cat.get(p.categoria) ?? 0) + 1); conteo.set(v, m);
+  }
+  const masUsado = (m: Map<string, number>) => Array.from(m.entries()).sort((a, b) => b[1] - a[1])[0][0];
+  const existentes: OpcionModelo[] = Array.from(conteo.entries()).map(([valor, m]) => ({ valor, etiqueta: etiquetaModelo(valor, masUsado(m.clas)), clasificacion: masUsado(m.clas), categoria: masUsado(m.cat) }));
+  const todos = new Map<string, OpcionModelo>();
+  for (const o of [...base, ...modelosGafas, ...existentes]) if (!todos.has(o.valor)) todos.set(o.valor, o);
+  const lista = Array.from(todos.values());
+  const armazones = lista.filter((o) => !esModeloGafa(o.valor)); const gafas = lista.filter((o) => esModeloGafa(o.valor)).sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, "es"));
+  const fijos = new Set(base.map((o) => o.valor));
+  return [...armazones.filter((o) => fijos.has(o.valor)), ...armazones.filter((o) => !fijos.has(o.valor)).sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, "es")), ...gafas];
 };
+// Opciones del selector de modelo: armazones y gafas por separado.
+const OpcionesModelo = ({ modelos }: { modelos: OpcionModelo[] }) => <>
+  <optgroup label="Armazones">{modelos.filter((m) => !esModeloGafa(m.valor)).map((m) => <option key={m.valor} value={m.valor}>{m.etiqueta}</option>)}</optgroup>
+  <optgroup label="Gafas">{modelos.filter((m) => esModeloGafa(m.valor)).map((m) => <option key={m.valor} value={m.valor}>{m.etiqueta}</option>)}</optgroup>
+</>;
 const gruposMonturas: Record<string, string[]> = { monturas_gafas: ["montura", "gafas_sol"], accesorios: ["accesorio", "servicio", "tratamiento", "otro"] };
 
 export default function InventarioBoard(props: InventarioData & { grupoInicial?: "monturas" | "lunas" }) {
@@ -228,7 +263,7 @@ function ProductoModal({ modelos, aviso, existencias, empresaId, categoriaInicia
       </div></>}
       <div className="new-patient-form" style={{ marginTop: 10 }}>
         <label>Marca<input value={marca} onChange={(event) => setMarca(event.target.value)} /></label>
-        <label>Modelo<select name="modelo" required value={modelo} onChange={(event) => setModelo(event.target.value)}><option value="" disabled>Elige el modelo</option>{opcionesModelo.map((m) => <option key={m.valor} value={m.valor}>{m.etiqueta}</option>)}</select><input type="hidden" name="clasificacion" value={clasificacionModelo} /></label>
+        <label>Modelo<select name="modelo" required value={modelo} onChange={(event) => setModelo(event.target.value)}><option value="" disabled>Elige el modelo</option><OpcionesModelo modelos={opcionesModelo} /></select><input type="hidden" name="clasificacion" value={clasificacionModelo} /></label>
         <label>Color<input value={color} onChange={(event) => setColor(event.target.value)} /></label>
         <label>Material<input name="material" defaultValue={producto?.material ?? ""} placeholder="Ej.: Acetato, Metal, TR90" /></label>
         <label>Barcode<input name="codigo_barra" defaultValue={producto?.codigo_barra ?? ""} placeholder="Dejar en blanco para crear uno automático" /></label>
@@ -324,7 +359,7 @@ function MasivoModal({ modelos, branches, pending, onClose, onSubmit }: { modelo
           <label>Nombre<input value={fila.nombre} onChange={(event) => update(index, { nombre: event.target.value })} placeholder="Ej.: Ray-Ban RB2140" /></label>
           {([ ["Marca", "marca"], ["Color", "color"], ["Material", "material"] ] as const).map(([label, campo]) => <label key={campo}>{label}<input value={fila[campo]} onChange={(event) => update(index, { [campo]: event.target.value })} /></label>)}
           <label>Tipo<select value={fila.categoria} onChange={(event) => update(index, { categoria: event.target.value })}><option value="montura">Montura</option><option value="gafas_sol">Gafas de sol</option></select></label>
-          <label>Modelo<select value={fila.modelo.trim().toUpperCase()} onChange={(event) => update(index, { modelo: event.target.value, clasificacion: modelos.find((m) => m.valor === event.target.value)?.clasificacion ?? "" })}><option value="">Elige el modelo</option>{modelos.map((m) => <option key={m.valor} value={m.valor}>{m.etiqueta}</option>)}{fila.modelo.trim() && !modelos.some((m) => m.valor === fila.modelo.trim().toUpperCase()) && <option value={fila.modelo.trim().toUpperCase()}>{fila.modelo} (del archivo)</option>}</select></label>
+          <label>Modelo<select value={fila.modelo.trim().toUpperCase()} onChange={(event) => { const opcion = modelos.find((m) => m.valor === event.target.value); update(index, { modelo: event.target.value, clasificacion: opcion?.clasificacion ?? "", ...(opcion?.categoria ? { categoria: opcion.categoria } : {}) }); }}><option value="">Elige el modelo</option><OpcionesModelo modelos={modelos} />{fila.modelo.trim() && !modelos.some((m) => m.valor === fila.modelo.trim().toUpperCase()) && <option value={fila.modelo.trim().toUpperCase()}>{fila.modelo} (del archivo)</option>}</select></label>
           <label>Proveedor<input value={fila.proveedor} onChange={(event) => update(index, { proveedor: event.target.value })} /></label>
           <label>Código<input value={fila.codigo} onChange={(event) => update(index, { codigo: event.target.value })} /></label>
           <label>Código de la varilla<input value={fila.codigo_barra} onChange={(event) => update(index, { codigo_barra: event.target.value })} /></label>
