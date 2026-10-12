@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, Printer, X } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { printDocumentById } from "@/lib/print-document";
-import { asignarCategoriaGasto, obtenerDesgloseInforme, type DesgloseInforme, type FilaDesglose, type TipoDesglose } from "./actions";
+import { clasificarEgreso, obtenerDesgloseInforme, type DesgloseInforme, type FilaDesglose, type TipoDesglose } from "./actions";
 
 const money = (n: unknown) => `$${Number(n ?? 0).toFixed(2)}`;
 const fecha = (value: unknown) => typeof value === "string" ? new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short" }).format(new Date(`${value}T12:00:00`)) : "";
@@ -23,7 +23,7 @@ const config: Record<TipoDesglose, { titulo: string; montoDe: (f: FilaDesglose) 
   saldo: { titulo: "Saldo de las ventas del mes", montoDe: (f) => Number(f.saldo ?? 0), agrupaciones: [porSucursal, sinAgrupar] },
   cxc: { titulo: "Cuentas por cobrar (todas)", montoDe: (f) => Number(f.saldo ?? 0), agrupaciones: [porSucursal, { valor: "mes", etiqueta: "Mes de la venta", de: (f) => str(f.fecha).slice(0, 7) }, sinAgrupar] },
   cobros: { titulo: "Cobros del mes", montoDe: (f) => Number(f.monto ?? 0), agrupaciones: [{ valor: "metodo", etiqueta: "Forma de pago", de: (f) => metodoLabel[str(f.metodo, "")] ?? str(f.metodo) }, porSucursal, { valor: "origen", etiqueta: "Venta del mes o anterior", de: (f) => f.venta_del_mes ? "Ventas de este mes" : "Abonos de ventas anteriores" }, sinAgrupar] },
-  gastos: { titulo: "Egresos del mes", montoDe: (f) => Number(f.monto ?? 0), agrupaciones: [{ valor: "categoria", etiqueta: "Mi clasificación", de: (f) => str(f.categoria, SIN_CLASIFICAR) }, { valor: "concepto", etiqueta: "Concepto", de: (f) => str(f.concepto).toUpperCase() }, { valor: "clasificacion", etiqueta: "Clasificación de caja", de: (f) => clasificacionLabel[str(f.clasificacion, "")] ?? str(f.clasificacion) }, porSucursal] },
+  gastos: { titulo: "Egresos del mes", montoDe: (f) => Number(f.monto ?? 0), agrupaciones: [{ valor: "clasificacion", etiqueta: "Clasificación", de: (f) => clasificacionLabel[str(f.clasificacion, "")] ?? SIN_CLASIFICAR }, { valor: "concepto", etiqueta: "Concepto", de: (f) => str(f.concepto).toUpperCase() }, porSucursal] },
   cuadres: { titulo: "Cuadres de caja del mes", montoDe: (f) => Math.abs(Number(f.diferencia ?? 0)), agrupaciones: [{ valor: "estado", etiqueta: "Resultado", de: (f) => f.correcto ? "Correctos" : "Con diferencia" }, porSucursal] },
 };
 
@@ -48,8 +48,8 @@ export default function DesgloseModal({ tipo, empresaId, mes, etiquetaPeriodo, p
   const unSoloGrupo = listaGrupos.length === 1;
   const alternar = (nombre: string) => setAbiertos((set) => { const n = new Set(set); if (n.has(nombre)) n.delete(nombre); else n.add(nombre); return n; });
 
-  const clasificar = (fila: FilaDesglose, categoria: string, porConcepto: boolean) => start(async () => {
-    try { await asignarCategoriaGasto(String(fila.id), categoria, porConcepto); setDatos(await obtenerDesgloseInforme(empresaId, mes, tipo)); onCambio?.(); }
+  const clasificar = (fila: FilaDesglose, categoria: string) => start(async () => {
+    try { await clasificarEgreso(String(fila.id), categoria); setDatos(await obtenerDesgloseInforme(empresaId, mes, tipo)); onCambio?.(); }
     catch (err) { setError(err instanceof Error ? err.message : "No se pudo guardar la categoría."); }
   });
 
@@ -64,34 +64,32 @@ export default function DesgloseModal({ tipo, empresaId, mes, etiquetaPeriodo, p
         <button type="button" className="text-action" onClick={() => setAbiertos(abiertos.size ? new Set() : new Set(listaGrupos.map((g) => g.nombre)))}>{abiertos.size ? "Cerrar todo" : "Abrir todo"}</button>
         <button type="button" className="outline-action" onClick={() => printDocumentById("informe-desglose-print")}><Printer size={14} /> Imprimir</button>
       </div>
-      {tipo === "gastos" && puedeClasificar && <p className="field-hint no-print">Elige la categoría de cada egreso. Con “Recordar” queda para todos los egresos con el mismo concepto, también los que se registren después.</p>}
+      {tipo === "gastos" && puedeClasificar && <p className="field-hint no-print">Cada egreso muestra el concepto y la clasificación guardados al registrarlo. Revisa los que figuran sin clasificar.</p>}
       {error && <p className="notice" role="alert">{error}</p>}
       {!datos && !error && <p className="field-hint">Cargando…</p>}
       {datos && !filas.length && <p className="field-hint">No hay registros en este periodo.</p>}
       <div className="informe-grupos">{listaGrupos.map((g) => { const abierto = unSoloGrupo || abiertos.has(g.nombre); return <div className="informe-grupo" key={g.nombre}>
         <button type="button" className="informe-grupo-header" onClick={() => alternar(g.nombre)} aria-expanded={abierto}>{abierto ? <ChevronDown size={16} /> : <ChevronRight size={16} />}<span className="informe-grupo-nombre">{g.nombre}</span><span className="informe-grupo-count">{g.items.length}</span><strong>{tipo === "cuadres" ? "" : money(g.total)}</strong></button>
-        {abierto && <ul className="informe-filas">{g.items.map((f) => <FilaItem key={String(f.id)} tipo={tipo} fila={f} categorias={datos?.categorias ?? []} puedeClasificar={puedeClasificar && tipo === "gastos"} pending={pending} onClasificar={(cat, porConcepto) => clasificar(f, cat, porConcepto)} />)}</ul>}
+        {abierto && <ul className="informe-filas">{g.items.map((f) => <FilaItem key={String(f.id)} tipo={tipo} fila={f} puedeClasificar={puedeClasificar && tipo === "gastos"} pending={pending} onClasificar={(cat) => clasificar(f, cat)} />)}</ul>}
       </div>; })}</div>
     </div>
   </section></div>, document.body);
 }
 
-function FilaItem({ tipo, fila: f, categorias, puedeClasificar, pending, onClasificar }: { tipo: TipoDesglose; fila: FilaDesglose; categorias: string[]; puedeClasificar: boolean; pending: boolean; onClasificar: (categoria: string, porConcepto: boolean) => void }) {
-  const [recordar, setRecordar] = useState(true);
-  const [nueva, setNueva] = useState<string | null>(null);
+function FilaItem({ tipo, fila: f, puedeClasificar, pending, onClasificar }: { tipo: TipoDesglose; fila: FilaDesglose; puedeClasificar: boolean; pending: boolean; onClasificar: (categoria: string) => void }) {
   let titulo = ""; let detalle: string[] = []; let monto = "";
   if (tipo === "ventas" || tipo === "saldo" || tipo === "cxc") { titulo = str(f.cliente); detalle = [fecha(f.fecha), f.folio ? `N.º ${f.folio}` : "", str(f.sucursal, ""), `Total ${money(f.total)}`, `Pagado ${money(f.pagado)}`]; monto = tipo === "ventas" ? money(f.total) : `Saldo ${money(f.saldo)}`; }
   else if (tipo === "cobros") { titulo = str(f.cliente); detalle = [fecha(f.fecha), f.folio ? `N.º ${f.folio}` : "", metodoLabel[str(f.metodo, "")] ?? str(f.metodo), str(f.banco, ""), str(f.sucursal, "")]; monto = money(f.monto); }
-  else if (tipo === "gastos") { titulo = str(f.concepto); detalle = [fecha(f.fecha), str(f.sucursal, ""), f.origen === "banco" ? "Banco" : f.origen ? "Caja" : "", clasificacionLabel[str(f.clasificacion, "")] ?? "", str(f.observaciones, "")]; monto = money(f.monto); }
+  else if (tipo === "gastos") { titulo = `Concepto: ${str(f.concepto)}`; detalle = [`Clasificación: ${clasificacionLabel[str(f.clasificacion, "")] ?? SIN_CLASIFICAR}`, fecha(f.fecha), str(f.sucursal, ""), f.origen === "banco" ? "Banco" : f.origen ? "Caja" : "", str(f.observaciones, "")]; monto = money(f.monto); }
   else { titulo = `${fecha(f.fecha)} · ${str(f.sucursal)}`; detalle = [`Esperado ${money(f.caja_esperada)}`, `Físico ${money(f.caja_fisica)}`, str(f.observaciones, "")]; monto = f.correcto ? "Correcto" : `Diferencia ${money(f.diferencia)}`; }
-  const actual = typeof f.categoria === "string" ? f.categoria : "";
   return <li className="informe-fila">
     <div className="informe-fila-main"><span className="informe-fila-titulo">{titulo}</span><span className="informe-fila-detalle">{detalle.filter(Boolean).join(" · ")}</span></div>
     <strong className="informe-fila-monto">{monto}</strong>
-    {puedeClasificar && <div className="informe-fila-clasificar no-print">
-      {nueva === null ? <select value={actual} disabled={pending} onChange={(event) => { if (event.target.value === "__nueva__") setNueva(""); else onClasificar(event.target.value, recordar); }}><option value="">{SIN_CLASIFICAR}</option>{categorias.map((c) => <option key={c} value={c}>{c}</option>)}<option value="__nueva__">+ Nueva categoría…</option></select>
-        : <span className="informe-nueva-cat"><input autoFocus value={nueva} onChange={(event) => setNueva(event.target.value)} placeholder="Ej.: Arriendo" onKeyDown={(event) => { if (event.key === "Enter" && nueva.trim()) { onClasificar(nueva.trim(), recordar); setNueva(null); } }} /><button type="button" className="outline-action" disabled={!nueva.trim() || pending} onClick={() => { onClasificar(nueva.trim(), recordar); setNueva(null); }}>Guardar</button><button type="button" className="text-action" onClick={() => setNueva(null)}>Cancelar</button></span>}
-      <label className="informe-recordar"><input type="checkbox" checked={recordar} onChange={(event) => setRecordar(event.target.checked)} /> Recordar para este concepto</label>
+    {puedeClasificar && !f.clasificacion && <div className="informe-fila-clasificar no-print">
+      <select defaultValue="" disabled={pending} onChange={(event) => { if (event.target.value) onClasificar(event.target.value); }} aria-label="Clasificar egreso">
+        <option value="">Elegir clasificación</option>
+        {Object.entries(clasificacionLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </select>
     </div>}
   </li>;
 }

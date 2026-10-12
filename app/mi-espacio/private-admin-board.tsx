@@ -4,10 +4,10 @@ import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
-import { Archive, ChevronLeft, ChevronRight, History, Landmark, LockKeyhole, Pencil, Plus, Wallet, X } from "lucide-react";
+import { Archive, ChevronLeft, ChevronRight, History, Landmark, LockKeyhole, Pencil, Plus, Trash2, Wallet, X } from "lucide-react";
 import type { PrivateAdminData } from "@/lib/mi-espacio";
 import { atrasadas, avance, cuotasPagadas, fechaCorta, hoyEcuador, itemsDelMes, mesDe, modalidades, money, nombreMes, proximoPago, sumarMeses, tipos, type BusinessDebt, type ItemMes, type ModalidadDeuda, type TipoDeuda } from "@/lib/mis-deudas-calc";
-import { actualizarDeuda, archivarDeuda, crearDeuda, registrarFacturaProveedor, registrarPagoDeuda } from "./actions";
+import { actualizarDeuda, archivarDeuda, corregirPagoDeuda, crearDeuda, registrarFacturaProveedor, registrarPagoDeuda } from "./actions";
 import s from "./mis-deudas.module.css";
 
 const estadoTexto = { pagado: "Pagado", vencido: "Vencido", hoy: "Vence hoy", proximo: "Próximo" } as const;
@@ -56,7 +56,7 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
     {notice && <div className="notice"><LockKeyhole size={18} /><span>{notice}</span></div>}
     {tocaCuadre && <Link href="/mi-espacio/bancos" className="notice" style={{ textDecoration: "none", fontWeight: 800 }}><Landmark size={18} /><span>{new Date(`${hoy}T12:00:00Z`).getUTCDay() === 6 ? "Hoy es sábado: toca el cuadre de bancos." : "Hace más de una semana que no cuadras los bancos."} Ábrelo aquí →</span></Link>}
 
-    <div className="tabs" style={{ marginBottom: 10 }}>{([["optica", "Deudas Shuvisión"], ["personal", "Deudas personales"], ["todo", "Todo"]] as const).map(([v, label]) => <button key={v} type="button" className={vista === v ? "active" : ""} onClick={() => setVista(v)}>{label}</button>)}</div>
+    
     <div className={s.monthNav}>
       <button type="button" onClick={() => setMes(sumarMeses(mes, -1))} aria-label="Mes anterior"><ChevronLeft size={16} /></button>
       <span className={s.monthName}>{nombreMes(mes)}</span>
@@ -104,7 +104,7 @@ export default function PrivateAdminBoard(props: PrivateAdminData) {
 
     {nueva && <NuevaDeuda preset={nueva} companies={props.companies} branches={props.branches} onClose={() => setNueva(null)} onSaved={(m) => { setNotice(m); setNueva(null); router.refresh(); }} />}
     {pagando && <PagarDeuda pago={pagando} branches={props.branches} cuentas={props.cuentas} companies={props.companies} onClose={() => setPagando(null)} onSaved={(m) => { setNotice(m); setPagando(null); router.refresh(); }} />}
-    {historial && <Historial deuda={historial} onClose={() => setHistorial(null)} />}
+    {historial && <Historial deuda={historial} onClose={() => setHistorial(null)} onSaved={() => { setHistorial(null); setNotice("Pago corregido."); router.refresh(); }} />}
     {editando && <EditarDeuda deuda={editando} companies={props.companies} branches={props.branches} onClose={() => setEditando(null)} onSaved={(m) => { setNotice(m); setEditando(null); router.refresh(); }} />}
     {facturando && <AgregarFactura deuda={facturando} onClose={() => setFacturando(null)} onSaved={() => { setNotice(`Factura agregada a ${facturando.proveedor}.`); setFacturando(null); router.refresh(); }} />}
   </div></main>;
@@ -244,7 +244,11 @@ function PagarDeuda({ pago, branches, cuentas, companies, onClose, onSaved }: { 
   </section></div>;
 }
 
-function Historial({ deuda, onClose }: { deuda: BusinessDebt; onClose: () => void }) {
+function Historial({ deuda, onClose, onSaved }: { deuda: BusinessDebt; onClose: () => void; onSaved: () => void }) {
+  const [editandoPago, setEditandoPago] = useState<BusinessDebt["pagos_deuda_negocio"][number] | null>(null);
+  const [error, setError] = useState("");
+  const [pending, start] = useTransition();
+  const guardar = (form: FormData) => start(async () => { const resultado = await corregirPagoDeuda(form); if (!resultado.ok) { setError(resultado.error); return; } onSaved(); });
   const pagos = [...deuda.pagos_deuda_negocio].sort((a, b) => b.fecha_pago.localeCompare(a.fecha_pago));
   const facturas = [...(deuda.facturas_proveedor ?? [])].sort((a, b) => b.fecha_emision.localeCompare(a.fecha_emision));
   return <div className="modal-backdrop" onClick={onClose}><section className="new-patient-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
@@ -252,8 +256,21 @@ function Historial({ deuda, onClose }: { deuda: BusinessDebt; onClose: () => voi
     <p className="section-label">HISTORIAL</p><h2>{deuda.proveedor}</h2>
     {deuda.tipo === "proveedor" && <><h3>Facturas ({facturas.length})</h3>{facturas.length ? <div className="task-list">{facturas.map((f) => <article className="task-card" key={f.id}><div className="task-main"><p style={{ margin: 0 }}><strong>{fechaCorta(f.fecha_emision)}</strong> · {f.numero} · {f.origen === "xml" ? "XML" : f.origen === "correo" ? "Correo" : "Manual"}</p>{f.razon_social && <p className="field-hint" style={{ margin: 0 }}>{f.razon_social}</p>}</div><div className="task-actions"><strong>{money(Number(f.total))}</strong></div></article>)}</div> : <p className={s.empty}>Todavía no hay facturas registradas.</p>}</>}
     <h3>Pagos ({pagos.length})</h3>
-    {pagos.length ? <div className="task-list">{pagos.map((p) => <article className="task-card" key={p.id}><div className="task-main"><p style={{ margin: 0 }}><strong>{fechaCorta(p.fecha_pago)}</strong> · {metodos.find((m) => m.value === p.metodo)?.label ?? p.metodo}{p.periodo ? ` · mes ${nombreMes(p.periodo.slice(0, 7))}` : ""}{p.referencia ? ` · Ref. ${p.referencia}` : ""}</p>{p.notas && <p className="field-hint" style={{ margin: 0 }}>{p.notas}</p>}</div><div className="task-actions"><strong>{money(Number(p.monto))}</strong></div></article>)}</div>
+    {pagos.length ? <div className="task-list">{pagos.map((p) => <article className="task-card" key={p.id}><div className="task-main"><p style={{ margin: 0 }}><strong>{fechaCorta(p.fecha_pago)}</strong> · {metodos.find((m) => m.value === p.metodo)?.label ?? p.metodo}{p.periodo ? ` · mes ${nombreMes(p.periodo.slice(0, 7))}` : ""}{p.referencia ? ` · Ref. ${p.referencia}` : ""}</p>{p.notas && <p className="field-hint" style={{ margin: 0 }}>{p.notas}</p>}</div><div className="task-actions"><strong>{money(Number(p.monto))}</strong><button type="button" className="icon-button" aria-label="Editar abono" onClick={() => { setError(""); setEditandoPago(p); }}><Pencil size={15} /></button></div></article>)}</div>
       : <p className={s.empty}>Todavía no hay pagos registrados.</p>}
+    {editandoPago && <div className="glass clinical-card" style={{ marginTop: 16, padding: 16 }}><h3>Editar o borrar abono</h3>
+      <form onSubmit={(e) => { e.preventDefault(); guardar(new FormData(e.currentTarget)); }}>
+        <input type="hidden" name="pago_id" value={editandoPago.id} />
+        <div className="new-patient-form"><label>Monto<input name="monto" type="number" step="0.01" min="0.01" required defaultValue={editandoPago.monto} /></label>
+          <label>Fecha<input name="fecha_pago" type="date" required defaultValue={editandoPago.fecha_pago} /></label>
+          <label>Mes correspondiente<input name="periodo" type="month" defaultValue={(editandoPago.periodo ?? editandoPago.fecha_pago).slice(0, 7)} /></label>
+          <label>Notas<input name="notas" defaultValue={editandoPago.notas ?? ""} /></label>
+          <label className="task-description">Motivo de la corrección<input name="motivo" required minLength={3} placeholder="Ej.: monto repetido" /></label></div>
+        {error && <p className="notice" role="alert">{error}</p>}
+        <div className="modal-actions"><button type="button" className="outline-action" onClick={() => setEditandoPago(null)}>Cancelar</button>
+          <button type="button" className="outline-action" disabled={pending} onClick={() => { const motivo = window.prompt("Motivo para borrar este abono:"); if (!motivo) return; const f = new FormData(); f.set("pago_id", editandoPago.id); f.set("eliminar", "true"); f.set("motivo", motivo); guardar(f); }}><Trash2 size={15} /> Borrar abono</button>
+          <button className="new-consultation" type="submit" disabled={pending}>{pending ? "Guardando…" : "Guardar cambios"}</button></div>
+      </form></div>}
   </section></div>;
 }
 

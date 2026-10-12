@@ -60,7 +60,7 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean; falta
 
     <ResumenCajaHoy key={sucursalVista} empresaId={empresaVista} branches={branches} cierres={cierres} defaultSucursalId={sucursalVista} onNuevoCuadre={(sucursalId) => { setCierreSucursalId(sucursalId); setShowCierre(true); }} />
 
-    <section className="glass agenda-board" style={{ marginBottom: 18 }}><div className="agenda-toolbar"><div><p className="section-label">CIERRE DIARIO</p><h2>Cuadre de caja</h2></div><button className="new-task" type="button" onClick={() => { setCierreSucursalId(""); setShowCierre(true); }}><Plus size={18} /> Nuevo cuadre</button></div>{cierres.length ? <div className="task-list">{cierres.map((cierre) => <CierreCard key={cierre.id} cierre={cierre} sucursalNombre={props.branches.find((b) => b.id === cierre.sucursal_id)?.nombre ?? "Sucursal"} />)}</div> : <section className="empty-state"><Banknote size={27} /><h3>Sin cuadres registrados</h3><p>El primer cierre diario aparecerá aquí.</p></section>}</section>
+    <SemanaCuadres cierres={cierres} onNuevoCuadre={(fecha) => { setCierreSucursalId(sucursalVista); setCierreFecha(fecha); setShowCierre(true); }} />
 
     <section className="glass agenda-board"><div className="agenda-toolbar"><div><p className="section-label">EGRESOS</p><h2>Gastos recientes</h2></div><button className="new-task" type="button" onClick={() => setShowGasto(true)}><Plus size={18} /> Nuevo gasto</button></div><AtajoEgresos />{gastos.length ? <div className="task-list">{gastos.slice(0, 15).map((gasto) => <article className="task-card" key={gasto.id}><div className="task-status"><span className="status-dot" /></div><div className="task-main"><div className="task-meta"><span>{clasificacionLabel[gasto.clasificacion]}</span><span>{gasto.origen === "banco" ? bancoLabel[cuentaById.get(gasto.cuenta_bancaria_id ?? "")?.banco ?? ""] || "Banco" : "Efectivo"}</span><span>{formatDate(gasto.fecha)}</span></div><h2>{gasto.concepto}</h2>{gasto.observaciones && <p>{gasto.observaciones}</p>}</div><div className="task-actions"><strong>{money(gasto.monto)}</strong>{esSuperadmin && <><button type="button" className="icon-button" title="Editar egreso" aria-label="Editar egreso" onClick={() => setEditandoGasto(gasto)}><Pencil size={15} /></button><button type="button" className="icon-button" title="Borrar egreso" aria-label="Borrar egreso" style={{ color: "#a24150" }} onClick={() => setBorrandoGasto(gasto)}><Trash2 size={15} /></button></>}</div></article>)}</div> : <section className="empty-state"><Receipt size={27} /><h3>Aún no hay gastos</h3><p>Registra el primer egreso de esta empresa.</p></section>}</section>
 
@@ -129,15 +129,24 @@ function ResumenCajaHoy({ empresaId, branches, cierres, defaultSucursalId, onNue
   </section>;
 }
 
-function CheckBadge({ label, value }: { label: string; value: boolean | null }) {
-  const cls = value === null ? "na" : value ? "ok" : "fail";
-  const text = value === null ? "N/A" : value ? "OK" : "Revisar";
-  return <span className={`check-badge ${cls}`}>{label}: {text}</span>;
-}
-
-function CierreCard({ cierre, sucursalNombre }: { cierre: CierreCaja; sucursalNombre: string }) {
-  const transferencias = cierre.declarado_transferencia_pichincha + cierre.declarado_transferencia_guayaquil + cierre.declarado_transferencia_internacional;
-  return <article className="task-card"><div className="task-status"><span className={`status-dot ${cierre.cuadre_correcto ? "aprobada" : "devuelta"}`} /></div><div className="task-main"><div className="task-meta"><span>{sucursalNombre}</span><strong>Cierre del {formatDate(cierre.fecha)}</strong></div><h2>Caja física: {money(cierre.caja_fisica)} · Esperada: {money(cierre.caja_esperada)}</h2><p>Caja anterior: {money(cierre.caja_anterior)} · Efectivo declarado: {money(cierre.declarado_efectivo)} · Tarjetas: {money(cierre.declarado_tarjeta)} · Transferencias: {money(transferencias)}</p><p>Egresos efectivo: {money(cierre.egresos_efectivo)} · Depósitos: {money(cierre.depositos)} · Diferencia de caja: {money(cierre.diferencia)}</p><div className="check-badges"><CheckBadge label="Métodos de pago" value={cierre.check_metodos_pago} /><CheckBadge label="Efectivo en caja" value={cierre.check_caja_fisica} /></div></div><div className="task-actions"><span className={`state-pill ${cierre.cuadre_correcto ? "aprobada" : "devuelta"}`}>{cierre.cuadre_correcto ? "Caja cuadrada" : "Caja no cuadrada"}</span></div></article>;
+function SemanaCuadres({ cierres, onNuevoCuadre }: { cierres: CierreCaja[]; onNuevoCuadre: (fecha: string) => void }) {
+  const hoy = today();
+  const dia = new Date(`${hoy}T12:00:00-05:00`).getDay();
+  const lunes = new Date(`${hoy}T12:00:00-05:00`);
+  lunes.setDate(lunes.getDate() - ((dia + 6) % 7));
+  const dias = Array.from({ length: 6 }, (_, i) => {
+    const fecha = new Date(lunes);
+    fecha.setDate(lunes.getDate() + i);
+    const clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
+    return { clave, nombre: ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][i], cierre: cierres.find((c) => c.fecha === clave) };
+  });
+  return <section className="glass agenda-board" style={{ marginBottom: 18 }}>
+    <div className="agenda-toolbar"><div><p className="section-label">CIERRE DIARIO</p><h2>Cuadres de la semana</h2></div></div>
+    <div className="cuadres-semana">{dias.map(({ clave, nombre, cierre }) => <button key={clave} type="button" className={`cuadre-dia ${cierre ? "guardado" : ""}`} disabled={!!cierre || clave > hoy} onClick={() => onNuevoCuadre(clave)} aria-label={`${nombre} ${formatDate(clave)}: ${cierre ? "cuadre guardado" : clave > hoy ? "día futuro" : "guardar cuadre"}`}>
+      <span>{nombre}</span><strong>{Number(clave.slice(-2))}</strong><span>{cierre ? <CheckCircle2 size={21} aria-hidden="true" /> : clave > hoy ? "·" : <Plus size={19} aria-hidden="true" />}</span>
+    </button>)}</div>
+    <p className="field-hint">{dias.filter((d) => d.cierre).length} de 6 cuadres guardados · Domingo cerrado</p>
+  </section>;
 }
 
 function GastoModal({ empresaId, branches, cuentas, canSaldos, pending, onClose, onSubmit }: { empresaId: string; branches: CajaData["branches"]; cuentas: CajaData["cuentas"]; canSaldos: boolean; pending: boolean; onClose: () => void; onSubmit: (form: FormData) => void }) {

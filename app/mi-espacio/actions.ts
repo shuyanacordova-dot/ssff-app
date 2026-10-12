@@ -85,6 +85,28 @@ export async function registrarPagoDeuda(form: FormData): Promise<Resultado> {
   } catch (err) { return { ok: false, error: err instanceof Error ? err.message : "No se pudo registrar el pago." }; }
 }
 
+export async function corregirPagoDeuda(form: FormData): Promise<Resultado> {
+  try {
+    const { supabase } = await privateContext();
+    const eliminar = value(form, "eliminar") === "true";
+    const pagoId = value(form, "pago_id");
+    const monto = numero(form, "monto");
+    const fecha = value(form, "fecha_pago");
+    const periodo = value(form, "periodo");
+    const motivo = value(form, "motivo");
+    if (!pagoId || motivo.length < 3) return { ok: false, error: "Escribe el motivo de la corrección." };
+    if (!eliminar && (!(monto > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(fecha))) return { ok: false, error: "Revisa el monto y la fecha." };
+    const { error } = await supabase.rpc("corregir_pago_deuda", {
+      p_pago: pagoId, p_eliminar: eliminar, p_monto: eliminar ? null : monto,
+      p_fecha: eliminar ? null : fecha, p_periodo: !eliminar && /^\d{4}-\d{2}$/.test(periodo) ? `${periodo}-01` : null,
+      p_notas: value(form, "notas"), p_motivo: motivo,
+    });
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/mi-espacio"); revalidatePath("/mi-espacio/bancos"); revalidatePath("/caja"); revalidatePath("/informes");
+    return { ok: true };
+  } catch (err) { return { ok: false, error: err instanceof Error ? err.message : "No se pudo corregir el pago." }; }
+}
+
 export async function registrarFacturaProveedor(form: FormData): Promise<Resultado> {
   try {
     const { supabase } = await privateContext();

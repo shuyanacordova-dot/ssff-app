@@ -620,3 +620,9 @@ button.informe-card:hover { border-color: #a9ccc5; background: #f4fbf8; transfor
 .informe-nueva-cat { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .informe-recordar { display: inline-flex; align-items: center; gap: 5px; color: #5d7086; font-size: 11.5px; font-weight: 700; }
 @media (max-width: 620px) { .informe-cards { grid-template-columns: 1fr 1fr; gap: 8px; }.informe-card { padding: 11px 12px; }.informe-card-valor { font-size: 18px; }.informe-kv { grid-template-columns: 1fr 1fr; } }
+.cuadres-semana { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin: 16px 0 8px; }
+.cuadre-dia { display: grid; justify-items: center; gap: 7px; padding: 13px 5px; border: 1px solid rgba(92, 111, 139, .22); border-radius: 18px; background: rgba(255, 255, 255, .7); color: #34445b; cursor: pointer; }
+.cuadre-dia strong { font-size: 22px; }
+.cuadre-dia.guardado { border-color: rgba(36, 118, 88, .32); background: rgba(215, 245, 231, .72); color: #247658; }
+.cuadre-dia:disabled { cursor: default; }
+@media (max-width: 600px) { .cuadres-semana { gap: 5px; } .cuadre-dia { padding: 10px 2px; border-radius: 12px; font-size: 11px; } .cuadre-dia strong { font-size: 18px; } }

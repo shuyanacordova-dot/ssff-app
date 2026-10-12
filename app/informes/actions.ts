@@ -37,3 +37,9 @@ export async function asignarCategoriaGasto(gastoId: string, categoria: string, 
   const { error } = await supabase.rpc("asignar_categoria_gasto", { p_gasto: gastoId, p_categoria: categoria, p_por_concepto: porConcepto });
   if (error) throw new Error(error.message || "No se pudo guardar la categoría.");
 }
+
+export async function clasificarEgreso(gastoId: string, clasificacion: string) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("clasificar_egreso_informe", { p_gasto: gastoId, p_clasificacion: clasificacion });
+  if (error) throw new Error(error.message || "No se pudo clasificar el egreso.");
+}
