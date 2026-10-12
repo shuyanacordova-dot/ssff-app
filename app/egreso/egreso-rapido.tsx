@@ -31,6 +31,7 @@ export default function EgresoRapido({ sucursales, cuentas, sucursalInicial, mon
       <div className="tabs" role="radiogroup" style={{ flexWrap: "wrap" }}>{metodos.map((m) => <button key={m.id} type="button" role="radio" aria-checked={metodo === m.id} className={metodo === m.id ? "active" : ""} onClick={() => setMetodo(m.id)}>{m.label}</button>)}</div>
       {sucursales.length > 1 && <label>Sucursal<select value={sucursalId} onChange={(event) => setSucursalId(event.target.value)}>{sucursales.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}</select></label>}
       <label>Clasificación<select name="clasificacion" defaultValue="gastos_operacion">{clasificaciones.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+      <label className="task-description">Observaciones<textarea name="observaciones" rows={3} placeholder="¿Qué se compró o a qué se destinó el dinero? Ej.: 2 resmas de papel y tinta para la impresora" /></label>
       {aviso && <p className="notice" role="status" style={aviso.ok ? { background: "#dff6ed", color: "#247658", fontWeight: 700 } : { background: "#ffe5e8", color: "#a24150", fontWeight: 700 }}>{aviso.texto}</p>}
       <button className="new-consultation" type="submit" disabled={pending} style={{ fontSize: 18, padding: "14px 18px" }}>{pending ? "Guardando…" : "Guardar egreso"}</button>
     </form>

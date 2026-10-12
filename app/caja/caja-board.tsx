@@ -150,7 +150,7 @@ function GastoModal({ empresaId, branches, cuentas, canSaldos, pending, onClose,
     <label>Monto<input name="monto" type="number" min="0.01" step="0.01" required /></label>
     <label>Origen<span className="radio-row"><label><input type="radio" name="origen" value="caja" checked={origen === "caja"} onChange={() => setOrigen("caja")} /> Caja (efectivo)</label>{canSaldos && <label><input type="radio" name="origen" value="banco" checked={origen === "banco"} onChange={() => setOrigen("banco")} /> Banco</label>}</span></label>
     {origen === "banco" && <label>Cuenta bancaria<select name="cuenta_bancaria_id" defaultValue=""><option value="" disabled>Selecciona la cuenta</option>{cuentas.map((c) => <option key={c.id} value={c.id}>{bancoLabel[c.banco]}</option>)}</select></label>}
-    <label className="task-description">Observaciones<textarea name="observaciones" placeholder="Detalle específico del gasto" /></label>
+    <label className="task-description">Observaciones<textarea name="observaciones" placeholder="¿Qué se compró o a qué se destinó el dinero?" /></label>
   </div><div className="modal-actions"><button className="outline-action" type="button" onClick={onClose}>Cancelar</button><button className="new-consultation" disabled={pending} type="submit">{pending ? "Guardando…" : "Registrar gasto"}</button></div></form></section></div>;
 }
 
