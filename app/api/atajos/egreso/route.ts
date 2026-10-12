@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// Atajo de iPhone "Registrar egreso": recibe { clave, sucursal, monto, concepto, metodo, clasificacion } y lo registra
+// Atajo de iPhone "Registrar egreso": recibe { clave, sucursal, monto, concepto, observaciones, metodo, clasificacion } y lo registra
 // con la clave personal creada en Cuadre de caja. La validación (clave, permisos, sucursal, banco) la hace la base de datos.
 export const dynamic = "force-dynamic";
 
@@ -17,6 +17,7 @@ export async function POST(request: Request) {
     p_concepto: String(body.concepto ?? ""),
     p_metodo: String(body.metodo ?? "efectivo"),
     p_clasificacion: String(body.clasificacion ?? "gastos_operacion"),
+    p_observaciones: String(body.observaciones ?? ""),
   });
   if (error) return NextResponse.json({ ok: false, mensaje: error.message }, { status: 400 });
   return NextResponse.json({ ok: true, mensaje: data });

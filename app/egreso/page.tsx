@@ -6,7 +6,7 @@ import EgresoRapido from "./egreso-rapido";
 export const dynamic = "force-dynamic";
 
 // Registrar egreso rápido desde el iPhone: se guarda como ícono en la pantalla de inicio o lo abre un atajo con
-// ?monto=…&concepto=…&metodo=efectivo|pichincha|guayaquil|internacional&sucursal=shuvision|sacha|focus
+// ?monto=…&concepto=…&observaciones=…&metodo=efectivo|pichincha|guayaquil|internacional&sucursal=shuvision|sacha|focus
 export default async function EgresoPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const query = await searchParams;
   const context = await getOperationalContext();
@@ -17,5 +17,5 @@ export default async function EgresoPage({ searchParams }: { searchParams: Promi
   const pedida = (query.sucursal ?? "").toLowerCase();
   const inicial = sucursales.find((s) => pedida && (pedida === "sacha" ? /sacha/i.test(s.nombre) : pedida === "focus" ? /focus/i.test(s.nombre) : /^shuvision$/i.test(s.nombre.trim())))?.id ?? context.activeBranch.id;
   return <EgresoRapido sucursales={sucursales} cuentas={(cuentas ?? []) as { id: string; banco: string; sucursal_id: string }[]} sucursalInicial={inicial}
-    montoInicial={(query.monto ?? "").replace(/[^0-9.,]/g, "")} conceptoInicial={query.concepto ?? ""} metodoInicial={(query.metodo ?? "efectivo").toLowerCase()} />;
+    montoInicial={(query.monto ?? "").replace(/[^0-9.,]/g, "")} conceptoInicial={query.concepto ?? ""} observacionesInicial={query.observaciones ?? ""} metodoInicial={(query.metodo ?? "efectivo").toLowerCase()} />;
 }
