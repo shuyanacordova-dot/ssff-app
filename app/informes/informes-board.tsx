@@ -2,10 +2,11 @@
 import { printDocumentById } from "@/lib/print-document";
 
 import Link from "next/link";
-import { Banknote, CircleAlert, Printer, ReceiptText, Target, Wallet } from "lucide-react";
+import { Banknote, ChevronRight, CircleAlert, Printer, ReceiptText, Target, Wallet, type LucideIcon } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import type { InformesData } from "@/lib/informes";
-import { establecerMetaVenta, obtenerInformeMensual, type InformeMensual, type InformeSucursal } from "./actions";
+import { establecerMetaVenta, obtenerInformeMensual, type InformeMensual, type InformeSucursal, type TipoDesglose } from "./actions";
+import DesgloseModal from "./desglose-modal";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
 const pct = (actual: number, meta: number) => meta > 0 ? Math.round((actual / meta) * 100) : 0;
@@ -21,6 +22,7 @@ export default function InformesBoard(props: InformesData) {
   const [loading, startLoading] = useTransition();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState(props.message ?? "");
+  const [desglose, setDesglose] = useState<TipoDesglose | null>(null);
   const isSuperadmin = props.profile?.rol === "superadmin";
   const todoElNegocio = empresaId === "__todo__";
 
@@ -39,6 +41,8 @@ export default function InformesBoard(props: InformesData) {
     catch (err) { setError(err instanceof Error ? err.message : "No se pudo guardar la meta."); }
   });
 
+  const recargar = () => startLoading(async () => { try { setInforme(await obtenerInformeMensual(todoElNegocio ? null : empresaId, `${mes}-01`)); } catch { /* el informe anterior se mantiene */ } });
+  const etiquetaPeriodo = `${mesLargo(mes)}${todoElNegocio ? " · Todo el negocio" : ` · ${props.companies.find((c) => c.id === empresaId)?.nombre ?? ""}`}`;
   const cumplimientoTotal = informe ? pct(informe.totales.ingresos_total ?? informe.totales.cobrado_total ?? 0, informe.totales.meta_total) : 0;
 
   return <main className="page agenda-page"><div className="container agenda-shell">
@@ -52,14 +56,14 @@ export default function InformesBoard(props: InformesData) {
     <p className="section-label" style={{ textTransform: "capitalize" }}>{mesLargo(mes)}{todoElNegocio ? " · Todo el negocio" : ` · ${props.companies.find((c) => c.id === empresaId)?.nombre ?? ""}`}</p>
 
     {loading && !informe ? <p className="field-hint">Calculando informe…</p> : informe && <>
-      <section className="agenda-summary">
-        <article><ReceiptText size={21} /><strong>{money(informe.totales.ventas_total)}</strong><span>ventas del mes ({informe.totales.ventas_count})</span></article>
-        <article><Wallet size={21} /><strong>{money(informe.totales.cobrado_total)}</strong><span>cobrado de las ventas del mes</span></article>
-        <article><Banknote size={21} /><strong>{money(informe.totales.saldo_total)}</strong><span>saldo del mes</span></article>
-        <article><CircleAlert size={21} /><strong>{money(informe.totales.gastos_total)}</strong><span>gastos del mes</span></article>
-        <article><Wallet size={21} /><strong>{money(informe.totales.cuentas_por_cobrar_total)}</strong><span>cuentas por cobrar (total)</span></article>
-        <article><Wallet size={21} /><strong>{money(informe.totales.ingresos_total ?? 0)}</strong><span>Cobrado en el mes</span></article>
-        <article><Target size={21} /><strong>{informe.totales.meta_total > 0 ? `${cumplimientoTotal}%` : "Sin meta"}</strong><span>cumplimiento de meta</span></article>
+      <section className="informe-cards">
+        <InformeCard icon={ReceiptText} label={`Ventas del mes (${informe.totales.ventas_count})`} valor={money(informe.totales.ventas_total)} onClick={() => setDesglose("ventas")} />
+        <InformeCard icon={Wallet} label="Cobrado de las ventas del mes" valor={money(informe.totales.cobrado_total)} onClick={() => setDesglose("ventas")} />
+        <InformeCard icon={Wallet} label="Cobrado en el mes (a cuenta)" valor={money(informe.totales.ingresos_total ?? 0)} onClick={() => setDesglose("cobros")} />
+        <InformeCard icon={Banknote} label="Saldo de las ventas del mes" valor={money(informe.totales.saldo_total)} onClick={() => setDesglose("saldo")} />
+        <InformeCard icon={CircleAlert} label="Egresos del mes" valor={money(informe.totales.gastos_total)} onClick={() => setDesglose("gastos")} tono="egreso" />
+        <InformeCard icon={Wallet} label="Cuentas por cobrar (total)" valor={money(informe.totales.cuentas_por_cobrar_total)} onClick={() => setDesglose("cxc")} />
+        <InformeCard icon={Target} label="Cumplimiento de meta" valor={informe.totales.meta_total > 0 ? `${cumplimientoTotal}%` : "Sin meta"} />
       </section>
 
       <section className="glass agenda-board" style={{ marginBottom: 18 }}>
@@ -76,11 +80,11 @@ export default function InformesBoard(props: InformesData) {
           const dinero = props.dineroDisponible?.find((d) => d.sucursal_id === row.sucursal_id);
           return <article className="task-card" key={row.sucursal_id}><div className="task-main">
             <h2>{row.sucursal_nombre}</h2>
-            <div className="consultation-stats">
-              <span><strong>A cuenta del mes</strong>{money(aCuenta)}</span>
-              <span><strong>Egresos del mes</strong>{money(egresos)}</span>
-              <span><strong>Resultado del mes</strong><b style={{ color: resultado < 0 ? "#a24150" : "#247658" }}>{resultado < 0 ? "−" : ""}{money(Math.abs(resultado))}</b></span>
-              <span><strong>Acumulado (dinero disponible)</strong>{!dinero ? "—" : dinero.estado === "listo" ? <>{money(Number(dinero.total))}<small style={{ display: "block" }}>Bancos {money(Number(dinero.bancos))} + efectivo {money(Number(dinero.efectivo))}</small></> : <>Por cuadrar <Link className="text-action no-print" href="/mi-espacio/bancos">Cuadrar</Link></>}</span>
+            <div className="informe-kv">
+              <span><small>A cuenta del mes</small><b>{money(aCuenta)}</b></span>
+              <span><small>Egresos del mes</small><b>{money(egresos)}</b></span>
+              <span><small>Resultado del mes</small><b style={{ color: resultado < 0 ? "#a24150" : "#247658" }}>{resultado < 0 ? "−" : ""}{money(Math.abs(resultado))}</b></span>
+              <span><small>Acumulado (dinero disponible)</small>{!dinero ? <b>—</b> : dinero.estado === "listo" ? <><b>{money(Number(dinero.total))}</b><small>Bancos {money(Number(dinero.bancos))} + efectivo {money(Number(dinero.efectivo))}</small></> : <>Por cuadrar <Link className="text-action no-print" href="/mi-espacio/bancos">Cuadrar</Link></>}</span>
             </div>
           </div></article>;
         })}</div>
@@ -88,24 +92,30 @@ export default function InformesBoard(props: InformesData) {
       </section>}
 
       <section className="glass agenda-board" style={{ marginBottom: 18 }}>
-        <p className="section-label">GASTOS POR CLASIFICACIÓN</p><h2>Egresos del mes</h2>
-        {informe.gastos_por_clasificacion.length ? <div className="consultation-stats">{informe.gastos_por_clasificacion.map((g) => <span key={g.clasificacion}><strong>{clasificacionLabel[g.clasificacion] ?? g.clasificacion}</strong>{money(g.monto)}</span>)}</div> : <p className="field-hint">Sin gastos registrados este mes.</p>}
+        <div className="informe-section-head"><div><p className="section-label">GASTOS POR CLASIFICACIÓN</p><h2>Egresos del mes</h2></div><button type="button" className="outline-action no-print" onClick={() => setDesglose("gastos")}>Ver egresos y clasificar <ChevronRight size={14} /></button></div>
+        {informe.gastos_por_clasificacion.length ? <div className="informe-kv">{informe.gastos_por_clasificacion.map((g) => <button type="button" key={g.clasificacion} onClick={() => setDesglose("gastos")}><small>{clasificacionLabel[g.clasificacion] ?? g.clasificacion}</small><b>{money(g.monto)}</b></button>)}</div> : <p className="field-hint">Sin gastos registrados este mes.</p>}
       </section>
 
       <section className="glass agenda-board" style={{ marginBottom: 18 }}>
-        <p className="section-label">COBROS POR FORMA DE PAGO</p><h2>Cómo pagaron los pacientes</h2>
-        {informe.cobros_por_metodo.length ? <div className="consultation-stats">{informe.cobros_por_metodo.map((c) => <span key={c.metodo}><strong>{metodoLabel[c.metodo] ?? c.metodo}</strong>{money(c.monto)}</span>)}</div> : <p className="field-hint">Sin cobros registrados este mes.</p>}
+        <div className="informe-section-head"><div><p className="section-label">COBROS POR FORMA DE PAGO</p><h2>Cómo pagaron los pacientes</h2></div><button type="button" className="outline-action no-print" onClick={() => setDesglose("cobros")}>Ver cobros <ChevronRight size={14} /></button></div>
+        {informe.cobros_por_metodo.length ? <div className="informe-kv">{informe.cobros_por_metodo.map((c) => <button type="button" key={c.metodo} onClick={() => setDesglose("cobros")}><small>{metodoLabel[c.metodo] ?? c.metodo}</small><b>{money(c.monto)}</b></button>)}</div> : <p className="field-hint">Sin cobros registrados este mes.</p>}
       </section>
 
       <section className="glass agenda-board">
-        <p className="section-label">CUADRES DE CAJA</p><h2>Control diario del mes</h2>
+        <div className="informe-section-head"><div><p className="section-label">CUADRES DE CAJA</p><h2>Control diario del mes</h2></div><button type="button" className="outline-action no-print" onClick={() => setDesglose("cuadres")}>Ver cuadres <ChevronRight size={14} /></button></div>
         <p>{informe.cuadres.correctos} de {informe.cuadres.total} cuadres salieron correctos este mes.</p>
       </section>
     </>}
     </div>
 
+    {desglose && <DesgloseModal tipo={desglose} empresaId={todoElNegocio ? null : empresaId} mes={`${mes}-01`} etiquetaPeriodo={etiquetaPeriodo} puedeClasificar={isSuperadmin} onClose={() => setDesglose(null)} onCambio={recargar} />}
     {informe && <div className="modal-actions no-print" style={{ marginTop: 14 }}><button className="outline-action" type="button" onClick={() => printDocumentById("monthly-report-print")}><Printer size={15} /> Imprimir / guardar informe</button></div>}
   </div></main>;
+}
+
+function InformeCard({ icon: Icon, label, valor, onClick, tono }: { icon: LucideIcon; label: string; valor: string; onClick?: () => void; tono?: "egreso" }) {
+  const contenido = <><span className="informe-card-label"><Icon size={16} />{label}</span><strong className="informe-card-valor">{valor}</strong>{onClick && <span className="informe-card-ver no-print">Ver detalle <ChevronRight size={13} /></span>}</>;
+  return onClick ? <button type="button" className={`informe-card ${tono ?? ""}`} onClick={onClick}>{contenido}</button> : <div className={`informe-card ${tono ?? ""}`}>{contenido}</div>;
 }
 
 function SucursalRow({ row, showEmpresa, onGuardarMeta }: { row: InformeSucursal; showEmpresa: boolean; onGuardarMeta: (monto: number) => void }) {
