@@ -82,7 +82,7 @@ function AtajoEgresos() {
   return <details style={{ marginBottom: 16 }}><summary>Registrar egresos desde el iPhone</summary><div style={{ paddingTop: 12 }}>
     <p><strong>1 · Ícono “Egreso” en el iPhone</strong></p>
     <ol><li>Abre en Safari: <a href="/egreso">{egresoUrl}</a></li><li>Compartir → “Añadir a pantalla de inicio” → Añadir.</li><li>Abre el ícono e inicia sesión una vez.</li></ol>
-    <p className="field-hint">Con Siri: «Oye Siri, abre Egreso». Igual para tareas con {egresoUrl.replace("/egreso", "/tareas?nueva=1")} (ícono “Tarea”).</p>
+    <p className="field-hint">Con Siri: «Oye Siri, abre Egreso».</p>
     <p><strong>2 · Atajo con IA (opcional)</strong></p>
     <div className="cob-row"><code style={{ overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>{promptAtajo}</code><button className="text-action" type="button" onClick={() => void copiar(promptAtajo)}>Copiar</button></div>
     {aviso && <p className="notice" role="status">{aviso}</p>}

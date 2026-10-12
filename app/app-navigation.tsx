@@ -45,7 +45,6 @@ const menuItems: NavItem[] = [
   { href: "/inventario", label: "Inventario", detail: "Monturas, lunas y stock", icon: Package, group: "Operación" },
   { href: "/mensajes", label: "Mensajes del día", detail: "Cobros, cumpleaños y controles anuales", icon: MessagesSquare, group: "Operación" },
   { href: "/crm", label: "CRM", detail: "A quién contactar hoy", icon: HeartHandshake, group: "Operación" },
-  { href: "/tareas", label: "Tareas", detail: "Seguimiento del equipo", icon: ClipboardList, group: "Operación" },
   { href: "/cuentas-cobrar", label: "Cuentas por cobrar", detail: "Saldos y convenios de pago", icon: Wallet, group: "Finanzas" },
   { href: "/facturacion", label: "Facturación", detail: "Borradores vinculados a ventas", icon: FileText, group: "Finanzas" },
   { href: "/convenios", label: "Convenios", detail: "Empresas aliadas", icon: Building2, group: "Finanzas" },

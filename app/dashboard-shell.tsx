@@ -57,7 +57,6 @@ export default function DashboardShell({ taskData, informeMensual, metasMessage,
     {acumulado && acumulado.length > 0 && <AcumuladoOpticas filas={acumulado} />}
     <section className="dashboard-main dashboard-main-wide">
       {canVerInformes && <MetasDashboard informe={informeMensual} message={metasMessage} />}
-      <PendingTasks taskData={taskData} />
     </section>
   </div></main>;
 }
