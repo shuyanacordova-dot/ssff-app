@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Bot, CheckCheck, CircleAlert, Clipboard, FileBarChart, ListChecks, MessageCircle, ShieldCheck, Sparkles } from "lucide-react";
 import { useState, useTransition } from "react";
-import { generarAyudaAdministrativa, type TareaAsistente } from "./actions";
+import { conversarConAsistente, generarAyudaAdministrativa, type MensajeAsistente, type ModeloAsistente, type TareaAsistente } from "./actions";
 
 const tasks: Array<{ id: TareaAsistente; title: string; detail: string; icon: typeof MessageCircle }> = [
   { id: "pedido_listo", title: "Pedido listo", detail: "Plantilla para avisar que los lentes pueden retirarse.", icon: CheckCheck },
@@ -19,6 +19,23 @@ export default function AssistantBoard({ configured }: { configured: boolean }) 
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [modelo, setModelo] = useState<ModeloAsistente>("chatgpt");
+  const [draft, setDraft] = useState("");
+  const [messages, setMessages] = useState<MensajeAsistente[]>([]);
+  const [chatError, setChatError] = useState("");
+
+  const send = () => {
+    const content = draft.trim();
+    if (!content || pending) return;
+    const next: MensajeAsistente[] = [...messages.slice(-10), { role: "user", content }];
+    setDraft(""); setMessages(next); setChatError("");
+    startTransition(async () => {
+      try {
+        const response = await conversarConAsistente(modelo, next);
+        setMessages([...next, { role: "assistant", content: response.text }]);
+      } catch (err) { setChatError(err instanceof Error ? err.message : "No se pudo consultar al asistente."); }
+    });
+  };
 
   const run = (task: TareaAsistente) => startTransition(async () => {
     setSelected(task); setError(""); setResult(""); setCopied(false);
@@ -30,8 +47,15 @@ export default function AssistantBoard({ configured }: { configured: boolean }) 
   return <main className="page agenda-page assistant-page"><div className="container agenda-shell">
     <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">FASE 6 · INTELIGENCIA ARTIFICIAL</p><h1>Asistente Shu</h1><p className="subtitle">Plantillas y guías administrativas con tecnología de OpenAI, sin compartir datos de pacientes.</p></div><div className={`assistant-status ${configured ? "ready" : "pending"}`}><span />{configured ? "Conexión privada disponible" : "Pendiente de conectar la clave"}</div></header>
 
-    <section className="assistant-safety"><ShieldCheck size={21} /><div><strong>Modo protegido de solo lectura</strong><p>Las solicitudes son predefinidas y no contienen nombres, cédulas, teléfonos, diagnósticos, ventas ni información de tu empresa. El resultado es un borrador: nada se envía ni se guarda automáticamente.</p></div></section>
+    <section className="assistant-safety"><ShieldCheck size={21} /><div><strong>Conversación privada de solo lectura</strong><p>Puedes conversar con ChatGPT o Claude. El texto que escribas se envía al proveedor elegido; evita incluir nombres, cédulas, teléfonos, historias clínicas, claves o datos bancarios. El asistente todavía no consulta los datos de LumOS y no guarda ni modifica nada.</p></div></section>
     {!configured && <div className="notice"><CircleAlert size={18} /><span>La Fase 6 está construida. Para generar respuestas falta configurar <strong>AI_GATEWAY_API_KEY</strong> únicamente en el servidor.</span></div>}
+
+    <section className="assistant-chat glass" aria-label="Conversación con IA">
+      <div className="assistant-chat-head"><div><p className="section-label">CONVERSACIÓN</p><h2>Pregunta lo que necesites</h2></div><div><label htmlFor="assistant-model">Responder con</label><select id="assistant-model" value={modelo} onChange={(event) => { setModelo(event.target.value as ModeloAsistente); setMessages([]); setChatError(""); }}><option value="chatgpt">ChatGPT</option><option value="claude">Claude</option></select></div></div>
+      <div className="assistant-messages" aria-live="polite">{messages.length ? messages.map((message, index) => <p className={message.role} key={index}><strong>{message.role === "user" ? "Tú" : modelo === "claude" ? "Claude" : "ChatGPT"}</strong><span>{message.content}</span></p>) : <p className="assistant-chat-empty">Escribe una pregunta general, pide ayuda para redactar o prepara la estructura de un informe.</p>}{pending && <p className="assistant-chat-empty">Preparando respuesta…</p>}</div>
+      <form className="assistant-compose" onSubmit={(event) => { event.preventDefault(); send(); }}><label htmlFor="assistant-question" className="sr-only">Tu pregunta</label><textarea id="assistant-question" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={2000} rows={2} placeholder="Escribe tu pregunta sin datos personales ni clínicos…" disabled={!configured || pending} /><button type="submit" disabled={!configured || pending || !draft.trim()}>Enviar</button></form>
+      {chatError && <p className="assistant-error"><CircleAlert size={16} /> {chatError}</p>}
+    </section>
 
     <div className="assistant-layout">
       <section className="assistant-task-panel"><p className="section-label">ELIGE UNA TAREA</p><h2>¿Qué quieres preparar?</h2><div className="assistant-task-grid">{tasks.map((task) => { const Icon = task.icon; return <button className={selected === task.id ? "active" : ""} key={task.id} type="button" disabled={!configured || pending} onClick={() => run(task.id)}><span><Icon size={19} /></span><strong>{task.title}</strong><small>{task.detail}</small></button>; })}</div></section>
