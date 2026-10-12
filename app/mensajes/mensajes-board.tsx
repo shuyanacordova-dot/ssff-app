@@ -20,9 +20,10 @@ export default function MensajesBoard(props: MensajesDiaData) {
   if (props.status !== "ready" || !props.dia) return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">CONTACTO CON PACIENTES</p><h1>Mensajes del día</h1><p className="subtitle">{props.message ?? "No se pudo abrir esta sección."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/mensajes">Iniciar sesión</Link>}</header></div></main>;
 
   const { dia } = props;
-  // El envío con un toque usa el mismo texto de la plantilla activa (si existe) que el envío automático.
+  // Las plantillas antiguas de Meta conservan su texto histórico; los envíos manuales usan la voz nueva.
+  // Las versiones personalizadas creadas después desde LumOS siguen teniendo prioridad.
   const optica = /focus/i.test(props.empresaNombre ?? "") ? "Focus Óptica" : "ShuVision Óptica";
-  const activa = (tipo: string) => props.plantillas.find((p) => p.tipo === tipo && p.activa)?.texto;
+  const activa = (tipo: string) => props.plantillas.find((p) => p.tipo === tipo && p.activa && !["feliz_cumpleanos", "feliz_cumpleanos_focus2", "recordatorio_control_anual", "recordatorio_control_anual_focus2", "recordatorio_control_periodico"].includes(p.nombre_meta))?.texto;
   const primer = (n: string) => { const x = n.trim().split(/\s+/)[0] ?? ""; return x ? x.charAt(0).toUpperCase() + x.slice(1).toLowerCase() : ""; };
   const textoCumple = (n: string) => { const t = activa("cumpleanos"); return conTarjeta(t ? renderPlantilla(t, { nombre: primer(n), optica }) : mensajeCumpleanos(n, props.empresaId), "cumple", props.empresaId); };
   const textoControl = (n: string, meses: number) => { const t = activa(meses >= 10 ? "control_anual" : "control_periodico"); return conTarjeta(t ? renderPlantilla(t, { nombre: primer(n), optica, meses: String(meses) }) : mensajeControl(n, meses, props.empresaId), "control", props.empresaId); };

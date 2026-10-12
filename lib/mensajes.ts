@@ -37,6 +37,7 @@ const primerNombre = (nombre: string) => { const n = nombre.trim().split(/\s+/)[
 export function mensajeTicketVirtual({ nombre, ticketUrl, empresaId }: Pick<ContextoMensaje, "nombre" | "ticketUrl"> & { empresaId?: string | null }) {
   const optica = (empresaId && nombreOptica[empresaId]) || "ShuVision Óptica";
   const saludo = primerNombre(nombre);
+  if (optica === "Focus Óptica") return `*FOCUS ÓPTICA | Tu compra*\n\n${saludo || "Hola"}, gracias por visitarnos. Guarda este enlace para consultar el detalle de tu compra, tus pagos y el saldo actualizado:\n${ticketUrl ?? ""}\n\nDesde allí también puedes decidir si autorizas el uso de tus datos y si deseas recibir novedades.\n\nSi necesitas ayuda con tu pedido, responde a este chat.\nFocus Óptica`;
   return `Hola ${saludo || "😊"} 👋, te saludamos de ${optica}. ¡Gracias por confiar en nosotros!\n\n🌿 Cuidemos el medio ambiente: en lugar de un recibo impreso, aquí tienes tu ticket virtual. Ahí puedes ver el detalle de tu compra, tus abonos y tu saldo, siempre actualizado:\n${ticketUrl ?? ""}\n\n🔒 En el mismo enlace puedes autorizar el uso de tus datos y, si deseas, recibir nuestras promociones.\n\nCualquier duda, escríbenos por aquí. ¡Que tengas un lindo día!`;
 }
 
@@ -57,6 +58,7 @@ export function mensajeLentesListos({ nombre, empresa, sucursal, saldo, ticketUr
   const saludo = primerNombre(nombre);
   const optica = opticaDesdeNombre(sucursal || empresa);
   const saldoLine = saldo && saldo > 0 ? `\n\nPara tu comodidad, te recordamos que el saldo pendiente es de $${Number(saldo).toFixed(2)}.` : "";
+  if (optica === "Focus Óptica") return `*FOCUS ÓPTICA | Tus lentes están listos*\n\n${saludo || "Hola"}, ya puedes pasar a retirarlos en Focus Óptica, Shushufindi. Al entregártelos revisaremos el ajuste para que te queden cómodos.${saldo && saldo > 0 ? `\n\nSaldo pendiente: $${Number(saldo).toFixed(2)}.` : ""}\n\nDinos qué día te viene bien y los tendremos preparados.${ticketUrl ? `\n\nConsulta tu compra: ${ticketUrl}` : ""}`;
   return `Hola ${saludo || "😊"} 👋, te saludamos de ${optica}.\n\n✨ ¡Tenemos buenas noticias! Tus lentes ya están listos y te esperan${lugarDesdeSucursal(sucursal)}. Cuando vengas a retirarlos, con gusto te los ajustamos para que te queden perfectos. 👓${saldoLine}\n\n¡Te esperamos con mucho cariño! 💙${ticketLine(ticketUrl)}`;
 }
 
@@ -79,19 +81,23 @@ export function construirMensajeContacto(plantilla: PlantillaContactoId, context
   const saldo = `$${saldoNum.toFixed(2)}`;
   const saludo = primerNombre(contexto.nombre) || "😊";
   const optica = opticaDesdeNombre(contexto.sucursal || contexto.empresa);
+  const focus = optica === "Focus Óptica";
   if (plantilla === "listo_retiro") {
     return mensajeLentesListos({ nombre: contexto.nombre, empresa: contexto.empresa, sucursal: contexto.sucursal ?? contexto.empresa, saldo: contexto.saldo, ticketUrl: contexto.ticketUrl });
   }
   if (plantilla === "cobro_mensual") {
     const periodo = contexto.frecuencia ? periodoLabel[contexto.frecuencia] : null;
+    if (focus) return `*FOCUS ÓPTICA | Estado de tu cuenta*\n\n${saludo}, ${periodo ? `${periodo} corresponde un abono de tu compra` : "te escribimos por el saldo de tu compra"}. El valor pendiente es *${saldo}*.\n\nPuedes pagar en la óptica o por transferencia. Envíanos el comprobante por este chat para actualizar tu cuenta. Si ya pagaste, compártelo para verificarlo.${contexto.ticketUrl ? `\n\nDetalle de tu compra: ${contexto.ticketUrl}` : ""}`;
     return `Hola ${saludo} 👋, te saludamos de ${optica}.\n\nSolo pasamos a recordarte, con cariño, ${periodo ? `que ${periodo} corresponde tu abono` : "tu abono pendiente"}. Tu saldo actual es de ${saldo}.\n\nPuedes acercarte a la óptica o hacer una transferencia y enviarnos el comprobante por aquí. Si ya realizaste tu pago, ¡muchas gracias! Envíanos el comprobante para registrarlo. 💙${ticketLine(contexto.ticketUrl)}`;
   }
   if (plantilla === "cobro_apartado") {
     const hasta = contexto.apartadoHasta ? ` hasta el ${fechaLarga(contexto.apartadoHasta)}` : " durante 6 meses desde tu compra";
+    if (focus) return `*FOCUS ÓPTICA | Tu apartado*\n\n${saludo}, tus lentes siguen reservados. Queda un saldo de *${saldo}* y puedes completar el pago${hasta}.\n\nSi necesitas revisar el plazo o coordinar un abono, responde a este mensaje.${contexto.ticketUrl ? `\n\nDetalle: ${contexto.ticketUrl}` : ""}`;
     return `Hola ${saludo} 👋, te saludamos de ${optica}.\n\nTe recordamos que tienes tus lentes separados en nuestro sistema de apartado. El saldo pendiente es de ${saldo} y tienes plazo${hasta} para completar el pago y retirarlos. 👓\n\nPuedes abonar cuando gustes en la óptica o por transferencia. Pasada esa fecha el apartado vence, así que si necesitas más tiempo escríbenos antes para ayudarte.${ticketLine(contexto.ticketUrl)}`;
   }
   if (plantilla === "lentes_rezagados") {
     const saldoLine = saldoNum > 0.004 ? ` Para retirarlos, el saldo pendiente es de ${saldo}.` : "";
+    if (focus) return `*FOCUS ÓPTICA | Retiro pendiente*\n\n${saludo}, tus lentes están listos para retirar en Shushufindi.${saldoNum > 0.004 ? ` El saldo pendiente es *${saldo}*.` : ""}\n\nIndícanos cuándo puedes pasar y prepararemos tu entrega.${contexto.ticketUrl ? `\n\nDetalle: ${contexto.ticketUrl}` : ""}`;
     return `Hola ${saludo} 👋, te saludamos de ${optica}.\n\nTus lentes están listos desde hace un tiempo y todavía te esperan${lugarDesdeSucursal(contexto.sucursal)}. 👓 Queremos que empieces a disfrutarlos y a ver mejor cuanto antes.${saldoLine}\n\nCuéntanos qué día puedes pasar por ellos y te los ajustamos al momento. ¡Te esperamos!${ticketLine(contexto.ticketUrl)}`;
   }
   // Cobro insistente: tono firme y respetuoso.
@@ -99,5 +105,6 @@ export function construirMensajeContacto(plantilla: PlantillaContactoId, context
   const vencidoLine = contexto.fechaCompra && dias !== null
     ? ` desde tu compra del ${formatFecha(contexto.fechaCompra)} (hace ${dias} día${dias === 1 ? "" : "s"})`
     : "";
+  if (focus) return `*FOCUS ÓPTICA | Saldo vencido*\n\n${saludo}, registramos un saldo pendiente de *${saldo}*${vencidoLine}. Necesitamos acordar contigo la fecha de pago.\n\nResponde a este mensaje o envíanos el comprobante si ya realizaste la transferencia. Quedamos atentos para actualizar tu cuenta.${contexto.ticketUrl ? `\n\nDetalle: ${contexto.ticketUrl}` : ""}`;
   return `Hola ${saludo}, te escribimos de ${optica}.\n\nTu cuenta mantiene un saldo vencido de ${saldo}${vencidoLine}. Necesitamos que regularices este pago a la brevedad.\n\nPor favor, acércate a la óptica o realiza hoy tu transferencia y envíanos el comprobante por este medio. Si ya pagaste, envíanos el comprobante para actualizar tu cuenta. Quedamos atentos a tu respuesta.${ticketLine(contexto.ticketUrl)}`;
 }

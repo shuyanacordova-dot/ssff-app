@@ -13,25 +13,25 @@ export const opticaDeEmpresa = (empresaId?: string | null) => empresaId && empre
 export const primerNombre = (nombre: string) => { const n = nombre.trim().split(/\s+/)[0] ?? ""; return n ? n.charAt(0).toUpperCase() + n.slice(1).toLowerCase() : ""; };
 
 export function mensajeCumpleanos(nombre: string, empresaId?: string | null) {
-  if (esFocus(empresaId)) return `🎉 ¡Hoy es tu día, ${primerNombre(nombre) || "amigo"}!\n\nEn *Focus Óptica* queremos celebrarlo contigo con un regalo:\n\n🎁 *15% de descuento* en tu próxima compra\n👓 *Limpieza y ajuste de tus lentes sin costo*\n\nVálido por 30 días desde hoy. Te esperamos en Shushufindi.\n\n¡Feliz cumpleaños! 🎂\n— Equipo Focus Óptica`;
+  if (esFocus(empresaId)) return `*FOCUS ÓPTICA | Un detalle para ti*\n\n${primerNombre(nombre) || "Hola"}, feliz cumpleaños. Que este nuevo año te traiga momentos que valga la pena mirar de cerca.\n\nTienes *15% de descuento* en tu próxima compra y *limpieza y ajuste sin costo* para tus lentes. Puedes usar estos beneficios durante los próximos 30 días en Focus Óptica, Shushufindi.\n\nSi quieres venir, responde aquí y coordinamos tu visita.\n\nFocus Óptica`;
   const optica = opticaDeEmpresa(empresaId);
-  return `¡Feliz cumpleaños, ${primerNombre(nombre) || "😊"}! ✨🎂\n\nDe parte de todo el equipo de *${optica}*, queremos desearte un día lleno de alegría, salud y momentos especiales. 🥳💙\n\n🎁 *Como regalo de cumpleaños tienes:*\n\n👓 *Ajuste de tus lentes GRATIS*\n\n🛍️ *15% de descuento* en cualquier compra en nuestra óptica.\n\n📅 Puedes disfrutar estos beneficios durante *1 mes a partir de la fecha en que recibes este mensaje*.\n\nAdemás, por ser paciente de ${optica}, podrás mantener el *precio de tus lentes* al renovar tu armazón y lunas, siempre que mantengas una calidad equivalente en lunas, filtros y armazón.\n\n¡Esperamos verte pronto! 👁️💙 *${optica} — cuidamos tu visión, celebramos contigo.*`;
+  return `¡Feliz cumpleaños, ${primerNombre(nombre) || "querido paciente"}! 🎂💙\n\nTodo el equipo de *${optica}* te desea un día lleno de alegría. Nos encanta acompañarte en cada etapa de tu vida y hoy queremos celebrarte.\n\n*Tu regalo de cumpleaños*\n👓 Ajuste de lentes sin costo.\n🎁 15% de descuento en cualquier compra en nuestra óptica.\n\nPuedes disfrutarlo durante *un mes desde hoy*. Si renuevas armazón y lunas con calidad equivalente, mantendremos el precio de tus lentes como beneficio de paciente. Escríbenos y te ayudamos a elegirlos.\n\n¡Un abrazo de parte de ${optica}!`;
 }
 
 // Control de 3 o 6 meses (o cualquier plazo menor a 10 meses): texto propio, sin plantilla de Meta.
 export function mensajeControlPeriodico(nombre: string, meses: number, empresaId?: string | null) {
-  if (esFocus(empresaId)) return `Hola ${primerNombre(nombre) || ""} 👋\n\nTe escribimos de *Focus Óptica*: ya se cumplen los *${meses} meses* para tu control visual.\n\n✅ Revisaremos cómo te sientes con tus lentes y si tu medida sigue bien.\n\nResponde este mensaje y te damos un turno. 📅\n— Equipo Focus Óptica`;
+  if (esFocus(empresaId)) return `*FOCUS ÓPTICA | Revisión visual*\n\n${primerNombre(nombre) || "Hola"}, se cumple el plazo de *${meses} meses* indicado para tu control. Podemos revisar tu visión y cómo te estás adaptando a tus lentes.\n\n¿Te reservamos una cita? Responde con el día que te conviene.\n\nFocus Óptica · Shushufindi`;
   const optica = opticaDeEmpresa(empresaId);
-  return `👁️ *TU CONTROL VISUAL TE ESPERA*\n\nHola ${primerNombre(nombre) || "😊"}, te saludamos de *${optica}*. En tu última revisión te indicamos un control a los *${meses} meses* y ya es momento de hacerlo.\n\nRevisaremos cómo va tu visión y si tu graduación sigue siendo la adecuada.\n\n📅 *Agenda tu control respondiendo a este mensaje.*\n\n*${optica} — cuidamos tu visión. 💙*`;
+  return `Hola ${primerNombre(nombre) || "querido paciente"} 👋💙\n\nEn *${optica}* seguimos pendientes de tu salud visual. Ya llegó el momento del control de *${meses} meses* que te recomendamos en tu última visita.\n\nNos gustaría saber cómo te sientes con tus lentes y comprobar que tu visión esté bien. 👓\n\n*Responde a este mensaje y buscamos juntos un horario para ti.*\n\nCon cariño, el equipo de ${optica}.`;
 }
 
 // Elige el texto según el plazo: 10 meses o más = control anual (mismo texto de Make).
 export const mensajeControl = (nombre: string, meses: number, empresaId?: string | null) => meses >= 10 ? mensajeControlAnual(nombre, empresaId) : mensajeControlPeriodico(nombre, meses, empresaId);
 
 export function mensajeControlAnual(nombre: string, empresaId?: string | null) {
-  if (esFocus(empresaId)) return `Hola ${primerNombre(nombre) || ""} 👋\n\nYa pasó un año desde tu último examen visual en *Focus Óptica*. La vista cambia con el tiempo y revisarla a tiempo hace la diferencia.\n\n✅ Tu examen de control es *gratis* por ser nuestro paciente.\n\nResponde este mensaje y te reservamos un turno. 📅\n— Equipo Focus Óptica, Shushufindi`;
+  if (esFocus(empresaId)) return `*FOCUS ÓPTICA | Es momento de revisar tu visión*\n\n${primerNombre(nombre) || "Hola"}, ha pasado aproximadamente un año desde tu última revisión. Un control nos permite comprobar si tu graduación sigue siendo adecuada.\n\nEl *examen de control no tiene costo* para nuestros pacientes.\n\n¿Quieres agendarlo? Indícanos qué día te viene bien y te confirmamos un turno.\n\nFocus Óptica · Shushufindi`;
   const optica = opticaDeEmpresa(empresaId);
-  return `👁️✨ *TU CONTROL VISUAL ANUAL TE ESTÁ ESPERANDO* ✨\n\nHola ${primerNombre(nombre) || "😊"}, ha pasado aproximadamente *un año desde tu último control visual* y queremos recordarte que ya es momento de revisar nuevamente tu visión.\n\n🎁 *Por ser paciente de ${optica}, tu examen visual es completamente GRATUITO.*\n\nDurante tu control podremos verificar tu agudeza visual, revisar si tu graduación continúa siendo adecuada y orientarte sobre cualquier cambio que necesites.\n\nAdemás, si necesitas renovar tus lentes, *mantenemos para nuestros pacientes el precio de sus lentes* siempre que se conserve una calidad equivalente en armazón, lunas y filtros.\n\n📅 *Agenda tu control respondiendo a este mensaje.*\n\nTu visión cambia. Nosotros queremos seguir cuidándola contigo. 💙\n\n*${optica} — cuidamos tu visión. 👁️*`;
+  return `Hola ${primerNombre(nombre) || "querido paciente"} 👋💙\n\n¡En *${optica}* nos acordamos de ti! Ha pasado aproximadamente un año desde tu última revisión y queremos invitarte a cuidar nuevamente tu visión.\n\nEn este control revisaremos cómo ves y si tu graduación necesita algún cambio. *El examen visual es gratuito para nuestros pacientes.* 👓\n\n*¿Te ayudamos a reservar un horario?* Solo responde a este mensaje.\n\nTe esperamos con el cariño de siempre,\n*Equipo ${optica}*`;
 }
 
 // Plantillas de Meta (WhatsApp Cloud API) del envío automático. Shuvisión usa las aprobadas en tiempo de Make;
@@ -59,12 +59,12 @@ export const plantillaMeta = (empresaId: string, tipo: TipoPlantilla) => (empres
 export const nombreOpticaLargo = (empresaId?: string | null) => empresaId && empresaId !== SHUVISION_ID ? "Focus Óptica" : "ShuVision Óptica";
 
 export function mensajePostventa(nombre: string, empresaId?: string | null) {
-  if (esFocus(empresaId)) return `Hola ${primerNombre(nombre)} 😊 Somos Focus Óptica.\n\n¿Qué tal te van tus lentes nuevos? Cuéntanos si ves cómodo de lejos y de cerca, o si sientes algo raro (mareo, molestia, que se resbalan).\n\nSi necesitas un ajuste, pasa cuando quieras: es gratis. 👓`;
+  if (esFocus(empresaId)) return `*FOCUS ÓPTICA | ¿Cómo van tus lentes?*\n\n${primerNombre(nombre) || "Hola"}, queremos saber cómo te ha ido desde que los recibiste. ¿Te resultan cómodos y ves bien en tus actividades diarias?\n\nSi notas alguna molestia, cuéntanos por aquí. Podemos revisarlos y ajustarlos sin costo.\n\nFocus Óptica`;
   return `Hola ${primerNombre(nombre)} 👋, te saludamos de ${opticaDeEmpresa(empresaId)}. Hace unos días retiraste tus lentes y queremos saber cómo te sientes con ellos. 👓\n\n¿Ves bien de lejos y de cerca? ¿Sientes alguna molestia, mareo o que se te resbalan? Cuéntanos y con gusto te ayudamos; el ajuste es gratis. 💙`;
 }
 
 export function mensajeResena(nombre: string, empresaId: string | null | undefined, url: string) {
-  if (esFocus(empresaId)) return `¡Gracias, ${primerNombre(nombre)}! Nos alegra mucho que estés contento con tus lentes. 🙌\n\n¿Nos regalas un minuto para contar tu experiencia en Google? Nos ayuda muchísimo:\n${url}\n\n— Equipo Focus Óptica`;
+  if (esFocus(empresaId)) return `${primerNombre(nombre) || "Hola"}, gracias por contarnos cómo te fue.\n\nSi te gustó la atención en *Focus Óptica*, puedes dejar tu opinión en Google aquí:\n${url}\n\nTu comentario ayuda a otras personas a conocernos. ¡Gracias!`;
   return `¡Qué gusto saber que estás feliz con tus lentes, ${primerNombre(nombre)}! 😊\n\nNos ayudarías muchísimo dejándonos tu opinión en Google, solo toma un minuto: ${url}\n\n¡Gracias por confiar en ${opticaDeEmpresa(empresaId)}! 💙`;
 }
 
