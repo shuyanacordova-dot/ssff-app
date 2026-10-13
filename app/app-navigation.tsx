@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Banknote,
+  Calculator,
   BarChart3,
   Building2,
   CalendarDays,
@@ -33,6 +34,7 @@ const primaryItems: NavItem[] = [
   { href: "/", label: "Inicio", detail: "Panel principal", icon: Home, group: "Operación" },
   { href: "/pacientes", label: "Pacientes", detail: "Historias y revisiones", icon: Users, group: "Operación" },
   { href: "/ventas", label: "Ventas", detail: "Cobros y pedidos", icon: Banknote, group: "Operación" },
+  { href: "/cotizador", label: "Cotizador", detail: "Precios de lunas", icon: Calculator, group: "Operación" },
   { href: "/resumen-dia", label: "Resumen del día", detail: "Cierre operativo", icon: Landmark, group: "Finanzas" },
   { href: "/caja", label: "Cuadre de caja", detail: "Apertura, gastos y cierre diario", icon: Coins, group: "Finanzas" },
   { href: "/agenda", label: "Agenda", detail: "Citas de pacientes", icon: CalendarDays, group: "Operación" },

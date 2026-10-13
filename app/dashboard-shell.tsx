@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Banknote, CalendarDays, Coins, Landmark, LogOut, Receipt, Target, UserPlus } from "lucide-react";
+import { Banknote, CalendarDays, Calculator, Coins, Landmark, LogOut, Receipt, Target, UserPlus } from "lucide-react";
 import type { TaskData } from "@/lib/tasks";
 import type { InformeMensual } from "./informes/actions";
 import type { DineroDisponible } from "@/lib/informes";
@@ -50,6 +50,7 @@ export default function DashboardShell({ taskData, informeMensual, metasMessage,
       <Link href="/egreso"><span className="quick-icon teal"><Receipt size={21} /></span><span><strong>Registrar egreso</strong><small>Gasto o pago de caja</small></span></Link>
       <Link href="/cuentas-cobrar"><span className="quick-icon teal"><Coins size={21} /></span><span><strong>Cobros de hoy</strong><small>Mensajes por enviar</small></span></Link>
       <Link href="/agenda"><span className="quick-icon teal"><CalendarDays size={21} /></span><span><strong>Agenda</strong><small>Ver citas de hoy</small></span></Link>
+      <Link href="/cotizador"><span className="quick-icon blue"><Calculator size={21} /></span><span><strong>Cotizador</strong><small>Precios de lunas</small></span></Link>
     </section>
 
     {cobrosHoy.cantidad > 0 && <section className="glass cob-dashboard-banner"><span>Hoy hay <strong>{cobrosHoy.cantidad}</strong> mensajes de cobro por enviar ({money(cobrosHoy.total)})</span><Link className="outline-action" href="/cuentas-cobrar">Ver cobros de hoy</Link></section>}
