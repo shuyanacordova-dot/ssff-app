@@ -79,6 +79,6 @@ export type NumeroSucursal = { sucursal_id: string; nombre: string; numero: stri
 export const limpiarWhatsapp = (texto: string) => texto.replace(/\*\*/g, "*").replace(/👁️|👁/gu, "👓").replace(/🛍️|🛍/gu, "🎁").replace(/\uFE0F/g, "");
 
 // Tarjeta con imagen: WhatsApp muestra la imagen como vista previa del enlace al final del mensaje.
-const SITIO = "https://ssff-app-shuyanacordova-5372.vercel.app";
+const SITIO = "https://ssff-app.vercel.app";
 export const tarjetaUrl = (tipo: "cumple" | "control", empresaId?: string | null) => `${SITIO}/tarjeta/${tipo}-${esFocus(empresaId) ? "focus" : "shuvision"}`;
 export const conTarjeta = (texto: string, tipo: "cumple" | "control", empresaId?: string | null) => `${limpiarWhatsapp(texto)}\n\n${tarjetaUrl(tipo, empresaId)}`;

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 // Tarjeta pública que acompaña los mensajes de cumpleaños y control: WhatsApp muestra su imagen como vista previa.
-const SITIO = "https://ssff-app-shuyanacordova-5372.vercel.app";
+const SITIO = "https://ssff-app.vercel.app";
 const tarjetas: Record<string, { titulo: string; descripcion: string; imagen: string; optica: string }> = {
   "cumple-shuvision": { titulo: "¡Feliz cumpleaños! · ShuVisión", descripcion: "Tu regalo: ajuste gratis y 15% de descuento por un mes.", imagen: "https://res.cloudinary.com/ip1jz9eg/image/upload/v1787675996/ChatGPT_Image_23_ago_2026_23_43_46.png", optica: "ShuVisión" },
   "control-shuvision": { titulo: "Tu control visual te espera · ShuVisión", descripcion: "Examen de control gratuito para nuestros pacientes.", imagen: "https://res.cloudinary.com/ip1jz9eg/image/upload/v1787676005/ChatGPT_Image_23_ago_2026_23_53_31.png", optica: "ShuVisión" },

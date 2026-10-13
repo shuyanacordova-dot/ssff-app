@@ -72,7 +72,7 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean; falta
 }
 
 
-const egresoUrl = "https://ssff-app-shuyanacordova-5372.vercel.app/egreso";
+const egresoUrl = "https://ssff-app.vercel.app/egreso";
 const promptAtajo = `Crea un atajo llamado "Registrar egreso" que me pregunte el monto, el concepto y las observaciones (qué se compró o a qué se destinó el dinero), y luego abra en Safari esta dirección poniendo lo que respondí: ${egresoUrl}?monto=[monto]&concepto=[concepto]&observaciones=[observaciones]`;
 
 // Egresos desde el iPhone (Shuyana 2026-10-07): pantalla /egreso como ícono, o un atajo que la abre con monto y concepto.
