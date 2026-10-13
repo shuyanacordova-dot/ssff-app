@@ -8,8 +8,21 @@ export function numeroWhatsapp(raw: string | null | undefined): string | null {
   return digits;
 }
 
+// Algunos teléfonos muestran emojis como el carácter de sustitución (�) al abrir wa.me.
+// Conservamos acentos, cifras y saltos de línea; quitamos solo pictogramas y marcas de emoji.
+export function textoSeguroWhatsapp(mensaje: string): string {
+  return mensaje
+    .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D\uFFFD]/gu, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/ +([.,!?;:])/g, "$1")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export function enlaceWhatsapp(raw: string | null | undefined, mensaje: string): string | null {
   const numero = numeroWhatsapp(raw);
   if (!numero) return null;
-  return `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
+  return `https://wa.me/${numero}?text=${encodeURIComponent(textoSeguroWhatsapp(mensaje))}`;
 }

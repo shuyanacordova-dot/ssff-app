@@ -1,4 +1,5 @@
 import type { TipoPlantilla } from "@/lib/plantillas-mensajes";
+import { textoSeguroWhatsapp } from "@/lib/whatsapp";
 
 // Textos de "Mensajes del día": los mismos que enviaba Make (plantillas aprobadas en Meta
 // "feliz_cumpleanos" y "recordatorio_control_anual", idioma es_EC). Se usan para el envío con un toque
@@ -77,7 +78,7 @@ export type NumeroSucursal = { sucursal_id: string; nombre: string; numero: stri
 
 // Evita símbolos poco compatibles y marcas de negrita visibles en WhatsApp.
 // Se conserva el selector de presentación de los demás emojis para que se muestren correctamente.
-export const limpiarWhatsapp = (texto: string) => texto.replace(/👁️|👁/gu, "👓").replace(/🛍️|🛍/gu, "🎁").replace(/\*/g, "");
+export const limpiarWhatsapp = (texto: string) => textoSeguroWhatsapp(texto).replace(/\*/g, "");
 
 // Tarjeta con imagen: WhatsApp muestra la imagen como vista previa del enlace al final del mensaje.
 const SITIO = "https://ssff-app.vercel.app";

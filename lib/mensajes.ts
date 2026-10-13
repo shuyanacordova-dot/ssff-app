@@ -1,4 +1,5 @@
 import { diasCalendarioGuayaquil } from "@/lib/record-date";
+import { textoSeguroWhatsapp } from "@/lib/whatsapp";
 export type PlantillaContactoId = "listo_retiro" | "cobro_insistente" | "cobro_mensual" | "cobro_apartado" | "lentes_rezagados";
 
 export type ContextoMensaje = {
@@ -77,6 +78,10 @@ export function plantillaSugerida(c: { insistente?: boolean; apartado?: boolean;
 }
 
 export function construirMensajeContacto(plantilla: PlantillaContactoId, contexto: ContextoMensaje) {
+  return textoSeguroWhatsapp(construirTextoContacto(plantilla, contexto));
+}
+
+function construirTextoContacto(plantilla: PlantillaContactoId, contexto: ContextoMensaje) {
   const saldoNum = Number(contexto.saldo ?? 0);
   const saldo = `$${saldoNum.toFixed(2)}`;
   const saludo = primerNombre(contexto.nombre) || "😊";
