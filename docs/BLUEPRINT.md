@@ -148,6 +148,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 |---|---|---|---|
 | L45 | 2026-10-12 | Marcar pagada la luz en Mis deudas creó un egreso de $50 aunque ya existía uno de $61,88 del 7-oct. Se retiraron el pago y el egreso duplicados; el egreso válido de $61,88 permanece y la reversión bancaria quedó auditada. | Antes de registrar un pago de gasto fijo, revisar egresos del mismo concepto y mes; al corregir, mantener sincronizado banco y auditoría. |
 | L46 | 2026-10-12 | La revisión automática rechazó reclasificar egresos históricos en lote por heurísticas sin auditoría individual. | Clasificar solo registros con evidencia concreta mediante el flujo auditado; dejar los ambiguos para revisión humana. |
+| L47 | 2026-10-13 | Al retirar uno de dos egresos Diners idénticos de $300, la pantalla de Caja mostró primero el registro más antiguo, aunque el desglose de Informes mostraba primero el más reciente. Se eliminó el antiguo y quedó el reciente; ambos tenían fecha, monto, cuenta y observación iguales. | Para duplicados indistinguibles, verificar el ID y el orden propio de cada pantalla antes de borrar. La corrección quedó auditada y con un solo movimiento bancario. |
 | L47 | 2026-10-13 | El primer intento de migración para el acceso de Erick falló porque `usuarios` no tiene columna `rol`; el rol está en el perfil operativo. La migración fallida no se aplicó. | Verificar las columnas reales antes de usar un campo en una migración; identificar al usuario por nombre, empresa y estado activo sin depender de una columna inexistente. |
 
 | L1 | 2026-09-24 | El botón "Crear orden de laboratorio" nunca aparecía: solo se mostraba si el producto vendido tenía categoría `lente`, pero las ventas antiguas no tenían producto ligado. | No ocultar botones importantes con condiciones que dependen de datos que pueden faltar. Probar con datos reales. |
@@ -235,6 +236,8 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta
 ---
 
 ## 9. Registro de entregas
+
+| 2026-10-13 | **Diners duplicado corregido**: dos egresos de $300 del 13-oct en Shuvision, misma cuenta y observación. A pedido de Shuyana se borró uno desde Caja con motivo auditado y se revirtió su movimiento bancario; quedó un solo egreso de $300. La pantalla ordenó los registros distinto a Informes: se conservó el más reciente. Verificación en Supabase: un egreso, una auditoría de eliminación y un solo movimiento de banco. Sin cambios de esquema. | (este commit) |
 
 | 2026-10-13 | **Erick puede cuadrar los bancos de Focus:** acceso al menú y a `/mi-espacio/bancos` para las tres cuentas de Focus; puede consultar historial, previsualizar y guardar cuadres. La Superadministradora conserva el acceso global. Las cuentas de otras sucursales se bloquean en el servidor y la base de datos. Migración `20261013201647_acceso_erick_cuadre_bancos_focus.sql` aplicada; comprobado con la identidad de Erick: Focus permitido, Shuvision denegado, previsualización y tres cuentas visibles. `npx tsc --noEmit` y `npm run build` OK. Publicado en `ssff-app.vercel.app` (`dpl_J9f3BScxEfi5anTLRAnegb7XrnGu`, READY); la ruta pública lleva a login, prueba en navegador con sesión de Erick pendiente. | `3f030e5` |
 
