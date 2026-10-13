@@ -38,14 +38,14 @@ function RxEyeCard({ eye, value, onChange, disabled, cerca = false, conProcesar 
   </div>;
 }
 
-export default function LabOrderModal({ sale, lensItems, productoById, patientName, patientPhone, company, branchName, existingOrderId, esGarantia, ordenOriginalId, onClose, onCreated }: {
+export default function LabOrderModal({ sale, lensItems, productoById, patientName, patientPhone, company, branchName, existingOrderId, editInitially = false, esGarantia, ordenOriginalId, onClose, onCreated }: {
   sale: Sale; lensItems: SaleItem[]; productoById?: Map<string, SaleProduct>; patientName: string; patientPhone?: string | null; company?: SaleCompany;
   branchName?: string;
-  existingOrderId?: string; esGarantia?: boolean; ordenOriginalId?: string | null;
+  existingOrderId?: string; editInitially?: boolean; esGarantia?: boolean; ordenOriginalId?: string | null;
   onClose: () => void; onCreated: (message: string) => void;
 }) {
   const [pending, start] = useTransition();
-  const [step, setStep] = useState<"form" | "created">(existingOrderId ? "created" : "form");
+  const [step, setStep] = useState<"form" | "created">(existingOrderId && !editInitially ? "created" : "form");
   const [loadingExisting, setLoadingExisting] = useState(!!existingOrderId);
   const [orderId, setOrderId] = useState(existingOrderId ?? "");
   const [orderCreatedAt, setOrderCreatedAt] = useState(sale.creado_en);
@@ -75,7 +75,8 @@ export default function LabOrderModal({ sale, lensItems, productoById, patientNa
     if (!existingOrderId) return;
     let active = true;
     getOrdenLaboratorio(existingOrderId).then((orden) => {
-      if (!active || !orden) return;
+      if (!active) return;
+      if (!orden) { setError("No se pudo cargar la orden."); return; }
       setEstado(orden.estado); setItemId(orden.venta_item_id ?? lensItems[0]?.id ?? ""); setLaboratorio(orden.laboratorio); setOrderCreatedAt(orden.creado_en);
       setConsultaId(orden.consulta_id ?? ""); setRx(orden.rx); setMedidas({ ...emptyMedidas(), ...orden.medidas }); setTipoLente(orden.tipo_lente); setNotas((orden.notas ?? "").replace(/^Intermedio\s*[:·—-]?\s*/i, ""));
       setUso(/^Intermedio\b/i.test(orden.notas ?? "") ? "intermedio" : orden.uso_calculado === "lejos_y_cerca" ? (orden.tipo_lente === "bifocal" ? "lejos_y_cerca" : "todas") : orden.uso_calculado);

@@ -2,7 +2,7 @@
 import { formatRecordDate } from "@/lib/record-date";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, Clock3, FlaskConical, MessageCircle, PackageCheck, Printer, Search, ShieldAlert, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, Clock3, FlaskConical, MessageCircle, PackageCheck, Pencil, Printer, Search, ShieldAlert, X } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import type { LabMonitorData, LabMonitorOrder } from "@/lib/monitor-laboratorio";
 import { estadoOrdenLabels, laboratorioLabels, tipoLenteLabels, type EstadoOrdenLaboratorio } from "@/lib/laboratorio";
@@ -118,6 +118,6 @@ function OrderDetail({ order, pending, onClose, onStatus }: { order: LabMonitorO
       <div className="lab-detail-grid lab-measures"><span><strong>Vertical</strong>{order.medidas?.vertical || "—"}</span><span><strong>Horizontal mayor</strong>{order.medidas?.horizontal_mayor || "—"}</span><span><strong>Puente</strong>{order.medidas?.puente || "—"}</span><span><strong>Altura</strong>{order.medidas?.altura || "—"}</span><span><strong>DNP</strong>{order.medidas?.dnp || "—"}</span></div>
       {order.notas && <div className="lab-notes"><strong>Indicaciones</strong><p>{order.notas}</p></div>}
     </div>
-    <div className="modal-actions no-print"><label className="lab-modal-status">Estado<select value={order.estado} disabled={pending} onChange={(event) => onStatus(event.target.value as EstadoOrdenLaboratorio)}>{statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button className="outline-action" type="button" onClick={() => printDocumentById("lab-monitor-print")}><Printer size={15} /> Imprimir</button><button className="new-consultation" type="button" onClick={onClose}>Cerrar</button></div>
+    <div className="modal-actions no-print"><label className="lab-modal-status">Estado<select value={order.estado} disabled={pending} onChange={(event) => onStatus(event.target.value as EstadoOrdenLaboratorio)}>{statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><Link className="outline-action" href={`/pacientes?paciente=${encodeURIComponent(order.paciente_id)}&orden=${encodeURIComponent(order.id)}&tab=laboratorio`}><Pencil size={15} /> Editar orden</Link><button className="outline-action" type="button" onClick={() => printDocumentById("lab-monitor-print")}><Printer size={15} /> Imprimir</button><button className="new-consultation" type="button" onClick={onClose}>Cerrar</button></div>
   </section></div>;
 }
