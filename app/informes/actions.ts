@@ -25,7 +25,7 @@ export async function establecerMetaVenta(empresaId: string, sucursalId: string,
 export type TipoDesglose = "ventas" | "saldo" | "cxc" | "cobros" | "gastos" | "cuadres";
 export type FilaDesglose = Record<string, string | number | boolean | null>;
 export type DesgloseInforme = { tipo: TipoDesglose; filas: FilaDesglose[]; categorias: string[] };
-export type EgresoParaEditar = { gasto: Gasto; cuentas: CuentaBancaria[]; cuadreGuardado: boolean };
+export type EgresoParaEditar = { gasto: Gasto; cuentas: CuentaBancaria[]; cuadreGuardado: boolean; cuentaAhorros: boolean };
 
 export async function obtenerEgresoParaEditar(gastoId: string): Promise<EgresoParaEditar> {
   const supabase = await createSupabaseServerClient();
@@ -39,15 +39,17 @@ export async function obtenerEgresoParaEditar(gastoId: string): Promise<EgresoPa
     .select("id,empresa_id,sucursal_id,fecha,clasificacion,concepto,monto,origen,cuenta_bancaria_id,observaciones,creado_en")
     .eq("id", gastoId).maybeSingle();
   if (gastoError || !gasto) throw new Error("No se encontró el egreso.");
-  const [cuentasResult, cierresResult] = await Promise.all([
+  const [cuentasResult, cierresResult, ahorroResult] = await Promise.all([
     supabase.from("cuentas_bancarias").select("id,empresa_id,sucursal_id,banco,saldo_actual").eq("empresa_id", gasto.empresa_id).eq("activo", true),
     gasto.sucursal_id ? supabase.from("cierres_caja").select("id").eq("sucursal_id", gasto.sucursal_id).eq("fecha", gasto.fecha).limit(1) : Promise.resolve({ data: [], error: null }),
+    supabase.from("cuentas_ahorro").select("id").eq("empresa_id", gasto.empresa_id).eq("banco", "diners").maybeSingle(),
   ]);
-  if (cuentasResult.error || cierresResult.error) throw new Error("No se pudieron cargar los datos del egreso.");
+  if (cuentasResult.error || cierresResult.error || ahorroResult.error) throw new Error("No se pudieron cargar los datos del egreso.");
   return {
     gasto: gasto as Gasto,
     cuentas: (cuentasResult.data ?? []).filter((cuenta) => cuenta.sucursal_id === gasto.sucursal_id || (!gasto.sucursal_id && cuenta.empresa_id === gasto.empresa_id)) as CuentaBancaria[],
     cuadreGuardado: (cierresResult.data ?? []).length > 0,
+    cuentaAhorros: !!ahorroResult.data,
   };
 }
 

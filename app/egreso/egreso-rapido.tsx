@@ -5,14 +5,16 @@ import { useState, useTransition } from "react";
 import { crearGasto } from "@/app/caja/actions";
 
 const metodos = [{ id: "efectivo", label: "Efectivo" }, { id: "pichincha", label: "Pichincha" }, { id: "guayaquil", label: "Guayaquil" }, { id: "internacional", label: "Internacional" }];
-const clasificaciones = [["gastos_operacion", "Gastos de operación"], ["gastos_mensuales", "Gastos mensuales"], ["pago_proveedor", "Pago a proveedor"], ["salarios", "Salarios"]];
+const clasificaciones = [["gastos_operacion", "Gastos de operación"], ["gastos_mensuales", "Gastos mensuales"], ["pago_proveedor", "Pago a proveedor"], ["salarios", "Salarios"], ["ahorros", "Ahorros"]];
 
-export default function EgresoRapido({ sucursales, cuentas, sucursalInicial, montoInicial, conceptoInicial, observacionesInicial, metodoInicial }: { sucursales: { id: string; nombre: string; empresa_id: string }[]; cuentas: { id: string; banco: string; sucursal_id: string }[]; sucursalInicial: string; montoInicial: string; conceptoInicial: string; observacionesInicial: string; metodoInicial: string }) {
+export default function EgresoRapido({ sucursales, cuentas, cuentaAhorrosEmpresaId, sucursalInicial, montoInicial, conceptoInicial, observacionesInicial, metodoInicial }: { sucursales: { id: string; nombre: string; empresa_id: string }[]; cuentas: { id: string; banco: string; sucursal_id: string }[]; cuentaAhorrosEmpresaId?: string; sucursalInicial: string; montoInicial: string; conceptoInicial: string; observacionesInicial: string; metodoInicial: string }) {
   const [sucursalId, setSucursalId] = useState(sucursalInicial);
   const [metodo, setMetodo] = useState(metodos.some((m) => m.id === metodoInicial) ? metodoInicial : "efectivo");
+  const [clasificacion, setClasificacion] = useState("gastos_operacion");
   const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null);
   const [pending, start] = useTransition();
   const sucursal = sucursales.find((s) => s.id === sucursalId);
+  const puedeAhorrar = sucursal?.empresa_id === cuentaAhorrosEmpresaId;
   const guardar = (form: HTMLFormElement) => start(async () => {
     const data = new FormData(form);
     const cuenta = cuentas.find((c) => c.sucursal_id === sucursalId && c.banco.toLowerCase() === metodo);
@@ -30,7 +32,7 @@ export default function EgresoRapido({ sucursales, cuentas, sucursalInicial, mon
       <label>¿Cómo se pagó?</label>
       <div className="tabs" role="radiogroup" style={{ flexWrap: "wrap" }}>{metodos.map((m) => <button key={m.id} type="button" role="radio" aria-checked={metodo === m.id} className={metodo === m.id ? "active" : ""} onClick={() => setMetodo(m.id)}>{m.label}</button>)}</div>
       {sucursales.length > 1 && <label>Sucursal<select value={sucursalId} onChange={(event) => setSucursalId(event.target.value)}>{sucursales.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}</select></label>}
-      <label>Clasificación<select name="clasificacion" defaultValue="gastos_operacion">{clasificaciones.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+      <label>Clasificación<select name="clasificacion" value={puedeAhorrar ? clasificacion : "gastos_operacion"} onChange={(event) => setClasificacion(event.target.value)}>{clasificaciones.filter(([v]) => v !== "ahorros" || puedeAhorrar).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>{puedeAhorrar && clasificacion === "ahorros" && <small>Se registrará en la cuenta de ahorros Diners de Shuvisión.</small>}</label>
       <label className="task-description">Observaciones<textarea name="observaciones" rows={3} defaultValue={observacionesInicial} placeholder="¿Qué se compró o a qué se destinó el dinero? Ej.: 2 resmas de papel y tinta para la impresora" /></label>
       {aviso && <p className="notice" role="status" style={aviso.ok ? { background: "#dff6ed", color: "#247658", fontWeight: 700 } : { background: "#ffe5e8", color: "#a24150", fontWeight: 700 }}>{aviso.texto}</p>}
       <button className="new-consultation" type="submit" disabled={pending} style={{ fontSize: 18, padding: "14px 18px" }}>{pending ? "Guardando…" : "Guardar egreso"}</button>

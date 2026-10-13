@@ -10,7 +10,7 @@ export type CierreCaja = { id: string; empresa_id: string; sucursal_id: string; 
 export type CajaCompany = { id: string; nombre: string };
 export type CajaBranch = { id: string; empresa_id: string; nombre: string };
 export type CajaProfile = { id: string; empresa_id: string; sucursal_id: string | null; rol: string };
-export type CajaData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: CajaProfile; companies: CajaCompany[]; branches: CajaBranch[]; cuentas: CuentaBancaria[]; movimientos: MovimientoBancario[]; gastos: Gasto[]; cierres: CierreCaja[] };
+export type CajaData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: CajaProfile; companies: CajaCompany[]; branches: CajaBranch[]; cuentas: CuentaBancaria[]; movimientos: MovimientoBancario[]; gastos: Gasto[]; cierres: CierreCaja[]; cuentaAhorrosEmpresaId?: string };
 
 const cajaRoles = new Set(["superadmin", "admin_sucursal", "vendedor", "caja"]);
 const roleName = (profile: { roles: { nombre: string } | { nombre: string }[] | null } | null) => Array.isArray(profile?.roles) ? profile.roles[0]?.nombre : profile?.roles?.nombre;
@@ -27,14 +27,15 @@ export async function getCajaData(): Promise<CajaData> {
     const role = roleName(profile);
     if (profileError || !profile?.activo || !role || !cajaRoles.has(role)) return { status: "forbidden", message: "Tu perfil no tiene permiso para caja.", ...empty };
 
-    const [companiesResult, branchesResult, cuentasResult, gastosResult, operationalContext] = await Promise.all([
+    const [companiesResult, branchesResult, cuentasResult, gastosResult, ahorroResult, operationalContext] = await Promise.all([
       supabase.from("empresas").select("id,nombre").eq("activo", true).order("nombre"),
       supabase.from("sucursales").select("id,empresa_id,nombre").eq("activo", true).order("nombre"),
       supabase.from("cuentas_bancarias").select("id,empresa_id,sucursal_id,banco,saldo_actual").eq("activo", true).order("banco"),
       supabase.from("gastos").select("id,empresa_id,sucursal_id,fecha,clasificacion,concepto,monto,origen,cuenta_bancaria_id,observaciones,creado_en").order("fecha", { ascending: false }).limit(100),
+      supabase.from("cuentas_ahorro").select("empresa_id").eq("banco", "diners").maybeSingle(),
       getOperationalContext(),
     ]);
-    if (companiesResult.error || branchesResult.error || cuentasResult.error || gastosResult.error) return { status: "error", message: "No se pudo cargar caja. Revisa la conexión y los permisos.", ...empty };
+    if (companiesResult.error || branchesResult.error || cuentasResult.error || gastosResult.error || ahorroResult.error) return { status: "error", message: "No se pudo cargar caja. Revisa la conexión y los permisos.", ...empty };
 
     const cierreBase = "id,empresa_id,sucursal_id,fecha,responsable_id,caja_anterior,caja_fisica,ventas_brutas,cobro_efectivo,cobro_tarjeta,cobro_transferencia_pichincha,cobro_transferencia_guayaquil,cobro_transferencia_internacional,cobro_credito,cobro_otro,egresos_efectivo,egresos_banco,deposito_pichincha,deposito_guayaquil,deposito_internacional,depositos,caja_esperada,diferencia,check_cobros_ventas,check_caja_fisica,cuadre_correcto,observaciones,creado_en";
     let cierresResult = await supabase.from("cierres_caja").select(`${cierreBase},declarado_efectivo,declarado_tarjeta,declarado_transferencia_pichincha,declarado_transferencia_guayaquil,declarado_transferencia_internacional,diferencia_cobros_declarados,check_metodos_pago`).order("fecha", { ascending: false }).limit(60);
@@ -62,6 +63,7 @@ export async function getCajaData(): Promise<CajaData> {
 
     return {
       status: "ready",
+      cuentaAhorrosEmpresaId: ahorroResult.data?.empresa_id,
       profile: { id: profile.id, empresa_id: operationalContext?.activeCompany.id ?? profile.empresa_id, sucursal_id: operationalContext?.activeBranch.id ?? profile.sucursal_id, rol: role },
       companies: (companiesResult.data ?? []).filter((c) => role === "superadmin" || c.id === profile.empresa_id),
       branches: (branchesResult.data ?? []).filter((b) => role === "superadmin" || (b.empresa_id === profile.empresa_id && (role === "admin_sucursal" || b.id === profile.sucursal_id))),

@@ -10,7 +10,7 @@ import EditarEgresoModal from "./editar-egreso-modal";
 const money = (n: unknown) => `$${Number(n ?? 0).toFixed(2)}`;
 const fecha = (value: unknown) => typeof value === "string" ? new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "short" }).format(new Date(`${value}T12:00:00`)) : "";
 const metodoLabel: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta", credito: "Crédito", otro: "Otro" };
-const clasificacionLabel: Record<string, string> = { salarios: "Salarios", pago_proveedor: "Pago a proveedor", gastos_mensuales: "Gastos mensuales", gastos_operacion: "Gastos de operación", ajuste: "Ajuste" };
+const clasificacionLabel: Record<string, string> = { salarios: "Salarios", pago_proveedor: "Pago a proveedor", gastos_mensuales: "Gastos mensuales", gastos_operacion: "Gastos de operación", ajuste: "Ajuste", ahorros: "Ahorros" };
 const tipoVentaLabel: Record<string, string> = { lentes: "Lentes", rapida: "Venta rápida", traspaso: "Traspaso" };
 const SIN_CLASIFICAR = "Sin clasificar";
 
@@ -101,7 +101,7 @@ function FilaItem({ tipo, fila: f, puedeClasificar, pending, onClasificar, onEdi
     {puedeClasificar && !f.clasificacion && <div className="informe-fila-clasificar no-print">
       <select defaultValue="" disabled={pending} onChange={(event) => { if (event.target.value) onClasificar(event.target.value); }} aria-label="Clasificar egreso">
         <option value="">Elegir clasificación</option>
-        {Object.entries(clasificacionLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        {Object.entries(clasificacionLabel).filter(([value]) => value !== "ahorros").map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select>
     </div>}
   </li>;

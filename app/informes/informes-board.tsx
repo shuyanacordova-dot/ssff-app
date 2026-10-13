@@ -2,6 +2,7 @@
 import { printDocumentById } from "@/lib/print-document";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Banknote, ChevronRight, CircleAlert, Printer, ReceiptText, Target, Wallet, type LucideIcon } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import type { InformesData } from "@/lib/informes";
@@ -10,12 +11,13 @@ import DesgloseModal from "./desglose-modal";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
 const pct = (actual: number, meta: number) => meta > 0 ? Math.round((actual / meta) * 100) : 0;
-const clasificacionLabel: Record<string, string> = { salarios: "Salarios", pago_proveedor: "Pago a proveedor", gastos_mensuales: "Gastos mensuales", gastos_operacion: "Gastos de operación", ajuste: "Ajuste" };
+const clasificacionLabel: Record<string, string> = { salarios: "Salarios", pago_proveedor: "Pago a proveedor", gastos_mensuales: "Gastos mensuales", gastos_operacion: "Gastos de operación", ajuste: "Ajuste", ahorros: "Ahorros" };
 const metodoLabel: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta", credito: "Crédito", otro: "Otro" };
 const mesActual = () => new Date().toISOString().slice(0, 7);
 const mesLargo = (mes: string) => new Intl.DateTimeFormat("es-EC", { month: "long", year: "numeric" }).format(new Date(`${mes}-01T12:00:00`));
 
 export default function InformesBoard(props: InformesData) {
+  const router = useRouter();
   const [empresaId, setEmpresaId] = useState<string>(props.profile?.empresa_id ?? props.companies[0]?.id ?? "");
   const [mes, setMes] = useState(mesActual());
   const [informe, setInforme] = useState<InformeMensual | null>(null);
@@ -78,7 +80,7 @@ export default function InformesBoard(props: InformesData) {
           const egresos = Number(row.gastos_total ?? 0);
           const resultado = aCuenta - egresos;
           const dinero = props.dineroDisponible?.find((d) => d.sucursal_id === row.sucursal_id);
-          return <article className="task-card" key={row.sucursal_id}><div className="task-main">
+          return <article className="task-card informe-sucursal-card" key={row.sucursal_id}><div className="task-main">
             <h2>{row.sucursal_nombre}</h2>
             <div className="informe-kv">
               <span><small>A cuenta del mes</small><b>{money(aCuenta)}</b></span>
@@ -89,6 +91,12 @@ export default function InformesBoard(props: InformesData) {
           </div></article>;
         })}</div>
         <p className="field-hint">El dinero disponible es de hoy (bancos desde su último cuadre + efectivo de la caja), no del mes elegido.</p>
+      </section>}
+
+      {isSuperadmin && props.ahorrosDiners && (todoElNegocio || empresaId === props.ahorrosDiners.empresa_id) && <section className="glass agenda-board" style={{ marginBottom: 18 }}>
+        <p className="section-label">AHORROS · SHUVISIÓN</p><h2>Cuenta Diners</h2>
+        <div className="informe-kv"><span><small>Saldo registrado en LumOS</small><b>{money(props.ahorrosDiners.saldo)}</b></span><span><small>Movimientos de ahorro</small><b>{props.ahorrosDiners.registros}</b></span></div>
+        <p className="field-hint">Los egresos clasificados como Ahorros de cualquiera de las dos sucursales de Shuvisión se suman aquí. El saldo refleja lo registrado en LumOS.</p>
       </section>}
 
       <section className="glass agenda-board" style={{ marginBottom: 18 }}>
@@ -108,7 +116,7 @@ export default function InformesBoard(props: InformesData) {
     </>}
     </div>
 
-    {desglose && <DesgloseModal tipo={desglose} empresaId={todoElNegocio ? null : empresaId} mes={`${mes}-01`} etiquetaPeriodo={etiquetaPeriodo} puedeClasificar={isSuperadmin} onClose={() => setDesglose(null)} onCambio={recargar} />}
+    {desglose && <DesgloseModal tipo={desglose} empresaId={todoElNegocio ? null : empresaId} mes={`${mes}-01`} etiquetaPeriodo={etiquetaPeriodo} puedeClasificar={isSuperadmin} onClose={() => setDesglose(null)} onCambio={() => { recargar(); router.refresh(); }} />}
     {informe && <div className="modal-actions no-print" style={{ marginTop: 14 }}><button className="outline-action" type="button" onClick={() => printDocumentById("monthly-report-print")}><Printer size={15} /> Imprimir / guardar informe</button></div>}
   </div></main>;
 }

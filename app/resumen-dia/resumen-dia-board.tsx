@@ -11,7 +11,7 @@ import type { ResumenDiaData } from "@/lib/resumen-dia";
 const money = (n: number) => `$${n.toFixed(2)}`;
 const formatHora = (value: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(value));
 const metodoLabel: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta", credito: "Crédito", otro: "Otro" };
-const clasificacionLabel: Record<string, string> = { salarios: "Salarios", pago_proveedor: "Pago a proveedor", gastos_mensuales: "Gastos mensuales", gastos_operacion: "Gastos de operación", ajuste: "Ajuste" };
+const clasificacionLabel: Record<string, string> = { salarios: "Salarios", pago_proveedor: "Pago a proveedor", gastos_mensuales: "Gastos mensuales", gastos_operacion: "Gastos de operación", ajuste: "Ajuste", ahorros: "Ahorros" };
 
 export default function ResumenDiaBoard(props: ResumenDiaData & { fecha: string }) {
   const router = useRouter();

@@ -23,7 +23,7 @@ export async function crearGasto(form: FormData) {
   if (!Number.isFinite(valor) || valor <= 0) throw new Error("Indica un monto válido.");
   const { error } = await supabase.rpc("registrar_gasto", { p_empresa: empresaId, p_sucursal: sucursalId, p_fecha: fecha, p_clasificacion: clasificacion, p_concepto: concepto, p_monto: valor, p_origen: origen, p_cuenta_bancaria_id: cuentaBancariaId, p_observaciones: observaciones || null });
   if (error) throw new Error(error.message || "No se pudo registrar el gasto.");
-  revalidatePath("/caja");
+  revalidatePath("/caja"); revalidatePath("/informes");
 }
 
 export async function crearMovimientoBancario(form: FormData) {
@@ -105,6 +105,6 @@ export async function eliminarGasto(gastoId: string, motivo: string): Promise<{ 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("eliminar_gasto", { p_gasto: gastoId, p_motivo: motivo });
   if (error) return { ok: false, error: error.message };
-  revalidatePath("/caja"); revalidatePath("/resumen-dia"); revalidatePath("/mi-espacio/bancos");
+  revalidatePath("/caja"); revalidatePath("/resumen-dia"); revalidatePath("/mi-espacio/bancos"); revalidatePath("/informes");
   return { ok: true };
 }

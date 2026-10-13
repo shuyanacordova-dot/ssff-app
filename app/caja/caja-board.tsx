@@ -17,7 +17,7 @@ const fechaCuadre = (fecha: string) => fecha ? new Intl.DateTimeFormat("es-EC", 
 const origenCaja = (vista: VistaCierre) => vista.origen_caja_anterior && vista.fecha_caja_anterior ? `${vista.origen_caja_anterior === "apertura" ? "Apertura" : "Cierre"} del ${formatDate(vista.fecha_caja_anterior)}` : "Sin registro previo";
 const formatDate = formatRecordDate;
 const bancoLabel: Record<string, string> = { pichincha: "Banco Pichincha", guayaquil: "Banco Guayaquil", internacional: "Banco Internacional" };
-const clasificacionLabel: Record<string, string> = { salarios: "Salarios", pago_proveedor: "Pago a proveedor", gastos_mensuales: "Gastos mensuales", gastos_operacion: "Gastos de operación", ajuste: "Ajuste" };
+const clasificacionLabel: Record<string, string> = { salarios: "Salarios", pago_proveedor: "Pago a proveedor", gastos_mensuales: "Gastos mensuales", gastos_operacion: "Gastos de operación", ajuste: "Ajuste", ahorros: "Ahorros" };
 
 export default function CajaBoard(props: CajaData & { autoGasto?: boolean; faltantes?: Record<string, string[]> }) {
   const [notice, setNotice] = useState(props.message ?? "");
@@ -48,7 +48,7 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean; falta
   const cuentaById = new Map(cuentas.map((cuenta) => [cuenta.id, cuenta]));
 
   const runAction = (action: () => Promise<unknown>, onOk: string) => startTransition(async () => {
-    try { await action(); setNotice(onOk); setShowGasto(false); setShowCierre(false); }
+    try { await action(); setNotice(onOk); setShowGasto(false); setShowCierre(false); router.refresh(); }
     catch (err) { setNotice(err instanceof Error ? err.message : "No se pudo completar la acción."); }
   });
 
@@ -64,9 +64,9 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean; falta
 
     <section className="glass agenda-board"><div className="agenda-toolbar"><div><p className="section-label">EGRESOS</p><h2>Gastos recientes</h2></div><button className="new-task" type="button" onClick={() => setShowGasto(true)}><Plus size={18} /> Nuevo gasto</button></div><AtajoEgresos />{gastos.length ? <div className="task-list">{gastos.slice(0, 15).map((gasto) => <article className="task-card" key={gasto.id}><div className="task-status"><span className="status-dot" /></div><div className="task-main"><div className="task-meta"><span>{clasificacionLabel[gasto.clasificacion]}</span><span>{gasto.origen === "banco" ? bancoLabel[cuentaById.get(gasto.cuenta_bancaria_id ?? "")?.banco ?? ""] || "Banco" : "Efectivo"}</span><span>{formatDate(gasto.fecha)}</span></div><h2>{gasto.concepto}</h2>{gasto.observaciones && <p>{gasto.observaciones}</p>}</div><div className="task-actions"><strong>{money(gasto.monto)}</strong>{esSuperadmin && <><button type="button" className="icon-button" title="Editar egreso" aria-label="Editar egreso" onClick={() => setEditandoGasto(gasto)}><Pencil size={15} /></button><button type="button" className="icon-button" title="Borrar egreso" aria-label="Borrar egreso" style={{ color: "#a24150" }} onClick={() => setBorrandoGasto(gasto)}><Trash2 size={15} /></button></>}</div></article>)}</div> : <section className="empty-state"><Receipt size={27} /><h3>Aún no hay gastos</h3><p>Registra el primer egreso de esta empresa.</p></section>}</section>
 
-    {editandoGasto && <EditarGastoModal gasto={editandoGasto} cuentas={props.cuentas.filter((c) => c.sucursal_id === editandoGasto.sucursal_id || (!editandoGasto.sucursal_id && c.empresa_id === editandoGasto.empresa_id))} cuadreGuardado={props.cierres.some((c) => c.sucursal_id === editandoGasto.sucursal_id && c.fecha === editandoGasto.fecha)} onClose={() => setEditandoGasto(null)} onSaved={(m) => { setEditandoGasto(null); setNotice(m); router.refresh(); }} />}
+    {editandoGasto && <EditarGastoModal gasto={editandoGasto} cuentas={props.cuentas.filter((c) => c.sucursal_id === editandoGasto.sucursal_id || (!editandoGasto.sucursal_id && c.empresa_id === editandoGasto.empresa_id))} cuentaAhorrosEmpresaId={props.cuentaAhorrosEmpresaId} cuadreGuardado={props.cierres.some((c) => c.sucursal_id === editandoGasto.sucursal_id && c.fecha === editandoGasto.fecha)} onClose={() => setEditandoGasto(null)} onSaved={(m) => { setEditandoGasto(null); setNotice(m); router.refresh(); }} />}
     {borrandoGasto && <BorrarGastoModal gasto={borrandoGasto} cuadreGuardado={props.cierres.some((c) => c.sucursal_id === borrandoGasto.sucursal_id && c.fecha === borrandoGasto.fecha)} onClose={() => setBorrandoGasto(null)} onSaved={(m) => { setBorrandoGasto(null); setNotice(m); router.refresh(); }} />}
-    {showGasto && <GastoModal empresaId={empresaVista} branches={branches} cuentas={cuentas} canSaldos={canSaldos} pending={pending} onClose={() => setShowGasto(false)} onSubmit={(form) => runAction(() => crearGasto(form), "Gasto registrado.")} />}
+    {showGasto && <GastoModal empresaId={empresaVista} branches={branches} cuentas={cuentas} cuentaAhorrosEmpresaId={props.cuentaAhorrosEmpresaId} canSaldos={canSaldos} pending={pending} onClose={() => setShowGasto(false)} onSubmit={(form) => runAction(() => crearGasto(form), "Gasto registrado.")} />}
     {showCierre && <CierreModal key={`${empresaVista}:${cierreSucursalId}:${cierreFecha}`} empresaId={empresaVista} branches={branches} initialSucursalId={cierreSucursalId || sucursalVista} initialFecha={cierreFecha || undefined} onClose={(message) => { setShowCierre(false); setCierreFecha(""); if (message) { setNotice(message); router.refresh(); } }} />}
   </div></main>;
 }
@@ -149,12 +149,13 @@ function SemanaCuadres({ cierres, onNuevoCuadre }: { cierres: CierreCaja[]; onNu
   </section>;
 }
 
-function GastoModal({ empresaId, branches, cuentas, canSaldos, pending, onClose, onSubmit }: { empresaId: string; branches: CajaData["branches"]; cuentas: CajaData["cuentas"]; canSaldos: boolean; pending: boolean; onClose: () => void; onSubmit: (form: FormData) => void }) {
+function GastoModal({ empresaId, branches, cuentas, cuentaAhorrosEmpresaId, canSaldos, pending, onClose, onSubmit }: { empresaId: string; branches: CajaData["branches"]; cuentas: CajaData["cuentas"]; cuentaAhorrosEmpresaId?: string; canSaldos: boolean; pending: boolean; onClose: () => void; onSubmit: (form: FormData) => void }) {
   const [origen, setOrigen] = useState<"caja" | "banco">("caja");
+  const [clasificacion, setClasificacion] = useState("gastos_operacion");
   return <div className="modal-backdrop"><section className="new-patient-modal" role="dialog" aria-modal="true" aria-labelledby="new-gasto-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button><p className="section-label">NUEVO GASTO</p><h2 id="new-gasto-title">Registrar egreso</h2><form onSubmit={(event) => { event.preventDefault(); onSubmit(new FormData(event.currentTarget)); }}><input type="hidden" name="empresa_id" value={empresaId} /><div className="new-patient-form">
     <label>Sucursal{origen === "caja" ? <select name="sucursal_id" required defaultValue=""><option value="" disabled>Selecciona la sucursal</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select> : <select name="sucursal_id" defaultValue=""><option value="">Gasto general de la empresa</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select>}</label>
     <label>Fecha<input name="fecha" type="date" defaultValue={today()} /></label>
-    <label>Clasificación<select name="clasificacion" defaultValue="gastos_operacion">{Object.entries(clasificacionLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+    <label>Clasificación<select name="clasificacion" value={clasificacion} onChange={(event) => setClasificacion(event.target.value)}>{Object.entries(clasificacionLabel).filter(([value]) => value !== "ahorros" || empresaId === cuentaAhorrosEmpresaId).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{clasificacion === "ahorros" && <small>El monto saldrá de la caja o cuenta elegida y quedará registrado en la única cuenta de ahorros Diners de Shuvisión.</small>}</label>
     <label>Concepto<input name="concepto" required placeholder="Ej.: Renta, OPTEC, marketing" /></label>
     <label>Monto<input name="monto" type="number" min="0.01" step="0.01" required /></label>
     <label>Origen<span className="radio-row"><label><input type="radio" name="origen" value="caja" checked={origen === "caja"} onChange={() => setOrigen("caja")} /> Caja (efectivo)</label>{canSaldos && <label><input type="radio" name="origen" value="banco" checked={origen === "banco"} onChange={() => setOrigen("banco")} /> Banco</label>}</span></label>
@@ -310,7 +311,7 @@ function AperturaCaja({ empresaId, sucursalId, fecha, vista, onSaved }: { empres
   </section>;
 }
 
-function EditarGastoModal({ gasto, cuentas, cuadreGuardado, onClose, onSaved }: { gasto: Gasto; cuentas: CajaData["cuentas"]; cuadreGuardado: boolean; onClose: () => void; onSaved: (m: string) => void }) {
+function EditarGastoModal({ gasto, cuentas, cuentaAhorrosEmpresaId, cuadreGuardado, onClose, onSaved }: { gasto: Gasto; cuentas: CajaData["cuentas"]; cuentaAhorrosEmpresaId?: string; cuadreGuardado: boolean; onClose: () => void; onSaved: (m: string) => void }) {
   const [origen, setOrigen] = useState<"caja" | "banco">(gasto.origen);
   const [montoTexto, setMontoTexto] = useState(String(gasto.monto));
   const [error, setError] = useState(""); const [pending, start] = useTransition();
@@ -325,7 +326,7 @@ function EditarGastoModal({ gasto, cuentas, cuadreGuardado, onClose, onSaved }: 
     {cuadreGuardado && <p className="notice"><AlertCircle size={16} /> El cuadre de caja de ese día ya se guardó con el valor anterior; el cambio se verá desde el siguiente cuadre.</p>}
     <form onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }}><div className="new-patient-form">
       <label>Fecha<input name="fecha" type="date" defaultValue={gasto.fecha} required /></label>
-      <label>Clasificación<select name="clasificacion" defaultValue={gasto.clasificacion}>{Object.entries(clasificacionLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <label>Clasificación<select name="clasificacion" defaultValue={gasto.clasificacion}>{Object.entries(clasificacionLabel).filter(([value]) => value !== "ahorros" || gasto.empresa_id === cuentaAhorrosEmpresaId).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{gasto.empresa_id === cuentaAhorrosEmpresaId && <small>Los egresos clasificados como Ahorros actualizan el saldo registrado de Diners.</small>}</label>
       <label>Concepto<input name="concepto" defaultValue={gasto.concepto} required /></label>
       <label>Monto<input name="monto" inputMode="decimal" value={montoTexto} onChange={(e) => setMontoTexto(montoInput(e.target.value))} required /></label>
       <label>Origen<span className="radio-row"><label><input type="radio" name="origen" value="caja" checked={origen === "caja"} onChange={() => setOrigen("caja")} /> Caja (efectivo)</label><label><input type="radio" name="origen" value="banco" checked={origen === "banco"} onChange={() => setOrigen("banco")} /> Banco</label></span></label>

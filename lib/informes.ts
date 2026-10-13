@@ -14,7 +14,7 @@ export type InformeMensual = {
 export type InformesCompany = { id: string; nombre: string };
 export type InformesProfile = { id: string; empresa_id: string; rol: string };
 export type DineroDisponible = { sucursal_id: string; sucursal_nombre: string; estado: "listo" | "pendiente"; cuentas_sin_cuadre: number; bancos: number; tarjetas_por_acreditar?: number; efectivo: number | null; total: number | null };
-export type InformesData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: InformesProfile; companies: InformesCompany[]; dineroDisponible?: DineroDisponible[] };
+export type InformesData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: InformesProfile; companies: InformesCompany[]; dineroDisponible?: DineroDisponible[]; ahorrosDiners?: { empresa_id: string; saldo: number; registros: number } | null };
 
 const informesRoles = new Set(["superadmin", "admin_sucursal"]);
 const roleName = (roles: { nombre: string } | { nombre: string }[] | null) => Array.isArray(roles) ? roles[0]?.nombre : roles?.nombre;
@@ -35,12 +35,17 @@ export async function getInformesData(): Promise<InformesData> {
 
     // Dinero disponible (bancos desde el último cuadre + efectivo de caja): solo la superadmin.
     let dineroDisponible: DineroDisponible[] = [];
+    let ahorrosDiners: InformesData["ahorrosDiners"] = null;
     if (role === "superadmin") {
-      const { data, error } = await supabase.rpc("dinero_disponible", { p_fecha: null });
-      if (!error && Array.isArray(data)) dineroDisponible = data as DineroDisponible[];
+      const [disponibleResult, ahorroResult] = await Promise.all([
+        supabase.rpc("dinero_disponible", { p_fecha: null }),
+        supabase.rpc("resumen_ahorros_diners"),
+      ]);
+      if (!disponibleResult.error && Array.isArray(disponibleResult.data)) dineroDisponible = disponibleResult.data as DineroDisponible[];
+      if (!ahorroResult.error && ahorroResult.data) ahorrosDiners = ahorroResult.data as InformesData["ahorrosDiners"];
     }
 
-    return { status: "ready", profile: { id: profile.id, empresa_id: profile.empresa_id, rol: role }, companies: companies ?? [], dineroDisponible };
+    return { status: "ready", profile: { id: profile.id, empresa_id: profile.empresa_id, rol: role }, companies: companies ?? [], dineroDisponible, ahorrosDiners };
   } catch {
     return { status: "error", message: "La conexión de informes no está disponible.", companies: [] };
   }

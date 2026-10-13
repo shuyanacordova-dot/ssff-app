@@ -588,6 +588,8 @@ button.informe-card:hover { border-color: #a9ccc5; background: #f4fbf8; transfor
 .informe-card.egreso .informe-card-valor { color: #9a4050; }
 .informe-card-ver { display: inline-flex; align-items: center; gap: 2px; color: #1c6259; font-size: 11px; font-weight: 800; }
 .informe-kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; margin-top: 8px; }
+.informe-sucursal-card { grid-template-columns: minmax(0, 1fr); }
+.informe-sucursal-card .task-main { min-width: 0; }
 .informe-kv > span, .informe-kv > button { display: grid; gap: 3px; min-width: 0; border: 1px solid #e3ebf1; border-radius: 12px; padding: 9px 11px; color: #34455c; background: #f5f8fb; text-align: left; font: inherit; }
 .informe-kv > button { cursor: pointer; }
 .informe-kv > button:hover { border-color: #a9ccc5; background: #f2faf7; }
