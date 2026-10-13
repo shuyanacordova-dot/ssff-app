@@ -9,9 +9,13 @@ const tarjetas: Record<string, { titulo: string; descripcion: string; imagen: st
   "control-focus": { titulo: "Tu control visual · Focus Óptica", descripcion: "Examen de control gratis para nuestros pacientes.", imagen: `${SITIO}/tarjeta-imagen/control-focus`, optica: "Focus Óptica" },
 };
 
+// WhatsApp no muestra la imagen de la vista previa si pesa demasiado (las originales pesan casi 2 MB):
+// se sirve una versión ligera (JPG, máx. 1000 px, ~90 KB) con el mismo contenido.
+const ligera = (url: string) => url.includes("res.cloudinary.com") ? url.replace("/image/upload/", "/image/upload/c_limit,w_1000,h_1000,q_auto:good,f_jpg/") : url;
+
 export async function generateMetadata({ params }: { params: Promise<{ clave: string }> }): Promise<Metadata> {
   const t = tarjetas[(await params).clave] ?? tarjetas["cumple-shuvision"];
-  return { title: t.titulo, description: t.descripcion, robots: { index: false }, openGraph: { title: t.titulo, description: t.descripcion, images: [{ url: t.imagen, width: 1200, height: 630 }], type: "website" }, twitter: { card: "summary_large_image", images: [t.imagen] } };
+  return { title: t.titulo, description: t.descripcion, robots: { index: false }, openGraph: { title: t.titulo, description: t.descripcion, images: [{ url: ligera(t.imagen) }], type: "website" }, twitter: { card: "summary_large_image", images: [ligera(t.imagen)] } };
 }
 
 export default async function Tarjeta({ params }: { params: Promise<{ clave: string }> }) {
@@ -19,7 +23,7 @@ export default async function Tarjeta({ params }: { params: Promise<{ clave: str
   return <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 16, background: "#f6f1e7" }}>
     <div style={{ maxWidth: 640, width: "100%", textAlign: "center" }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={t.imagen} alt={t.titulo} style={{ width: "100%", borderRadius: 18 }} />
+      <img src={ligera(t.imagen)} alt={t.titulo} style={{ width: "100%", borderRadius: 18 }} />
       <h1 style={{ fontSize: 24, margin: "16px 0 6px" }}>{t.titulo}</h1>
       <p>{t.descripcion}</p>
     </div>

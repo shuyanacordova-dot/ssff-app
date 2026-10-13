@@ -10,6 +10,7 @@ import { enlaceWhatsapp } from "@/lib/whatsapp";
 import { ColaCobrosHoy } from "@/app/cuentas-cobrar/cuentas-cobrar-board";
 import { configurarMensajesAutomaticos, guardarResenaUrl, marcarMensajeDia } from "./actions";
 import PlantillasPanel from "./plantillas-panel";
+import BotonNoContactar from "@/app/no-contactar-button";
 import { renderPlantilla } from "@/lib/plantillas-mensajes";
 
 type Tab = "cobros" | "cumpleanos" | "controles" | "entregas" | "plantillas";
@@ -69,7 +70,9 @@ export default function MensajesBoard(props: MensajesDiaData) {
 
 type Item = { id: string; nombre: string; telefono: string | null; enviadoEn: string | null; auto: boolean; referencia: string | null; detalle: string; badges: string[]; mensaje: string; imagen?: string };
 
-function Lista({ titulo, ayuda, vacio, items, motivo, empresaId, sucursalId }: { titulo: string; ayuda: string; vacio: string; items: Item[]; motivo: "cumpleanos" | "control" } & MensajesDiaData) {
+function Lista({ titulo, ayuda, vacio, items: todos, motivo, empresaId, sucursalId }: { titulo: string; ayuda: string; vacio: string; items: Item[]; motivo: "cumpleanos" | "control" } & MensajesDiaData) {
+  const [sinContacto, setSinContacto] = useState<string[]>([]);
+  const items = todos.filter((i) => !sinContacto.includes(i.id));
   const [enviados, setEnviados] = useState<string[]>([]);
   const [verMensaje, setVerMensaje] = useState<string | null>(null);
   const [aviso, setAviso] = useState("");
@@ -123,6 +126,7 @@ function Lista({ titulo, ayuda, vacio, items, motivo, empresaId, sucursalId }: {
         <div className="cob-row-action">
           <button className="text-action" type="button" onClick={() => setVerMensaje(verMensaje === item.id ? null : item.id)}><Eye size={14} /> {verMensaje === item.id ? "Ocultar" : "Ver mensaje"}</button>
           <Link className="text-action" href={`/pacientes?buscar=${encodeURIComponent(item.nombre.trim())}`}><FolderOpen size={14} /> Carpeta</Link>
+          <BotonNoContactar pacienteId={item.id} nombre={item.nombre} onDone={() => setSinContacto((prev) => [...prev, item.id])} />
           {!hecho && (tieneWhatsapp
             ? <><button className="new-consultation" type="button" onClick={() => marcar(item, true)}><MessageCircle size={14} /> Enviar por WhatsApp</button>{item.imagen && puedeCompartir && <button className="outline-action" type="button" disabled={compartiendo === item.id} onClick={() => void compartirImagen(item)}>Con imagen</button>}</>
             : <><span>Sin WhatsApp registrado</span><button className="outline-action" type="button" onClick={() => marcar(item, false)}>Marcar como avisado</button></>)}
@@ -132,8 +136,10 @@ function Lista({ titulo, ayuda, vacio, items, motivo, empresaId, sucursalId }: {
   </section>;
 }
 
-function EntregasLista({ entregas, resenaUrl, esSuperadmin, empresaId, sucursalId }: MensajesDiaData) {
+function EntregasLista({ entregas: todasEntregas, resenaUrl, esSuperadmin, empresaId, sucursalId }: MensajesDiaData) {
   const router = useRouter();
+  const [sinContacto, setSinContacto] = useState<string[]>([]);
+  const entregas = todasEntregas.filter((e) => !sinContacto.includes(e.paciente_id));
   const [hechos, setHechos] = useState<Record<string, "postventa" | "resena">>({});
   const [guardando, setGuardando] = useState<string | null>(null);
   const [url, setUrl] = useState(resenaUrl ?? "");
@@ -168,6 +174,7 @@ function EntregasLista({ entregas, resenaUrl, esSuperadmin, empresaId, sucursalI
       return <article className="cob-row" key={item.orden_id} style={resena ? { opacity: 0.6 } : undefined}>
         <div className="cob-row-main"><h3>{item.nombre}</h3><span className="cob-badge">{resena ? "Reseña enviada" : postventa ? "Postventa hecha" : "Pendiente de postventa"}</span><p>Entregados el {fecha(item.entregado)}{item.telefono ? ` · ${item.telefono}` : ""}</p>{postventa && <p>Ya se le preguntó el {item.postventa_en ? fecha(item.postventa_en) : "día de hoy"}</p>}</div>
         <div className="cob-row-action"><Link className="text-action" href={`/pacientes?buscar=${encodeURIComponent(item.nombre.trim())}`}><FolderOpen size={14} /> Carpeta</Link>
+          <BotonNoContactar pacienteId={item.paciente_id} nombre={item.nombre} onDone={() => setSinContacto((prev) => [...prev, item.paciente_id])} />
           {!resena && (tieneWhatsapp ? <button className="new-consultation" type="button" disabled={guardando === item.orden_id || (!!postventa && !resenaUrl)} onClick={() => registrar(item, postventa ? "resena" : "postventa", true)}>{postventa ? "Todo bien · enviar link de reseña" : "Preguntar cómo está"}</button> : <><span>Sin WhatsApp registrado</span><button className="outline-action" type="button" disabled={guardando === item.orden_id || (!!postventa && !resenaUrl)} onClick={() => registrar(item, postventa ? "resena" : "postventa", false)}>Marcar como hecho</button></>)}
           {postventa && !resena && !resenaUrl && <p className="notice">Falta el link de reseñas de esta sucursal</p>}
         </div>

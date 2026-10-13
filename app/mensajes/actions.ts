@@ -35,3 +35,17 @@ export async function configurarMensajesAutomaticos(input: { empresaId: string; 
   if (error) throw new Error(error.message || "No se pudo guardar la configuración.");
   revalidatePath("/mensajes");
 }
+
+// "No contactar": el paciente sale de todas las colas de contacto (cobros, cumpleaños, controles, seguimiento y CRM).
+export async function marcarNoContactar(pacienteId: string, valor: boolean, motivo?: string) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("marcar_no_contactar", { p_paciente: pacienteId, p_valor: valor, p_motivo: motivo ?? null });
+  if (error) throw new Error(error.message || "No se pudo actualizar el paciente.");
+  for (const ruta of ["/", "/mensajes", "/cuentas-cobrar", "/crm", "/pacientes"]) revalidatePath(ruta);
+}
+
+export async function estadoNoContactar(pacienteId: string): Promise<{ no_contactar: boolean; motivo: string | null; en: string | null }> {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.from("pacientes_clinicos").select("no_contactar,no_contactar_motivo,no_contactar_en").eq("id", pacienteId).maybeSingle();
+  return { no_contactar: !!data?.no_contactar, motivo: data?.no_contactar_motivo ?? null, en: data?.no_contactar_en ?? null };
+}

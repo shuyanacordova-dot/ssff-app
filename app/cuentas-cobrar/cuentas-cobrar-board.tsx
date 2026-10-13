@@ -3,6 +3,7 @@ import { paymentMethodLabels } from "@/lib/payment-methods";
 import { printDocumentById } from "@/lib/print-document";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, CircleAlert, Copy, FileText, FlaskConical, MessageCircle, MoreVertical, PackageCheck, Printer, Repeat, Tag, Wallet, X } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { CategoriaDeuda, CuentasCobrarData, DeudaPaciente, EmpresaConvenio, LenteRezagado, CobroHoy } from "@/lib/cuentas-cobrar";
@@ -14,6 +15,7 @@ import { enlaceWhatsapp } from "@/lib/whatsapp";
 import { buscarTitularConvenio, crearAcuerdoPago, crearEmpresaConvenio, type AcuerdoPago, type PersonaTitular } from "@/app/ventas/convenio-actions";
 import { cambiarCobroAutomatico, activarCobroInsistente, actualizarFrecuenciaCobro, clasificarDeuda, titularSugeridoConvenio, vincularConvenio, fijarFechaCobro, marcarApartado, marcarMensajeCobro, registrarCanje } from "./actions";
 import Letterhead from "../print-letterhead";
+import BotonNoContactar from "@/app/no-contactar-button";
 import { TodasSucursalesToggle, useTodasSucursales } from "@/app/todas-sucursales-toggle";
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
@@ -165,12 +167,13 @@ export function ColaCobrosHoy({ cola, sucursalId, sucursalNombre, error }: { col
     {pendientes.length ? <div className="cob-list">{pendientes.map((row, index) => {
       const tieneWhatsapp = !!enlaceWhatsapp(row.telefono, "");
       const fecha = row.ultimo_mensaje ? new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "2-digit" }).format(new Date(row.ultimo_mensaje)) : null;
-      return <article className="cob-row" key={row.paciente_id}><div className="cob-row-main"><h3>{row.nombres} {row.apellidos}</h3><span className={row.cobro_insistente ? "cob-badge cob-badge-urgent" : "cob-badge"}>{row.motivo}</span><span className="cob-badge">{row.apartado && !row.cobro_insistente ? "Apartado" : plantillaSugerida({ insistente: row.cobro_insistente, apartado: row.apartado, frecuencia: row.frecuencia, dias: row.dias_deuda }) === "cobro_insistente" ? "Firme" : "Recordatorio"}</span><p>Último mensaje: {fecha ?? "Nunca"}</p></div><div className="cob-row-action"><strong>{money(Number(row.saldo))}</strong>{tieneWhatsapp ? <button className={`new-consultation${index === 0 ? " cob-next-button" : ""}`} type="button" disabled={!!procesando || !sucursalId} onClick={() => enviar(row, true)}><MessageCircle size={14} /> Enviar por WhatsApp</button> : <><span>Sin WhatsApp registrado</span><button className={`outline-action${index === 0 ? " cob-next-button" : ""}`} type="button" disabled={!!procesando || !sucursalId} onClick={() => enviar(row, false)}>Marcar como avisado</button></>}</div></article>;
+      return <article className="cob-row" key={row.paciente_id}><div className="cob-row-main"><h3>{row.nombres} {row.apellidos}</h3><span className={row.cobro_insistente ? "cob-badge cob-badge-urgent" : "cob-badge"}>{row.motivo}</span><span className="cob-badge">{row.apartado && !row.cobro_insistente ? "Apartado" : plantillaSugerida({ insistente: row.cobro_insistente, apartado: row.apartado, frecuencia: row.frecuencia, dias: row.dias_deuda }) === "cobro_insistente" ? "Firme" : "Recordatorio"}</span><p>Último mensaje: {fecha ?? "Nunca"}</p></div><div className="cob-row-action"><strong>{money(Number(row.saldo))}</strong><BotonNoContactar pacienteId={row.paciente_id} nombre={`${row.nombres} ${row.apellidos}`} onDone={() => setOcultos((prev) => [...prev, row.paciente_id])} />{tieneWhatsapp ? <button className={`new-consultation${index === 0 ? " cob-next-button" : ""}`} type="button" disabled={!!procesando || !sucursalId} onClick={() => enviar(row, true)}><MessageCircle size={14} /> Enviar por WhatsApp</button> : <><span>Sin WhatsApp registrado</span><button className={`outline-action${index === 0 ? " cob-next-button" : ""}`} type="button" disabled={!!procesando || !sucursalId} onClick={() => enviar(row, false)}>Marcar como avisado</button></>}</div></article>;
     })}</div> : <p className="cob-empty">No quedan mensajes de cobro para esta sucursal hoy.</p>}
   </section>;
 }
 
 function DeudaCard({ deuda, sucursalActivaId, usuarioNombre, onMensaje, pending, onCanje, onApartado, mostrarCategoria, onClasificar, onFrecuencia, onCobroInsistente, onConvenio }: { deuda: DeudaPaciente; sucursalActivaId?: string; usuarioNombre: string; onMensaje: () => void; pending: boolean; onCanje?: () => void; onApartado: () => void; mostrarCategoria: boolean; onClasificar: (categoria: string) => void; onFrecuencia: (frecuencia: string) => void; onCobroInsistente: (activo: boolean) => void; onConvenio: () => void }) {
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [origin, setOrigin] = useState("");
   const [plantilla, setPlantilla] = useState<PlantillaContactoId>(() => plantillaSugerida({ rezagado: deuda.categoria === "rezagados", insistente: deuda.cobro_insistente, apartado: deuda.categoria === "apartados", frecuencia: deuda.frecuencia_cobro as "diaria" | "semanal" | "quincenal" | "mensual" | null, dias: deuda.dias_mas_antigua }));
@@ -192,7 +195,7 @@ function DeudaCard({ deuda, sucursalActivaId, usuarioNombre, onMensaje, pending,
   const mensaje = construirMensajeContacto(plantilla, { nombre: deuda.nombres, empresa: deuda.empresa_nombre, saldo: deuda.saldo_total, ticketUrl, fechaCompra, apartadoHasta: apartado?.venta.apartado_hasta, frecuencia: deuda.frecuencia_cobro as "diaria" | "semanal" | "quincenal" | "mensual" | null, sucursal: deuda.sucursales[0] });
   const registrar = () => { const sucursal = [...deuda.ventas].sort((a, b) => b.creado_en.localeCompare(a.creado_en))[0]?.sucursal_id ?? sucursalActivaId; if (!sucursal) return; onMensaje(); void marcarMensajeCobro(deuda.paciente_id, sucursal).catch(() => {}); };
   const guardarFecha = (fecha: string | null) => startFecha(async () => { try { await fijarFechaCobro(deuda.paciente_id, fecha); setFechaCobro(fecha ?? ""); setVerFecha(false); } catch (err) { setFechaError(err instanceof Error ? err.message : "No se pudo guardar la fecha."); } });
-  const wa = enlaceWhatsapp(deuda.telefono, mensaje);
+  const wa = deuda.no_contactar ? null : enlaceWhatsapp(deuda.telefono, mensaje);
   const closeMenu = () => setMenuOpen(false);
   const copiarMensaje = async () => {
     try { await navigator.clipboard.writeText(mensaje); registrar(); setCopied(true); window.setTimeout(() => setCopied(false), 1800); }
@@ -202,7 +205,7 @@ function DeudaCard({ deuda, sucursalActivaId, usuarioNombre, onMensaje, pending,
   useEffect(() => { if (!menuOpen) return; const onClick = (event: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(event.target as Node)) closeMenu(); }; document.addEventListener("mousedown", onClick); return () => document.removeEventListener("mousedown", onClick); }, [menuOpen]);
 
   return <article className="task-card"><div className="task-status" /><div className="task-main">
-    <div className="task-meta"><span className="branch-meta" style={{ fontSize: 13 }}>{deuda.sucursales.join(" · ")}</span><span className={deuda.dias_mas_antigua > DIAS_URGENTE ? "urgente" : ""}>{deuda.dias_mas_antigua === 0 ? "Hoy" : deuda.dias_mas_antigua === 1 ? "Ayer" : `${deuda.dias_mas_antigua} días`}</span>{mostrarCategoria && <span>{categoriaLabel(deuda.categoria)}{deuda.categoria_manual ? " (manual)" : ""}</span>}{deuda.convenio && <span>{deuda.convenio.empresa === "Financiamiento con la óptica" ? deuda.convenio.empresa : `Convenio ${deuda.convenio.empresa}`} · {deuda.convenio.cuotas} cuotas de {money(deuda.convenio.monto_cuota)}{deuda.convenio.titular && deuda.convenio.titular.toLowerCase() !== `${deuda.nombres} ${deuda.apellidos}`.trim().toLowerCase() ? ` · Firma: ${deuda.convenio.titular}` : ""}</span>}{apartado && <span className={apartado.vencido ? "urgente" : ""}><Tag size={11} /> {apartado.texto}</span>}{deuda.cobro_insistente && <span className="urgente"><AlertTriangle size={11} /> Cobro insistente</span>}{fechaCobro && <span className="state-pill">Cobrar el {new Intl.DateTimeFormat("es-EC", { day: "numeric", month: "short", timeZone: "America/Guayaquil" }).format(new Date(`${fechaCobro}T12:00:00-05:00`))}</span>}</div>
+    <div className="task-meta"><span className="branch-meta" style={{ fontSize: 13 }}>{deuda.sucursales.join(" · ")}</span>{deuda.no_contactar && <span className="urgente">No contactar</span>}<span className={deuda.dias_mas_antigua > DIAS_URGENTE ? "urgente" : ""}>{deuda.dias_mas_antigua === 0 ? "Hoy" : deuda.dias_mas_antigua === 1 ? "Ayer" : `${deuda.dias_mas_antigua} días`}</span>{mostrarCategoria && <span>{categoriaLabel(deuda.categoria)}{deuda.categoria_manual ? " (manual)" : ""}</span>}{deuda.convenio && <span>{deuda.convenio.empresa === "Financiamiento con la óptica" ? deuda.convenio.empresa : `Convenio ${deuda.convenio.empresa}`} · {deuda.convenio.cuotas} cuotas de {money(deuda.convenio.monto_cuota)}{deuda.convenio.titular && deuda.convenio.titular.toLowerCase() !== `${deuda.nombres} ${deuda.apellidos}`.trim().toLowerCase() ? ` · Firma: ${deuda.convenio.titular}` : ""}</span>}{apartado && <span className={apartado.vencido ? "urgente" : ""}><Tag size={11} /> {apartado.texto}</span>}{deuda.cobro_insistente && <span className="urgente"><AlertTriangle size={11} /> Cobro insistente</span>}{fechaCobro && <span className="state-pill">Cobrar el {new Intl.DateTimeFormat("es-EC", { day: "numeric", month: "short", timeZone: "America/Guayaquil" }).format(new Date(`${fechaCobro}T12:00:00-05:00`))}</span>}</div>
     <h2>{nombre}</h2>
     <p>Saldo pendiente: <strong>{money(deuda.saldo_total)}</strong></p><p>{deuda.ultimo_mensaje ? <>Último mensaje: {formatDate(deuda.ultimo_mensaje)}{deuda.ultimo_mensaje_por ? ` · ${deuda.ultimo_mensaje_por}` : ""}{new Intl.DateTimeFormat("en-CA", { timeZone: "America/Guayaquil", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(deuda.ultimo_mensaje)) === hoyEcuador() && <span className="state-pill aprobada" style={{ marginLeft: 8 }}>Contactado hoy</span>}</> : "Sin contactar"}</p>
     <div className="collection-controls">
@@ -230,6 +233,7 @@ function DeudaCard({ deuda, sucursalActivaId, usuarioNombre, onMensaje, pending,
         <button type="button" onClick={() => { onApartado(); closeMenu(); }}><Tag size={14} /> {apartado ? "Quitar apartado" : "Marcar como apartado"}</button>
         <button type="button" onClick={() => { setVerFecha(true); closeMenu(); }}>Fecha de cobro</button>
         <button type="button" onClick={() => { onConvenio(); closeMenu(); }}><FileText size={14} /> Convenio de pago</button>
+        <BotonNoContactar className="danger" pacienteId={deuda.paciente_id} nombre={nombre} onDone={() => { closeMenu(); router.refresh(); }} />
         <button type="button" className={deuda.cobro_insistente ? "danger" : ""} onClick={() => { onCobroInsistente(!deuda.cobro_insistente); closeMenu(); }}><AlertTriangle size={14} /> {deuda.cobro_insistente ? "Quitar cobro insistente" : "Activar cobro insistente"}</button>
       </div>}
     </div>

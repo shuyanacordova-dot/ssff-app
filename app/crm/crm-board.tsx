@@ -9,6 +9,7 @@ import { enlaceWhatsapp } from "@/lib/whatsapp";
 import { mensajeLentesListos } from "@/lib/mensajes";
 import { formatRecordDate } from "@/lib/record-date";
 import { registrarContactoCrm } from "./actions";
+import BotonNoContactar from "@/app/no-contactar-button";
 
 const motivos: CrmMotivo[] = ["examen_sin_compra", "lentes_listos", "control", "postventa", "cumpleanos", "inactivo"];
 
@@ -43,7 +44,8 @@ export default function CrmBoard(props: CrmData) {
   const [registrando, setRegistrando] = useState<CrmItem | null>(null);
   const [notice, setNotice] = useState("");
   const counts = useMemo(() => Object.fromEntries(motivos.map((m) => [m, props.items.filter((i) => i.motivo === m).length])) as Record<CrmMotivo, number>, [props.items]);
-  const visibles = props.items.filter((i) => i.motivo === tab);
+  const [sinContacto, setSinContacto] = useState<string[]>([]);
+  const visibles = props.items.filter((i) => i.motivo === tab && !sinContacto.includes(i.paciente_id));
 
   if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">RELACIÓN CON PACIENTES</p><h1>CRM</h1><p className="subtitle">{props.message ?? "No se pudo abrir el CRM."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/crm">Iniciar sesión</Link>}</header></div></main>;
 
@@ -65,6 +67,7 @@ export default function CrmBoard(props: CrmData) {
           <div className="task-actions">
             {wa ? <a className="outline-action" href={wa} target="_blank" rel="noreferrer"><MessageCircle size={14} /> WhatsApp</a> : <span className="field-hint">Sin teléfono</span>}
             <button className="outline-action" type="button" onClick={() => setRegistrando(item)}><NotebookPen size={14} /> Registrar contacto</button>
+            <BotonNoContactar pacienteId={item.paciente_id} nombre={item.nombre} onDone={() => setSinContacto((prev) => [...prev, item.paciente_id])} />
             <Link className="text-action" href={`/pacientes?buscar=${encodeURIComponent(item.nombre.trim())}`}><FolderOpen size={14} /> Abrir carpeta</Link>
           </div>
         </article>;

@@ -5,6 +5,8 @@ import { MessageCircle, NotebookPen } from "lucide-react";
 import { obtenerHistorialCrm, registrarContactoCrm, type ContactoCrm } from "@/app/crm/actions";
 import { formatRecordDate } from "@/lib/record-date";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
+import { estadoNoContactar, marcarNoContactar } from "@/app/mensajes/actions";
+import BotonNoContactar from "@/app/no-contactar-button";
 
 const motivoLabel: Record<string, string> = { control: "Control", examen_sin_compra: "Examen sin compra", lentes_listos: "Lentes listos", postventa: "Postventa", cumpleanos: "Cumpleaños", inactivo: "Inactivo", otro: "Otro" };
 const canalLabel: Record<string, string> = { whatsapp: "WhatsApp", llamada: "Llamada", presencial: "Presencial" };
@@ -17,13 +19,26 @@ export default function ComunicacionesPanel({ pacienteId, empresaId, sucursalId,
   const [pending, startTransition] = useTransition();
   const cargar = useCallback(() => { obtenerHistorialCrm(pacienteId).then(setContactos).catch(() => setContactos([])); }, [pacienteId]);
   useEffect(() => { setContactos(null); cargar(); }, [cargar]);
-  const wa = enlaceWhatsapp(telefono, "");
+  const [bloqueo, setBloqueo] = useState<{ no_contactar: boolean; motivo: string | null; en: string | null } | null>(null);
+  const [bloqueoError, setBloqueoError] = useState("");
+  const cargarBloqueo = useCallback(() => { estadoNoContactar(pacienteId).then(setBloqueo).catch(() => setBloqueo({ no_contactar: false, motivo: null, en: null })); }, [pacienteId]);
+  useEffect(() => { setBloqueo(null); cargarBloqueo(); }, [cargarBloqueo]);
+  const permitirContacto = () => startTransition(async () => {
+    setBloqueoError("");
+    try { await marcarNoContactar(pacienteId, false); cargarBloqueo(); }
+    catch (err) { setBloqueoError(err instanceof Error ? err.message : "No se pudo actualizar."); }
+  });
+  const noContactar = !!bloqueo?.no_contactar;
+  const wa = noContactar ? null : enlaceWhatsapp(telefono, "");
 
   return <section className="clinical-content history-list">
     <div className="tab-actions">
       <button className="new-consultation" type="button" onClick={() => setFormOpen((v) => !v)}><NotebookPen size={17} /> Registrar contacto</button>
       {wa && <a className="outline-action" href={wa} target="_blank" rel="noreferrer"><MessageCircle size={15} /> Abrir WhatsApp</a>}
+      {bloqueo && !noContactar && <BotonNoContactar className="outline-action" pacienteId={pacienteId} nombre="este paciente" onDone={cargarBloqueo} />}
     </div>
+    {noContactar && <div className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 700, flexWrap: "wrap", gap: 8 }}><span>NO CONTACTAR{bloqueo?.motivo ? ` · ${bloqueo.motivo}` : ""}{bloqueo?.en ? ` · desde ${formatRecordDate(bloqueo.en)}` : ""}. No aparece en cobros, cumpleaños, controles ni seguimiento.</span><button className="outline-action" type="button" disabled={pending} onClick={permitirContacto}>Volver a permitir contacto</button></div>}
+    {bloqueoError && <p className="notice" role="alert">{bloqueoError}</p>}
     {formOpen && <form className="new-patient-form glass" style={{ padding: 14, marginBottom: 12 }} onSubmit={(event) => {
       event.preventDefault(); setError("");
       const form = new FormData(event.currentTarget);
