@@ -97,7 +97,7 @@ export async function editarGasto(form: FormData): Promise<{ ok: true } | { ok: 
     p_observaciones: text(form, "observaciones") || null, p_motivo: text(form, "motivo") || null,
   });
   if (error) return { ok: false, error: error.message };
-  revalidatePath("/caja"); revalidatePath("/resumen-dia"); revalidatePath("/mi-espacio/bancos");
+  revalidatePath("/caja"); revalidatePath("/resumen-dia"); revalidatePath("/mi-espacio/bancos"); revalidatePath("/informes");
   return { ok: true };
 }
 

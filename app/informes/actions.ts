@@ -1,6 +1,8 @@
 "use server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/current-user";
+import type { CuentaBancaria, Gasto } from "@/lib/caja";
 
 import type { InformeMensual } from "@/lib/informes";
 export type { InformeMensual, InformeSucursal } from "@/lib/informes";
@@ -23,6 +25,31 @@ export async function establecerMetaVenta(empresaId: string, sucursalId: string,
 export type TipoDesglose = "ventas" | "saldo" | "cxc" | "cobros" | "gastos" | "cuadres";
 export type FilaDesglose = Record<string, string | number | boolean | null>;
 export type DesgloseInforme = { tipo: TipoDesglose; filas: FilaDesglose[]; categorias: string[] };
+export type EgresoParaEditar = { gasto: Gasto; cuentas: CuentaBancaria[]; cuadreGuardado: boolean };
+
+export async function obtenerEgresoParaEditar(gastoId: string): Promise<EgresoParaEditar> {
+  const supabase = await createSupabaseServerClient();
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Inicia sesión para editar egresos.");
+  const { data: profile, error: profileError } = await supabase.from("usuarios").select("activo,roles(nombre)").eq("auth_user_id", user.id).maybeSingle();
+  const roles = profile?.roles as { nombre: string } | { nombre: string }[] | null | undefined;
+  const rol = Array.isArray(roles) ? roles[0]?.nombre : roles?.nombre;
+  if (profileError || !profile?.activo || rol !== "superadmin") throw new Error("Solo la Superadministradora puede editar egresos.");
+  const { data: gasto, error: gastoError } = await supabase.from("gastos")
+    .select("id,empresa_id,sucursal_id,fecha,clasificacion,concepto,monto,origen,cuenta_bancaria_id,observaciones,creado_en")
+    .eq("id", gastoId).maybeSingle();
+  if (gastoError || !gasto) throw new Error("No se encontró el egreso.");
+  const [cuentasResult, cierresResult] = await Promise.all([
+    supabase.from("cuentas_bancarias").select("id,empresa_id,sucursal_id,banco,saldo_actual").eq("empresa_id", gasto.empresa_id).eq("activo", true),
+    gasto.sucursal_id ? supabase.from("cierres_caja").select("id").eq("sucursal_id", gasto.sucursal_id).eq("fecha", gasto.fecha).limit(1) : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (cuentasResult.error || cierresResult.error) throw new Error("No se pudieron cargar los datos del egreso.");
+  return {
+    gasto: gasto as Gasto,
+    cuentas: (cuentasResult.data ?? []).filter((cuenta) => cuenta.sucursal_id === gasto.sucursal_id || (!gasto.sucursal_id && cuenta.empresa_id === gasto.empresa_id)) as CuentaBancaria[],
+    cuadreGuardado: (cierresResult.data ?? []).length > 0,
+  };
+}
 
 export async function obtenerDesgloseInforme(empresaId: string | null, mes: string, tipo: TipoDesglose) {
   const supabase = await createSupabaseServerClient();

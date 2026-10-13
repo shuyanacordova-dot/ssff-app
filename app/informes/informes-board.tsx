@@ -92,7 +92,7 @@ export default function InformesBoard(props: InformesData) {
       </section>}
 
       <section className="glass agenda-board" style={{ marginBottom: 18 }}>
-        <div className="informe-section-head"><div><p className="section-label">GASTOS POR CLASIFICACIÓN</p><h2>Egresos del mes</h2></div><button type="button" className="outline-action no-print" onClick={() => setDesglose("gastos")}>Ver egresos y clasificar <ChevronRight size={14} /></button></div>
+        <div className="informe-section-head"><div><p className="section-label">GASTOS POR CLASIFICACIÓN</p><h2>Egresos del mes</h2></div><button type="button" className="outline-action no-print" onClick={() => setDesglose("gastos")}>Ver y editar egresos <ChevronRight size={14} /></button></div>
         {informe.gastos_por_clasificacion.length ? <div className="informe-kv">{informe.gastos_por_clasificacion.map((g) => <button type="button" key={g.clasificacion} onClick={() => setDesglose("gastos")}><small>{clasificacionLabel[g.clasificacion] ?? g.clasificacion}</small><b>{money(g.monto)}</b></button>)}</div> : <p className="field-hint">Sin gastos registrados este mes.</p>}
       </section>
 
