@@ -15,14 +15,14 @@ export const primerNombre = (nombre: string) => { const n = nombre.trim().split(
 export function mensajeCumpleanos(nombre: string, empresaId?: string | null) {
   if (esFocus(empresaId)) return `*FOCUS ÓPTICA | Un detalle para ti*\n\n${primerNombre(nombre) || "Hola"}, feliz cumpleaños. Que este nuevo año te traiga momentos que valga la pena mirar de cerca.\n\nTienes *15% de descuento* en tu próxima compra y *limpieza y ajuste sin costo* para tus lentes. Puedes usar estos beneficios durante los próximos 30 días en Focus Óptica, Shushufindi.\n\nSi quieres venir, responde aquí y coordinamos tu visita.\n\nFocus Óptica`;
   const optica = opticaDeEmpresa(empresaId);
-  return `¡Feliz cumpleaños, ${primerNombre(nombre) || "querido paciente"}! 🎂💙\n\nTodo el equipo de *${optica}* te desea un día lleno de alegría. Nos encanta acompañarte en cada etapa de tu vida y hoy queremos celebrarte.\n\n*Tu regalo de cumpleaños*\n👓 Ajuste de lentes sin costo.\n🎁 15% de descuento en cualquier compra en nuestra óptica.\n\nPuedes disfrutarlo durante *un mes desde hoy*. Si renuevas armazón y lunas con calidad equivalente, mantendremos el precio de tus lentes como beneficio de paciente. Escríbenos y te ayudamos a elegirlos.\n\n¡Un abrazo de parte de ${optica}!`;
+  return `¡Feliz cumpleaños, ${primerNombre(nombre) || "querido paciente"}! 🎂💙\n\nTodo el equipo de ${optica} te desea un día lleno de alegría. Nos encanta acompañarte y hoy queremos celebrarte.\n\n🎁 Tu regalo de cumpleaños:\n👓 Ajuste de lentes sin costo.\n✨ 15 % de descuento en cualquier compra en nuestra óptica.\n\nPuedes disfrutar estos beneficios durante un mes desde hoy. Si renuevas armazón y lunas con calidad equivalente, mantendremos el precio de tus lentes como beneficio de paciente. Escríbenos y te ayudamos a elegirlos.\n\n¡Un abrazo de parte de ${optica}!`;
 }
 
 // Control de 3 o 6 meses (o cualquier plazo menor a 10 meses): texto propio, sin plantilla de Meta.
 export function mensajeControlPeriodico(nombre: string, meses: number, empresaId?: string | null) {
   if (esFocus(empresaId)) return `*FOCUS ÓPTICA | Revisión visual*\n\n${primerNombre(nombre) || "Hola"}, se cumple el plazo de *${meses} meses* indicado para tu control. Podemos revisar tu visión y cómo te estás adaptando a tus lentes.\n\n¿Te reservamos una cita? Responde con el día que te conviene.\n\nFocus Óptica · Shushufindi`;
   const optica = opticaDeEmpresa(empresaId);
-  return `Hola ${primerNombre(nombre) || "querido paciente"} 👋💙\n\nEn *${optica}* seguimos pendientes de tu salud visual. Ya llegó el momento del control de *${meses} meses* que te recomendamos en tu última visita.\n\nNos gustaría saber cómo te sientes con tus lentes y comprobar que tu visión esté bien. 👓\n\n*Responde a este mensaje y buscamos juntos un horario para ti.*\n\nCon cariño, el equipo de ${optica}.`;
+  return `Hola, ${primerNombre(nombre) || "querido paciente"} 👋💙\n\nEn ${optica} seguimos pendientes de tu salud visual. Ya llegó el momento del control de ${meses} meses que te recomendamos en tu última visita.\n\n👓 Nos gustaría saber cómo te sientes con tus lentes y comprobar que tu visión esté bien.\n\n📅 Responde a este mensaje y buscamos juntos un horario para ti.\n\nCon cariño, el equipo de ${optica}.`;
 }
 
 // Elige el texto según el plazo: 10 meses o más = control anual (mismo texto de Make).
@@ -31,7 +31,7 @@ export const mensajeControl = (nombre: string, meses: number, empresaId?: string
 export function mensajeControlAnual(nombre: string, empresaId?: string | null) {
   if (esFocus(empresaId)) return `*FOCUS ÓPTICA | Es momento de revisar tu visión*\n\n${primerNombre(nombre) || "Hola"}, ha pasado aproximadamente un año desde tu última revisión. Un control nos permite comprobar si tu graduación sigue siendo adecuada.\n\nEl *examen de control no tiene costo* para nuestros pacientes.\n\n¿Quieres agendarlo? Indícanos qué día te viene bien y te confirmamos un turno.\n\nFocus Óptica · Shushufindi`;
   const optica = opticaDeEmpresa(empresaId);
-  return `Hola ${primerNombre(nombre) || "querido paciente"} 👋💙\n\n¡En *${optica}* nos acordamos de ti! Ha pasado aproximadamente un año desde tu última revisión y queremos invitarte a cuidar nuevamente tu visión.\n\nEn este control revisaremos cómo ves y si tu graduación necesita algún cambio. *El examen visual es gratuito para nuestros pacientes.* 👓\n\n*¿Te ayudamos a reservar un horario?* Solo responde a este mensaje.\n\nTe esperamos con el cariño de siempre,\n*Equipo ${optica}*`;
+  return `Hola, ${primerNombre(nombre) || "querido paciente"} 👋💙\n\nEn ${optica} nos acordamos de ti. Ha pasado aproximadamente un año desde tu última revisión y queremos invitarte a cuidar nuevamente tu visión.\n\n👓 En este control revisaremos cómo ves y si tu graduación necesita algún cambio. El examen visual es gratuito para nuestros pacientes.\n\n📅 ¿Te ayudamos a reservar un horario? Solo responde a este mensaje.\n\nTe esperamos con el cariño de siempre,\nEquipo ${optica}`;
 }
 
 // Plantillas de Meta (WhatsApp Cloud API) del envío automático. Shuvisión usa las aprobadas en tiempo de Make;
@@ -75,8 +75,9 @@ export type MensajesDia = { empresa_id: string; hoy: string; cumpleanos: Cumplea
 export type ConfigMensajesAutomaticos = { activo: boolean; cumpleanos: boolean; control_anual: boolean; cobros: boolean; actualizado_en: string | null };
 export type NumeroSucursal = { sucursal_id: string; nombre: string; numero: string | null; conectado: boolean };
 
-// WhatsApp en algunos teléfonos muestra cuadritos con ciertos emojis (👁️, 🛍️) y deja visibles los "**".
-export const limpiarWhatsapp = (texto: string) => texto.replace(/\*\*/g, "*").replace(/👁️|👁/gu, "👓").replace(/🛍️|🛍/gu, "🎁").replace(/\uFE0F/g, "");
+// Evita símbolos poco compatibles y marcas de negrita visibles en WhatsApp.
+// Se conserva el selector de presentación de los demás emojis para que se muestren correctamente.
+export const limpiarWhatsapp = (texto: string) => texto.replace(/👁️|👁/gu, "👓").replace(/🛍️|🛍/gu, "🎁").replace(/\*/g, "");
 
 // Tarjeta con imagen: WhatsApp muestra la imagen como vista previa del enlace al final del mensaje.
 const SITIO = "https://ssff-app.vercel.app";
