@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { branchLetterhead, loadBranchIdentities, type CompanyIdentity } from "@/lib/sucursales";
 
 export type AcuerdoPago = {
+  modalidad?: "convenio" | "optica";
   id: string; texto: string; monto_cuota: number; fecha_primera_cuota: string; cuotas: number;
   paciente_nombre: string; paciente_cedula: string | null; paciente_ocupacion: string | null; paciente_telefono: string | null;
   empresa_convenio_nombre: string; atendio_nombre: string | null;
@@ -58,6 +59,25 @@ export async function crearAcuerdoPago(ventaId: string, empresaConvenioId: strin
   return acuerdo;
 }
 
+export async function crearFinanciamientoOptica(ventaId: string, cuotas: number, firmanteId?: string | null) {
+  if (!ventaId || !Number.isInteger(cuotas) || cuotas < 1 || cuotas > 36) throw new Error("Indica entre 1 y 36 cuotas.");
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("crear_financiamiento_optica", { p_venta: ventaId, p_cuotas: cuotas, p_firmante: firmanteId || null });
+  if (error) throw new Error(error.message || "No se pudo generar el compromiso de pago.");
+  const acuerdo = data as AcuerdoPago;
+  const { data: venta } = await supabase.from("ventas").select("empresa_id,sucursal_id").eq("id", ventaId).maybeSingle();
+  if (venta) {
+    const [{ data: company }, branchResult] = await Promise.all([
+      supabase.from("empresas").select("id,nombre,direccion,telefono,email,logo_url").eq("id", venta.empresa_id).maybeSingle(),
+      loadBranchIdentities(supabase),
+    ]);
+    const identity = branchLetterhead(company as CompanyIdentity | null, branchResult.branches.find((branch) => branch.id === venta.sucursal_id));
+    if (identity) Object.assign(acuerdo, { empresa_nombre: identity.nombre, empresa_direccion: identity.direccion, empresa_telefono: identity.telefono, empresa_email: identity.email, empresa_logo_url: identity.logo_url });
+  }
+  revalidatePath("/ventas"); revalidatePath("/pacientes"); revalidatePath("/cuentas-cobrar");
+  return acuerdo;
+}
+
 export type PersonaTitular = { id: string; nombre: string; cedula: string | null };
 const personaTitular = (p: { id: string; nombres: string | null; apellidos: string | null; cedula: string | null }): PersonaTitular =>
   ({ id: p.id, nombre: `${p.nombres ?? ""} ${p.apellidos ?? ""}`.trim(), cedula: p.cedula });
@@ -69,7 +89,7 @@ export async function datosAutorizacionRol(ventaId: string) {
   if (ventaError || !venta || venta.estado !== "completada" || !venta.paciente_id) throw new Error("No se encontró una venta válida.");
   const [empresas, acuerdo, paciente] = await Promise.all([
     supabase.from("empresas_convenio").select("id,nombre,cuotas_predeterminadas").eq("activo", true).order("nombre"),
-    supabase.from("acuerdos_pago").select("empresa_convenio_id,cuotas,titular_paciente_id").eq("venta_id", ventaId).maybeSingle(),
+    supabase.from("acuerdos_pago").select("empresa_convenio_id,cuotas,titular_paciente_id,modalidad").eq("venta_id", ventaId).maybeSingle(),
     supabase.from("pacientes_clinicos").select("id,nombres,apellidos,cedula,responsable_id").eq("id", venta.paciente_id).maybeSingle(),
   ]);
   if (empresas.error || acuerdo.error || paciente.error || !paciente.data) throw new Error("No se pudieron cargar los convenios.");

@@ -83,10 +83,10 @@ export async function getCuentasCobrarData(convenioId?: string): Promise<Cuentas
     const nombreRemitente = new Map((remitentes ?? []).map((item) => [item.id, item.nombre]));
     const pacienteById = new Map((pacientes ?? []).map((p) => [p.id, p]));
     const ventaIds = (ventas ?? []).map((v) => v.id);
-    const { data: acuerdos } = ventaIds.length ? await supabase.from("acuerdos_pago").select("venta_id,cuotas,monto_cuota,fecha_primera_cuota,empresas_convenio(nombre),titular:pacientes_clinicos!acuerdos_pago_titular_paciente_id_fkey(nombres,apellidos)").in("venta_id", ventaIds) : { data: [] };
+    const { data: acuerdos } = ventaIds.length ? await supabase.from("acuerdos_pago").select("venta_id,modalidad,cuotas,monto_cuota,fecha_primera_cuota,empresas_convenio(nombre),titular:pacientes_clinicos!acuerdos_pago_titular_paciente_id_fkey(nombres,apellidos)").in("venta_id", ventaIds) : { data: [] };
     const acuerdoByVenta = new Map((acuerdos ?? []).map((a) => {
       const emp = a.empresas_convenio as unknown as { nombre: string } | { nombre: string }[] | null;
-      return [a.venta_id as string, { empresa: (Array.isArray(emp) ? emp[0]?.nombre : emp?.nombre) ?? "Convenio", cuotas: Number(a.cuotas), monto_cuota: Number(a.monto_cuota), fecha_primera_cuota: a.fecha_primera_cuota as string | null, titular: (() => { const t = a.titular as unknown as { nombres: string | null; apellidos: string | null } | { nombres: string | null; apellidos: string | null }[] | null; const x = Array.isArray(t) ? t[0] : t; return x ? `${x.nombres ?? ""} ${x.apellidos ?? ""}`.trim() : null; })() } satisfies ConvenioDeuda];
+      return [a.venta_id as string, { empresa: a.modalidad === "optica" ? "Financiamiento con la óptica" : (Array.isArray(emp) ? emp[0]?.nombre : emp?.nombre) ?? "Convenio", cuotas: Number(a.cuotas), monto_cuota: Number(a.monto_cuota), fecha_primera_cuota: a.fecha_primera_cuota as string | null, titular: (() => { const t = a.titular as unknown as { nombres: string | null; apellidos: string | null } | { nombres: string | null; apellidos: string | null }[] | null; const x = Array.isArray(t) ? t[0] : t; return x ? `${x.nombres ?? ""} ${x.apellidos ?? ""}`.trim() : null; })() } satisfies ConvenioDeuda];
     }));
 
     const grupos = new Map<string, DeudaPaciente>();

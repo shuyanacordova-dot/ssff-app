@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { Search, X } from "lucide-react";
 import { registrarVenta } from "./actions";
 import { detallesProducto, materialConIndice, textoBusquedaProducto } from "@/lib/producto-labels";
-import { convenioDelPaciente, crearAcuerdoPago, crearEmpresaConvenio, type AcuerdoPago } from "./convenio-actions";
+import { convenioDelPaciente, crearAcuerdoPago, crearFinanciamientoOptica, crearEmpresaConvenio, type AcuerdoPago } from "./convenio-actions";
 import AcuerdoPagoView from "./acuerdo-pago-view";
 import type { EmpresaConvenio, PaymentMethod, SaleBranch, SaleCompany, SalePatient, SaleProduct, SaleStock } from "@/lib/ventas";
 
@@ -37,6 +37,7 @@ export default function Cart({ products, stock, branches, patients, empresasConv
   const [items, setItems] = useState<CartItem[]>([]); const [payments, setPayments] = useState<CartPayment[]>([]);
   const [notice, setNotice] = useState(""); const [pending, start] = useTransition();
   const [convenioActivo, setConvenioActivo] = useState(false);
+  const [tipoAcuerdo, setTipoAcuerdo] = useState<"convenio" | "optica">("convenio");
   const [convenios, setConvenios] = useState(empresasConvenio);
   const [empresaConvenioId, setEmpresaConvenioId] = useState("");
   const [cuotas, setCuotas] = useState("6");
@@ -89,7 +90,7 @@ export default function Cart({ products, stock, branches, patients, empresasConv
   const updatePayment = (index: number, patch: Partial<CartPayment>) => setPayments(payments.map((payment, i) => i === index ? { ...payment, ...patch } : payment));
   const removePayment = (index: number) => setPayments(payments.filter((_, i) => i !== index));
 
-  const resetAll = () => { setItems([]); setPayments([]); setCliente(""); setPacienteId(defaultPacienteId ?? ""); setConvenioActivo(false); setEmpresaConvenioId(""); setCuotas("6"); setModo(""); };
+  const resetAll = () => { setItems([]); setPayments([]); setCliente(""); setPacienteId(defaultPacienteId ?? ""); setConvenioActivo(false); setTipoAcuerdo("convenio"); setEmpresaConvenioId(""); setCuotas("6"); setModo(""); };
 
   const crearConvenio = () => start(async () => {
     try { const id = await crearEmpresaConvenio(nuevaConvenioNombre); setConvenios((list) => [...list, { id, nombre: nuevaConvenioNombre.trim() }]); setEmpresaConvenioId(id); setShowNuevaConvenio(false); setNuevaConvenioNombre(""); }
@@ -99,7 +100,7 @@ export default function Cart({ products, stock, branches, patients, empresasConv
   const submit = (form: HTMLFormElement) => {
     if (payments.some((p) => !(Number(p.monto) > 0))) { setNotice("Escribe el monto de cada abono (o quita el abono vacío)."); return; }
     if (paidTotal > subtotal + 0.0001) { setNotice(`Los abonos (${money(paidTotal)}) no pueden superar el total de la venta (${money(subtotal)}). Si cobras recargo por tarjeta, súmalo al precio.`); return; }
-    if (convenioActivo && (!empresaConvenioId || !Number(cuotas))) { setNotice("Elige la empresa del convenio y el número de cuotas."); return; }
+    if (convenioActivo && (tipoAcuerdo === "convenio" && !empresaConvenioId || !Number.isInteger(Number(cuotas)) || Number(cuotas) < 1 || Number(cuotas) > 36 || saldo <= 0)) { setNotice("Elige el tipo de acuerdo, entre 1 y 36 cuotas, y deja un saldo pendiente."); return; }
     start(async () => {
       const data = new FormData(form);
       data.set("tipo_venta", modo);
@@ -108,8 +109,8 @@ export default function Cart({ products, stock, branches, patients, empresasConv
       try {
         const ventaId = await registrarVenta(data);
         if (convenioActivo) {
-          const result = await crearAcuerdoPago(ventaId, empresaConvenioId, Number(cuotas));
-          setAcuerdo(result); setNotice(""); onDone("Venta registrada y acuerdo de pago firmado.");
+          const result = tipoAcuerdo === "optica" ? await crearFinanciamientoOptica(ventaId, Number(cuotas)) : await crearAcuerdoPago(ventaId, empresaConvenioId, Number(cuotas));
+          setAcuerdo(result); setNotice(""); onDone("Venta registrada. Documento listo para imprimir y firmar.");
         } else {
           const message = paidTotal + 0.0001 < subtotal ? `Venta registrada con saldo pendiente de ${money(subtotal - paidTotal)}.` : "Venta registrada y cobrada.";
           setNotice(message); onDone(message); resetAll();
@@ -151,18 +152,18 @@ export default function Cart({ products, stock, branches, patients, empresasConv
       {payments.map((payment, index) => <div className="new-patient-form" key={index}><label>Método<select value={payment.metodo} onChange={(event) => updatePayment(index, { metodo: event.target.value as PaymentMethod, banco: event.target.value === "transferencia" ? payment.banco : "" })}>{methods.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}{(saldosFavor[company] ?? 0) > 0.004 && <option value="saldo_favor">Saldo a favor (disponible ${(saldosFavor[company] ?? 0).toFixed(2)})</option>}</select></label><label>Monto<input type="text" inputMode="decimal" autoComplete="off" placeholder="0.00" value={payment.monto} onChange={(event) => updatePayment(index, { monto: event.target.value.replace(/,/g, ".").replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1") })} /></label><label>Referencia<input value={payment.referencia} onChange={(event) => updatePayment(index, { referencia: event.target.value })} placeholder="Opcional" /></label>{payment.metodo === "transferencia" && <label>Banco<select value={payment.banco} onChange={(event) => updatePayment(index, { banco: event.target.value })}><option value="">Selecciona el banco</option>{bancos.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}</select></label>}<button type="button" className="outline-action" onClick={() => removePayment(index)}>Quitar abono</button></div>)}
 
       <div className="receta-option" style={{ marginTop: 12 }}>
-        <label className="receta-option-header"><input type="checkbox" checked={convenioActivo} onChange={(event) => { setConvenioActivo(event.target.checked); if (event.target.checked) setTarifaConvenio(true); }} /> Convenio por descuento a rol de pagos</label>
+        <label className="receta-option-header"><input type="checkbox" checked={convenioActivo} onChange={(event) => { setConvenioActivo(event.target.checked); if (event.target.checked && tipoAcuerdo === "convenio") setTarifaConvenio(true); }} /> Convenio o financiamiento con la óptica</label>
         {convenioActivo && <div className="receta-option-body">
-          <div className="new-patient-form">
-            <label>Empresa<span style={{ display: "flex", gap: 6 }}><select value={empresaConvenioId} onChange={(event) => { setEmpresaConvenioId(event.target.value); const conv = convenios.find((c) => c.id === event.target.value) as { cuotas_predeterminadas?: number } | undefined; if (conv?.cuotas_predeterminadas) setCuotas(String(conv.cuotas_predeterminadas)); }} style={{ flex: 1 }}><option value="">Selecciona la empresa</option>{convenios.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select><button type="button" className="outline-action" onClick={() => setShowNuevaConvenio(true)}>+</button></span></label>
+          <div className="new-patient-form"><label>Tipo de acuerdo<select value={tipoAcuerdo} onChange={(event) => { const tipo = event.target.value as "convenio" | "optica"; setTipoAcuerdo(tipo); if (tipo === "optica") setTarifaConvenio(false); else setTarifaConvenio(true); }}><option value="convenio">Convenio con empresa · descuento a rol</option><option value="optica">Financiamiento con la óptica</option></select></label>
+            {tipoAcuerdo === "convenio" && <label>Empresa<span style={{ display: "flex", gap: 6 }}><select value={empresaConvenioId} onChange={(event) => { setEmpresaConvenioId(event.target.value); const conv = convenios.find((c) => c.id === event.target.value) as { cuotas_predeterminadas?: number } | undefined; if (conv?.cuotas_predeterminadas) setCuotas(String(conv.cuotas_predeterminadas)); }} style={{ flex: 1 }}><option value="">Selecciona la empresa</option>{convenios.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select><button type="button" className="outline-action" onClick={() => setShowNuevaConvenio(true)}>+</button></span></label>}
             <label>Cantidad de cuotas<input type="number" min={1} step={1} value={cuotas} onChange={(event) => setCuotas(event.target.value)} /></label>
           </div>
           <p className="field-hint">Primera cuota posible: <strong>{formatFecha(primeraCuotaFecha())}</strong> (primer día del mes siguiente).</p>
         </div>}
       </div>
 
-      <p className="notice">{notice || (convenioActivo ? "Al firmar se genera el acuerdo de pago con el descuento por rol de pagos." : (payments.length ? "Si los abonos no cubren el total, la venta queda con saldo pendiente para abonar después." : "Sin abonos registrados, la venta se cerrará con saldo pendiente por el total."))}</p>
-      <button disabled={!items.length || pending || items.some((item) => item.precio !== undefined && !item.precio.trim())} className="new-consultation" type="submit">{pending ? "Guardando…" : convenioActivo ? "Firmar acuerdo de pago" : "Cerrar venta"}</button>
+      <p className="notice">{notice || (convenioActivo ? "Se generará un documento para imprimir y firmar según el tipo de acuerdo elegido." : (payments.length ? "Si los abonos no cubren el total, la venta queda con saldo pendiente para abonar después." : "Sin abonos registrados, la venta se cerrará con saldo pendiente por el total."))}</p>
+      <button disabled={!items.length || pending || items.some((item) => item.precio !== undefined && !item.precio.trim())} className="new-consultation" type="submit">{pending ? "Guardando…" : convenioActivo ? "Generar documento de pago" : "Cerrar venta"}</button>
     </form>
     {showNuevaConvenio && <div className="modal-backdrop"><section className="new-patient-modal" role="dialog" aria-modal="true"><p className="section-label">NUEVA EMPRESA DE CONVENIO</p><h2>Agregar empresa</h2><div className="new-patient-form"><label className="task-description">Nombre<input value={nuevaConvenioNombre} onChange={(event) => setNuevaConvenioNombre(event.target.value)} placeholder="Ej.: Municipio de Shushufindi" /></label></div><div className="modal-actions"><button className="outline-action" type="button" onClick={() => setShowNuevaConvenio(false)}>Cancelar</button><button className="new-consultation" type="button" disabled={pending || !nuevaConvenioNombre.trim()} onClick={crearConvenio}>{pending ? "Guardando…" : "Guardar empresa"}</button></div></section></div>}
     {buscando && <ProductSearchModal title={buscando === "rapida" ? "BUSCAR ACCESORIOS, GAFAS O EXÁMENES" : buscando === "montura" ? "BUSCAR ARMAZÓN" : "BUSCAR LUNAS"} products={buscando === "rapida" ? availableRapida : buscando === "montura" ? availableArmazon : availableLunas} branch={branch} stockFor={stockFor} tarifaConvenio={tarifaConvenio} onSelect={addProduct} onClose={() => setBuscando("")} />}
