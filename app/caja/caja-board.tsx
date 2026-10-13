@@ -2,7 +2,7 @@
 import { fechaGuayaquil, formatRecordDate } from "@/lib/record-date";
 
 import Link from "next/link";
-import { AlertCircle, Banknote, CheckCircle2, Pencil, Plus, Receipt, Trash2, XCircle, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, Pencil, Plus, Receipt, Trash2, XCircle, X } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { CajaData, CajaBranch, CierreCaja, Gasto } from "@/lib/caja";
 import { useRouter } from "next/navigation";
@@ -31,6 +31,7 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean; falta
   const canSaldos = role === "superadmin" || role === "admin_sucursal" || role === "caja";
   // Solo la Superadministradora corrige o borra egresos (queda copia en gastos_auditoria).
   const esSuperadmin = role === "superadmin";
+  const [cuadreAbierto, setCuadreAbierto] = useState<CierreCaja | null>(null);
   const [editandoGasto, setEditandoGasto] = useState<Gasto | null>(null);
   const [borrandoGasto, setBorrandoGasto] = useState<Gasto | null>(null);
   const router = useRouter();
@@ -45,6 +46,7 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean; falta
   const cuentas = props.cuentas.filter((cuenta) => cuenta.sucursal_id === sucursalVista);
   const gastos = props.gastos.filter((gasto) => gasto.sucursal_id === sucursalVista);
   const cierres = props.cierres.filter((cierre) => cierre.sucursal_id === sucursalVista);
+  const cuadresGuardados = cierres.filter((cierre) => !/migrado/i.test(cierre.observaciones ?? ""));
   const cuentaById = new Map(cuentas.map((cuenta) => [cuenta.id, cuenta]));
 
   const runAction = (action: () => Promise<unknown>, onOk: string) => startTransition(async () => {
@@ -54,16 +56,19 @@ export default function CajaBoard(props: CajaData & { autoGasto?: boolean; falta
 
   return <main className="page agenda-page"><div className="container agenda-shell">
     <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">FINANZAS</p><h1>Cuadre de caja</h1><p className="subtitle">Cuadre diario y gastos de {branchVista?.nombre ?? "la sucursal"}. Cada sucursal tiene su propia caja.</p></div><SucursalTabs branches={props.branches} value={sucursalVista} onChange={setSucursalVista} /></header>
-    <section className="agenda-summary"><article><Receipt size={21} /><strong>{gastos.length}</strong><span>gastos registrados</span></article><article><Banknote size={21} /><strong>{cierres.filter((c) => c.cuadre_correcto).length}/{cierres.length}</strong><span>cuadres correctos</span></article></section>
     {(props.faltantes?.[sucursalVista] ?? []).length > 0 && <div className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 700, flexWrap: "wrap", gap: 8 }}><AlertCircle size={18} /><span>Falta el cuadre de {branchVista?.nombre}:</span>{(props.faltantes?.[sucursalVista] ?? []).map((dia) => <button key={dia} type="button" className="outline-action" onClick={() => { setCierreSucursalId(sucursalVista); setCierreFecha(dia); setShowCierre(true); }}>{new Intl.DateTimeFormat("es-EC", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${dia}T12:00:00Z`))}</button>)}</div>}
     <div className="notice"><AlertCircle size={18} /><span>{notice || "Un cuadre solo puede registrarse una vez por sucursal y fecha; verifica los datos antes de guardar."}</span></div>
 
     <ResumenCajaHoy key={sucursalVista} empresaId={empresaVista} branches={branches} cierres={cierres} defaultSucursalId={sucursalVista} onNuevoCuadre={(sucursalId) => { setCierreSucursalId(sucursalId); setShowCierre(true); }} />
 
-    <SemanaCuadres cierres={cierres} onNuevoCuadre={(fecha) => { setCierreSucursalId(sucursalVista); setCierreFecha(fecha); setShowCierre(true); }} />
+    <SemanaCuadres cierres={cierres} onAbrir={setCuadreAbierto} onNuevoCuadre={(fecha) => { setCierreSucursalId(sucursalVista); setCierreFecha(fecha); setShowCierre(true); }} />
 
-    <section className="glass agenda-board"><div className="agenda-toolbar"><div><p className="section-label">EGRESOS</p><h2>Gastos recientes</h2></div><button className="new-task" type="button" onClick={() => setShowGasto(true)}><Plus size={18} /> Nuevo gasto</button></div><AtajoEgresos />{gastos.length ? <div className="task-list">{gastos.slice(0, 15).map((gasto) => <article className="task-card" key={gasto.id}><div className="task-status"><span className="status-dot" /></div><div className="task-main"><div className="task-meta"><span>{clasificacionLabel[gasto.clasificacion]}</span><span>{gasto.origen === "banco" ? bancoLabel[cuentaById.get(gasto.cuenta_bancaria_id ?? "")?.banco ?? ""] || "Banco" : "Efectivo"}</span><span>{formatDate(gasto.fecha)}</span></div><h2>{gasto.concepto}</h2>{gasto.observaciones && <p>{gasto.observaciones}</p>}</div><div className="task-actions"><strong>{money(gasto.monto)}</strong>{esSuperadmin && <><button type="button" className="icon-button" title="Editar egreso" aria-label="Editar egreso" onClick={() => setEditandoGasto(gasto)}><Pencil size={15} /></button><button type="button" className="icon-button" title="Borrar egreso" aria-label="Borrar egreso" style={{ color: "#a24150" }} onClick={() => setBorrandoGasto(gasto)}><Trash2 size={15} /></button></>}</div></article>)}</div> : <section className="empty-state"><Receipt size={27} /><h3>Aún no hay gastos</h3><p>Registra el primer egreso de esta empresa.</p></section>}</section>
+    <section className="glass agenda-board"><div className="agenda-toolbar"><div><p className="section-label">CUADRES DEL EQUIPO</p><h2>Cuadres guardados</h2></div><button className="new-task" type="button" onClick={() => setShowGasto(true)}><Plus size={18} /> Nuevo gasto</button></div><AtajoEgresos />
+      {cuadresGuardados.length ? <div className="task-list">{cuadresGuardados.slice(0, 20).map((c) => <article className="task-card" key={c.id}><div className="task-status"><span className={`status-dot ${c.cuadre_correcto ? "ok" : ""}`} /></div><div className="task-main"><div className="task-meta"><span>{formatDate(c.fecha)}</span>{props.responsables?.[c.responsable_id] && <span>Hecho por {props.responsables[c.responsable_id]}</span>}<span>{c.cuadre_correcto ? "Cuadró" : `Diferencia ${money(c.diferencia)}`}</span></div><h2>Caja física {money(c.caja_fisica)} · esperada {money(c.caja_esperada)}</h2>{c.observaciones && <p>{c.observaciones}</p>}</div><div className="task-actions"><button className="outline-action" type="button" onClick={() => setCuadreAbierto(c)}>Abrir cuadre</button></div></article>)}</div> : <section className="empty-state"><Receipt size={27} /><h3>Aún no hay cuadres guardados</h3><p>Cuando tu equipo guarde un cuadre podrás abrirlo aquí para revisarlo.</p></section>}
+      <details style={{ marginTop: 16 }}><summary>Gastos recientes (egresos)</summary><div style={{ paddingTop: 12 }}>{gastos.length ? <div className="task-list">{gastos.slice(0, 15).map((gasto) => <article className="task-card" key={gasto.id}><div className="task-status"><span className="status-dot" /></div><div className="task-main"><div className="task-meta"><span>{clasificacionLabel[gasto.clasificacion]}</span><span>{gasto.origen === "banco" ? bancoLabel[cuentaById.get(gasto.cuenta_bancaria_id ?? "")?.banco ?? ""] || "Banco" : "Efectivo"}</span><span>{formatDate(gasto.fecha)}</span></div><h2>{gasto.concepto}</h2>{gasto.observaciones && <p>{gasto.observaciones}</p>}</div><div className="task-actions"><strong>{money(gasto.monto)}</strong>{esSuperadmin && <><button type="button" className="icon-button" title="Editar egreso" aria-label="Editar egreso" onClick={() => setEditandoGasto(gasto)}><Pencil size={15} /></button><button type="button" className="icon-button" title="Borrar egreso" aria-label="Borrar egreso" style={{ color: "#a24150" }} onClick={() => setBorrandoGasto(gasto)}><Trash2 size={15} /></button></>}</div></article>)}</div> : <section className="empty-state"><Receipt size={27} /><h3>Aún no hay gastos</h3><p>Registra el primer egreso de esta empresa.</p></section>}</div></details>
+    </section>
 
+    {cuadreAbierto && <CuadreDetalleModal cierre={cuadreAbierto} responsable={props.responsables?.[cuadreAbierto.responsable_id]} sucursal={props.branches.find((b) => b.id === cuadreAbierto.sucursal_id)?.nombre} gastos={props.gastos.filter((g) => g.sucursal_id === cuadreAbierto.sucursal_id && g.fecha === cuadreAbierto.fecha)} onClose={() => setCuadreAbierto(null)} />}
     {editandoGasto && <EditarGastoModal gasto={editandoGasto} cuentas={props.cuentas.filter((c) => c.sucursal_id === editandoGasto.sucursal_id || (!editandoGasto.sucursal_id && c.empresa_id === editandoGasto.empresa_id))} cuentaAhorrosEmpresaId={props.cuentaAhorrosEmpresaId} cuadreGuardado={props.cierres.some((c) => c.sucursal_id === editandoGasto.sucursal_id && c.fecha === editandoGasto.fecha)} onClose={() => setEditandoGasto(null)} onSaved={(m) => { setEditandoGasto(null); setNotice(m); router.refresh(); }} />}
     {borrandoGasto && <BorrarGastoModal gasto={borrandoGasto} cuadreGuardado={props.cierres.some((c) => c.sucursal_id === borrandoGasto.sucursal_id && c.fecha === borrandoGasto.fecha)} onClose={() => setBorrandoGasto(null)} onSaved={(m) => { setBorrandoGasto(null); setNotice(m); router.refresh(); }} />}
     {showGasto && <GastoModal empresaId={empresaVista} branches={branches} cuentas={cuentas} cuentaAhorrosEmpresaId={props.cuentaAhorrosEmpresaId} canSaldos={canSaldos} pending={pending} onClose={() => setShowGasto(false)} onSubmit={(form) => runAction(() => crearGasto(form), "Gasto registrado.")} />}
@@ -129,7 +134,26 @@ function ResumenCajaHoy({ empresaId, branches, cierres, defaultSucursalId, onNue
   </section>;
 }
 
-function SemanaCuadres({ cierres, onNuevoCuadre }: { cierres: CierreCaja[]; onNuevoCuadre: (fecha: string) => void }) {
+function CuadreDetalleModal({ cierre, responsable, sucursal, gastos, onClose }: { cierre: CierreCaja; responsable?: string; sucursal?: string; gastos: Gasto[]; onClose: () => void }) {
+  const fila = (etiqueta: string, valor: number) => <span><strong>{etiqueta}</strong>{money(valor)}</span>;
+  const egresosCaja = gastos.filter((g) => g.origen === "caja");
+  const egresosBanco = gastos.filter((g) => g.origen === "banco");
+  return <div className="modal-backdrop"><section className="new-patient-modal task-modal" role="dialog" aria-modal="true" aria-labelledby="cuadre-detalle-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button>
+    <p className="section-label">CUADRE DE CAJA · {sucursal?.toUpperCase()}</p><h2 id="cuadre-detalle-title">{fechaCuadre(cierre.fecha)}</h2>
+    <p className="field-hint">{responsable ? `Hecho por ${responsable} · ` : ""}guardado el {formatDate(cierre.creado_en)} · {cierre.cuadre_correcto ? "Cuadró" : `Diferencia de ${money(cierre.diferencia)}`}</p>
+    <p className="section-label" style={{ marginTop: 14 }}>EFECTIVO</p>
+    <div className="consultation-stats">{fila("Caja anterior", cierre.caja_anterior)}{fila("Cobros en efectivo", cierre.cobro_efectivo)}{fila("Egresos en efectivo", cierre.egresos_efectivo)}{fila("Depósitos", cierre.depositos)}{fila("Caja esperada", cierre.caja_esperada)}{fila("Caja física contada", cierre.caja_fisica)}{fila("Diferencia", cierre.diferencia)}</div>
+    <p className="section-label" style={{ marginTop: 14 }}>COBROS DEL DÍA</p>
+    <div className="consultation-stats">{fila("Ventas del día", cierre.ventas_brutas)}{fila("Tarjeta", cierre.cobro_tarjeta)}{fila("Transferencia Pichincha", cierre.cobro_transferencia_pichincha)}{fila("Transferencia Guayaquil", cierre.cobro_transferencia_guayaquil)}{fila("Transferencia Internacional", cierre.cobro_transferencia_internacional)}{cierre.cobro_credito > 0 && fila("Crédito", cierre.cobro_credito)}{cierre.cobro_otro > 0 && fila("Otros", cierre.cobro_otro)}</div>
+    {(cierre.deposito_pichincha > 0 || cierre.deposito_guayaquil > 0 || cierre.deposito_internacional > 0) && <><p className="section-label" style={{ marginTop: 14 }}>DEPÓSITOS A BANCOS</p><div className="consultation-stats">{cierre.deposito_pichincha > 0 && fila("Pichincha", cierre.deposito_pichincha)}{cierre.deposito_guayaquil > 0 && fila("Guayaquil", cierre.deposito_guayaquil)}{cierre.deposito_internacional > 0 && fila("Internacional", cierre.deposito_internacional)}</div></>}
+    <p className="section-label" style={{ marginTop: 14 }}>EGRESOS DEL DÍA</p>
+    {gastos.length ? <div className="task-list">{[...egresosCaja, ...egresosBanco].map((g) => <article className="task-card" key={g.id}><div className="task-main"><div className="task-meta"><span>{g.origen === "caja" ? "Efectivo" : "Banco"}</span><span>{clasificacionLabel[g.clasificacion] ?? g.clasificacion}</span></div><h2 style={{ fontSize: 15 }}>{g.concepto}</h2>{g.observaciones && <p>{g.observaciones}</p>}</div><div className="task-actions"><strong>{money(g.monto)}</strong></div></article>)}</div> : <p className="field-hint">Sin egresos registrados ese día.</p>}
+    {cierre.observaciones && <><p className="section-label" style={{ marginTop: 14 }}>OBSERVACIONES</p><p>{cierre.observaciones}</p></>}
+    <div className="modal-actions"><button className="new-consultation" type="button" onClick={onClose}>Cerrar</button></div>
+  </section></div>;
+}
+
+function SemanaCuadres({ cierres, onNuevoCuadre, onAbrir }: { cierres: CierreCaja[]; onNuevoCuadre: (fecha: string) => void; onAbrir: (cierre: CierreCaja) => void }) {
   const hoy = today();
   const dia = new Date(`${hoy}T12:00:00-05:00`).getDay();
   const lunes = new Date(`${hoy}T12:00:00-05:00`);
@@ -142,7 +166,7 @@ function SemanaCuadres({ cierres, onNuevoCuadre }: { cierres: CierreCaja[]; onNu
   });
   return <section className="glass agenda-board" style={{ marginBottom: 18 }}>
     <div className="agenda-toolbar"><div><p className="section-label">CIERRE DIARIO</p><h2>Cuadres de la semana</h2></div></div>
-    <div className="cuadres-semana">{dias.map(({ clave, nombre, cierre }) => <button key={clave} type="button" className={`cuadre-dia ${cierre ? "guardado" : ""}`} disabled={!!cierre || clave > hoy} onClick={() => onNuevoCuadre(clave)} aria-label={`${nombre} ${formatDate(clave)}: ${cierre ? "cuadre guardado" : clave > hoy ? "día futuro" : "guardar cuadre"}`}>
+    <div className="cuadres-semana">{dias.map(({ clave, nombre, cierre }) => <button key={clave} type="button" className={`cuadre-dia ${cierre ? "guardado" : ""}`} disabled={!cierre && clave > hoy} onClick={() => cierre ? onAbrir(cierre) : onNuevoCuadre(clave)} aria-label={`${nombre} ${formatDate(clave)}: ${cierre ? "abrir el cuadre guardado" : clave > hoy ? "día futuro" : "guardar cuadre"}`}>
       <span>{nombre}</span><strong>{Number(clave.slice(-2))}</strong><span>{cierre ? <CheckCircle2 size={21} aria-hidden="true" /> : clave > hoy ? "·" : <Plus size={19} aria-hidden="true" />}</span>
     </button>)}</div>
     <p className="field-hint">{dias.filter((d) => d.cierre).length} de 6 cuadres guardados · Domingo cerrado</p>

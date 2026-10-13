@@ -10,7 +10,7 @@ export type CierreCaja = { id: string; empresa_id: string; sucursal_id: string; 
 export type CajaCompany = { id: string; nombre: string };
 export type CajaBranch = { id: string; empresa_id: string; nombre: string };
 export type CajaProfile = { id: string; empresa_id: string; sucursal_id: string | null; rol: string };
-export type CajaData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: CajaProfile; companies: CajaCompany[]; branches: CajaBranch[]; cuentas: CuentaBancaria[]; movimientos: MovimientoBancario[]; gastos: Gasto[]; cierres: CierreCaja[]; cuentaAhorrosEmpresaId?: string };
+export type CajaData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string; profile?: CajaProfile; companies: CajaCompany[]; branches: CajaBranch[]; cuentas: CuentaBancaria[]; movimientos: MovimientoBancario[]; gastos: Gasto[]; cierres: CierreCaja[]; responsables?: Record<string, string>; cuentaAhorrosEmpresaId?: string };
 
 const cajaRoles = new Set(["superadmin", "admin_sucursal", "vendedor", "caja"]);
 const roleName = (profile: { roles: { nombre: string } | { nombre: string }[] | null } | null) => Array.isArray(profile?.roles) ? profile.roles[0]?.nombre : profile?.roles?.nombre;
@@ -61,8 +61,13 @@ export async function getCajaData(): Promise<CajaData> {
     const movimientosResult = cuentaIds.length ? await supabase.from("movimientos_bancarios").select("id,cuenta_id,fecha,tipo,monto,observaciones,creado_en").in("cuenta_id", cuentaIds).order("fecha", { ascending: false }).limit(150) : { data: [], error: null };
     if (movimientosResult.error) return { status: "error", message: "No se pudieron leer los movimientos bancarios.", ...empty };
 
+    const responsableIds = Array.from(new Set((cierresResult.data ?? []).map((c) => c.responsable_id).filter(Boolean))) as string[];
+    const responsablesResult = responsableIds.length ? await supabase.from("usuarios").select("id,nombre").in("id", responsableIds) : { data: [] as { id: string; nombre: string }[] };
+    const responsables = Object.fromEntries((responsablesResult.data ?? []).map((u) => [u.id, u.nombre]));
+
     return {
       status: "ready",
+      responsables,
       cuentaAhorrosEmpresaId: ahorroResult.data?.empresa_id,
       profile: { id: profile.id, empresa_id: operationalContext?.activeCompany.id ?? profile.empresa_id, sucursal_id: operationalContext?.activeBranch.id ?? profile.sucursal_id, rol: role },
       companies: (companiesResult.data ?? []).filter((c) => role === "superadmin" || c.id === profile.empresa_id),
