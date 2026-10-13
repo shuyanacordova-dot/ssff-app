@@ -25,9 +25,9 @@ import {
   Users,
   Wallet,
   X, HeartHandshake, LockKeyhole, ListChecks, MessagesSquare } from "lucide-react";
-import { esSuperadminActual } from "./nav-actions";
+import { esSuperadminActual, puedeVerCuadreBancosActual } from "./nav-actions";
 
-type NavItem = { href: string; label: string; detail: string; icon: typeof Home; group: "Operación" | "Finanzas" | "Administración"; soloSuperadmin?: boolean };
+type NavItem = { href: string; label: string; detail: string; icon: typeof Home; group: "Operación" | "Finanzas" | "Administración"; soloSuperadmin?: boolean; soloCuadreBancos?: boolean };
 
 const primaryItems: NavItem[] = [
   { href: "/", label: "Inicio", detail: "Panel principal", icon: Home, group: "Operación" },
@@ -50,7 +50,7 @@ const menuItems: NavItem[] = [
   { href: "/convenios", label: "Convenios", detail: "Empresas aliadas", icon: Building2, group: "Finanzas" },
   { href: "/informes", label: "Informes y metas", detail: "Resultados por sucursal", icon: BarChart3, group: "Finanzas" },
   { href: "/mi-espacio", label: "Mis deudas", detail: "Deudas de la óptica · solo para ti", icon: LockKeyhole, group: "Finanzas", soloSuperadmin: true },
-  { href: "/mi-espacio/bancos", label: "Cuadre de bancos", detail: "Saldo real de cada cuenta por sucursal · solo para ti", icon: Landmark, group: "Finanzas", soloSuperadmin: true },
+  { href: "/mi-espacio/bancos", label: "Cuadre de bancos", detail: "Saldo real de las cuentas autorizadas", icon: Landmark, group: "Finanzas", soloCuadreBancos: true },
   { href: "/asistente", label: "Asistente Shu", detail: "Plantillas y ayuda administrativa", icon: Sparkles, group: "Administración" },
   { href: "/equipo", label: "Equipo y accesos", detail: "Usuarios, roles y contraseñas", icon: Users, group: "Administración" },
   { href: "/configuracion/sucursales", label: "Sucursales e identidad", detail: "Logo, contacto y presentación", icon: Settings, group: "Administración" },
@@ -67,17 +67,19 @@ export default function AppNavigation() {
   const hidden = hiddenPrefixes.some((prefix) => pathname.startsWith(prefix));
   // "Mis deudas" es solo para la Superadministradora (la página además lo verifica en el servidor).
   const [superadmin, setSuperadmin] = useState(false);
+  const [cuadreBancos, setCuadreBancos] = useState(false);
   useEffect(() => {
-    if (hidden) { setSuperadmin(false); return; }
+    if (hidden) { setSuperadmin(false); setCuadreBancos(false); return; }
     let activo = true;
     esSuperadminActual().then((value) => { if (activo) setSuperadmin(value); }).catch(() => { if (activo) setSuperadmin(false); });
+    puedeVerCuadreBancosActual().then((value) => { if (activo) setCuadreBancos(value); }).catch(() => { if (activo) setCuadreBancos(false); });
     return () => { activo = false; };
   }, [hidden]);
   const visibleItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    const permitidos = menuItems.filter((item) => !item.soloSuperadmin || superadmin);
+    const permitidos = menuItems.filter((item) => (!item.soloSuperadmin || superadmin) && (!item.soloCuadreBancos || cuadreBancos));
     return normalized ? permitidos.filter((item) => `${item.label} ${item.detail} ${item.group}`.toLowerCase().includes(normalized)) : permitidos;
-  }, [query, superadmin]);
+  }, [query, superadmin, cuadreBancos]);
 
   useEffect(() => { setOpen(false); setQuery(""); }, [pathname]);
   useEffect(() => {

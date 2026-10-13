@@ -10,3 +10,11 @@ export async function esSuperadminActual(): Promise<boolean> {
     return data === true;
   } catch { return false; }
 }
+
+export async function puedeVerCuadreBancosActual(): Promise<boolean> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.rpc("sucursales_cuadre_bancos_usuario");
+    return !error && Array.isArray(data) && data.length > 0;
+  } catch { return false; }
+}

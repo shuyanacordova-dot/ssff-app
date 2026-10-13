@@ -27,7 +27,7 @@ function PillDiferencia({ diferencia }: { diferencia: number | null }) {
   return <span className={`${s.pill} ${s.pillVencido}`}>{diferencia > 0 ? `Sobra ${money(diferencia)}` : `Falta ${money(-diferencia)}`}</span>;
 }
 
-export default function CuadreBancosBoard(props: { status: "ready" | "needs_login" | "forbidden"; fecha: string; cuentas: CuentaCuadre[]; historial: CuadreGuardado[]; general: FilaCuadreGeneral[]; pendientes?: PagoPendiente[]; acreditaciones?: AcreditacionReciente[]; errorTarjetas?: string | null }) {
+export default function CuadreBancosBoard(props: { status: "ready" | "needs_login" | "forbidden"; fecha: string; cuentas: CuentaCuadre[]; historial: CuadreGuardado[]; general: FilaCuadreGeneral[]; pendientes?: PagoPendiente[]; acreditaciones?: AcreditacionReciente[]; errorTarjetas?: string | null; soloFocus?: boolean }) {
   const router = useRouter();
   // La fecha va en la dirección (?fecha=) para que el cuadre general se calcule en el servidor.
   const fecha = props.fecha;
@@ -35,7 +35,7 @@ export default function CuadreBancosBoard(props: { status: "ready" | "needs_logi
   const [abierta, setAbierta] = useState<CuentaCuadre | null>(null);
   const [notice, setNotice] = useState("");
 
-  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/mi-espacio">← Mis deudas</Link><p className="eyebrow">ESPACIO PRIVADO</p><h1>Cuadre de bancos</h1><p className="subtitle">{props.status === "needs_login" ? "Inicia sesión para continuar." : "Este apartado es solo para la Superadministradora."}</p></div></header></div></main>;
+  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← Inicio</Link><p className="eyebrow">ESPACIO PRIVADO</p><h1>Cuadre de bancos</h1><p className="subtitle">{props.status === "needs_login" ? "Inicia sesión para continuar." : "No tienes acceso al cuadre de bancos."}</p></div></header></div></main>;
 
   const ultimo = (cuentaId: string) => props.historial.find((h) => h.cuenta_id === cuentaId);
   const esSabado = new Date(`${fecha}T12:00:00Z`).getUTCDay() === 6;
@@ -46,12 +46,12 @@ export default function CuadreBancosBoard(props: { status: "ready" | "needs_logi
 
   return <main className="page agenda-page"><div className="container agenda-shell">
     <header className="agenda-header">
-      <div><Link className="back-link" href="/mi-espacio">← Mis deudas</Link><p className="eyebrow">ESPACIO PRIVADO · SOLO PARA TI</p><h1>Cuadre de bancos</h1><p className="subtitle">Cada sábado compara saldos bancarios y efectivo con el total esperado.</p></div>
+      <div><Link className="back-link" href={props.soloFocus ? "/" : "/mi-espacio"}>← {props.soloFocus ? "Inicio" : "Mis deudas"}</Link><p className="eyebrow">{props.soloFocus ? "FOCUS · BANCOS" : "ESPACIO PRIVADO · SOLO PARA TI"}</p><h1>Cuadre de bancos</h1><p className="subtitle">{props.soloFocus ? "Compara los saldos bancarios de Focus con el total esperado." : "Cada sábado compara saldos bancarios y efectivo con el total esperado."}</p></div>
       <label style={{ display: "grid", gap: 4, fontSize: 12, fontWeight: 800, color: "#5d7086" }}>Fecha del cuadre<input type="date" value={fecha} max={hoyEcuador()} onChange={(e) => setFecha(e.target.value || hoyEcuador())} style={{ border: "1px solid #d4e0ea", borderRadius: 10, padding: "8px 10px" }} /></label>
     </header>
     {notice && <div className="notice"><LockKeyhole size={18} /><span>{notice}</span></div>}
 
-    <TarjetasAcreditacion pendientes={props.pendientes ?? []} acreditaciones={props.acreditaciones ?? []} cuentas={props.cuentas} errorCarga={props.errorTarjetas ?? null} />
+    {!props.soloFocus && <TarjetasAcreditacion pendientes={props.pendientes ?? []} acreditaciones={props.acreditaciones ?? []} cuentas={props.cuentas} errorCarga={props.errorTarjetas ?? null} />}
 
     {!esSabado && <div className="notice"><Landmark size={18} /><span>El cuadre toca los sábados, pero puedes hacerlo cualquier día: se cuenta desde el último cuadre de cada cuenta hasta la fecha elegida.</span></div>}
 
