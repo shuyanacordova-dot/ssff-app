@@ -60,7 +60,7 @@ export async function crearAcuerdoPago(ventaId: string, empresaConvenioId: strin
 }
 
 export async function crearFinanciamientoOptica(ventaId: string, cuotas: number, firmanteId?: string | null) {
-  if (!ventaId || !Number.isInteger(cuotas) || cuotas < 1 || cuotas > 36) throw new Error("Indica entre 1 y 36 cuotas.");
+  if (!ventaId || !Number.isInteger(cuotas) || cuotas < 1 || cuotas > 9) throw new Error("El financiamiento con la óptica admite entre 1 y 9 pagos.");
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("crear_financiamiento_optica", { p_venta: ventaId, p_cuotas: cuotas, p_firmante: firmanteId || null });
   if (error) throw new Error(error.message || "No se pudo generar el compromiso de pago.");

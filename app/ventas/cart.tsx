@@ -100,7 +100,7 @@ export default function Cart({ products, stock, branches, patients, empresasConv
   const submit = (form: HTMLFormElement) => {
     if (payments.some((p) => !(Number(p.monto) > 0))) { setNotice("Escribe el monto de cada abono (o quita el abono vacío)."); return; }
     if (paidTotal > subtotal + 0.0001) { setNotice(`Los abonos (${money(paidTotal)}) no pueden superar el total de la venta (${money(subtotal)}). Si cobras recargo por tarjeta, súmalo al precio.`); return; }
-    if (convenioActivo && (tipoAcuerdo === "convenio" && !empresaConvenioId || !Number.isInteger(Number(cuotas)) || Number(cuotas) < 1 || Number(cuotas) > 36 || saldo <= 0)) { setNotice("Elige el tipo de acuerdo, entre 1 y 36 cuotas, y deja un saldo pendiente."); return; }
+    if (convenioActivo && (tipoAcuerdo === "convenio" && !empresaConvenioId || !Number.isInteger(Number(cuotas)) || Number(cuotas) < 1 || Number(cuotas) > (tipoAcuerdo === "optica" ? 9 : 36) || saldo <= 0)) { setNotice(tipoAcuerdo === "optica" ? "Elige entre 1 y 9 pagos y deja un saldo pendiente." : "Elige la empresa, entre 1 y 36 cuotas, y deja un saldo pendiente."); return; }
     start(async () => {
       const data = new FormData(form);
       data.set("tipo_venta", modo);
@@ -156,7 +156,7 @@ export default function Cart({ products, stock, branches, patients, empresasConv
         {convenioActivo && <div className="receta-option-body">
           <div className="new-patient-form"><label>Tipo de acuerdo<select value={tipoAcuerdo} onChange={(event) => { const tipo = event.target.value as "convenio" | "optica"; setTipoAcuerdo(tipo); if (tipo === "optica") setTarifaConvenio(false); else setTarifaConvenio(true); }}><option value="convenio">Convenio con empresa · descuento a rol</option><option value="optica">Financiamiento con la óptica</option></select></label>
             {tipoAcuerdo === "convenio" && <label>Empresa<span style={{ display: "flex", gap: 6 }}><select value={empresaConvenioId} onChange={(event) => { setEmpresaConvenioId(event.target.value); const conv = convenios.find((c) => c.id === event.target.value) as { cuotas_predeterminadas?: number } | undefined; if (conv?.cuotas_predeterminadas) setCuotas(String(conv.cuotas_predeterminadas)); }} style={{ flex: 1 }}><option value="">Selecciona la empresa</option>{convenios.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select><button type="button" className="outline-action" onClick={() => setShowNuevaConvenio(true)}>+</button></span></label>}
-            <label>Cantidad de cuotas<input type="number" min={1} step={1} value={cuotas} onChange={(event) => setCuotas(event.target.value)} /></label>
+            <label>Cantidad de {tipoAcuerdo === "optica" ? "pagos (máximo 9)" : "cuotas"}<input type="number" min={1} max={tipoAcuerdo === "optica" ? 9 : 36} step={1} value={cuotas} onChange={(event) => setCuotas(event.target.value)} /></label>
           </div>
           <p className="field-hint">Primera cuota posible: <strong>{formatFecha(primeraCuotaFecha())}</strong> (primer día del mes siguiente).</p>
         </div>}
