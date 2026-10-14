@@ -1,4 +1,13 @@
 -- Prueba de la migración 3 de referidos. Se ejecuta como [migración 3] + [preludio] + [este archivo].
+
+-- Función de apoyo para C19 (simula que otra caja usa el mismo referido registrado mientras se cierra la venta).
+create or replace function pg_temp.carrera() returns trigger language plpgsql security definer set search_path = '' as $f$
+begin
+  update public.referidos set estado = 'en_pago', venta_id = current_setting('t.race_venta')::uuid, descuento_aplicado = 15, credito_a_otorgar = 10, aplicado_en = now()
+   where referido_paciente_id = current_setting('t.race_pac')::uuid and estado = 'registrado';
+  return new;
+end $f$;
+
 do $$
 declare
   v_focus uuid := current_setting('t.focus')::uuid;
@@ -11,6 +20,7 @@ declare
   a uuid; b uuid; c uuid; d uuid; e uuid; f uuid; g uuid; h uuid; x uuid; j uuid;
   ca text; cf text;
   s uuid; r record; prev jsonb; n int;
+  ivo uuid; opti uuid; conv uuid; dum1 uuid; dum2 uuid; dum3 uuid; dum4 uuid; race uuid; sd uuid;
 begin
   select id into v_prog from public.programas_referidos where empresa_id = v_focus;
   a := pg_temp.paciente('Ana', '0992000001', v_focus, v_sf);
@@ -104,5 +114,53 @@ begin
   reset role;
   if not (prev->>'encontrado')::boolean or position('Ana' in (prev->>'nombre')) = 0 then raise exception 'FALLO C16: búsqueda de código %', prev; end if;
 
-  raise exception 'PRUEBAS_OK: venta con referido (C1-C16)';
+  -- C17 (fix 1): código válido con descuento de bienvenida $0 igual registra el referido (el referidor debe ganar su crédito)
+  update public.programas_referidos set descuento_bienvenida = 0 where id = v_prog;
+  ivo := pg_temp.paciente('Ivo', '0992000011', v_focus, v_sf);
+  s := pg_temp.vender(v_focus, v_sf, vf, ivo, ca, 150, 0);
+  select * into r from public.ventas where id = s;
+  if r.descuento <> 0 or r.total <> 150 or r.saldo <> 150 then raise exception 'FALLO C17a: totales % / % / %', r.descuento, r.total, r.saldo; end if;
+  select count(*) into n from public.referidos
+   where venta_id = s and estado = 'en_pago' and descuento_aplicado = 0 and referidor_paciente_id = a and referido_paciente_id = ivo
+     and credito_a_otorgar = (select credito_por_referido from public.programas_referidos where id = v_prog);
+  if n <> 1 then raise exception 'FALLO C17b: con descuento 0 no se registró el referido en pago (%)', n; end if;
+  if not exists (select 1 from public.referidos_auditoria where venta_id = s and evento = 'descuento_aplicado') then raise exception 'FALLO C17c: falta la auditoría'; end if;
+  update public.programas_referidos set descuento_bienvenida = 15 where id = v_prog;
+
+  -- C18 (fix 2): el financiamiento propio de la óptica ('optica') NO excluye; el de convenio sí
+  opti := pg_temp.paciente('Opti', '0992000012', v_focus, v_sf);
+  dum1 := pg_temp.paciente('Dummy1', '0992000013', v_focus, v_sf);
+  sd := pg_temp.vender(v_focus, v_sf, vf, dum1, null, 10, 10);
+  insert into public.acuerdos_pago (venta_id, cuotas, monto_cuota, fecha_primera_cuota, texto, titular_paciente_id, modalidad)
+  values (sd, 3, 3.34, current_date, 'prueba optica', opti, 'optica');
+  s := pg_temp.vender(v_focus, v_sf, vf, opti, ca, 150, 0);
+  if (select descuento from public.ventas where id = s) <> 15 then raise exception 'FALLO C18a: un paciente con financiamiento de la óptica fue excluido'; end if;
+  conv := pg_temp.paciente('Conv', '0992000014', v_focus, v_sf);
+  dum2 := pg_temp.paciente('Dummy2', '0992000015', v_focus, v_sf);
+  insert into public.acuerdos_pago (venta_id, cuotas, monto_cuota, fecha_primera_cuota, texto, titular_paciente_id, modalidad, empresa_convenio_id)
+  values (pg_temp.vender(v_focus, v_sf, vf, dum2, null, 10, 10), 3, 3.34, current_date, 'prueba convenio', conv, 'convenio', (select id from public.empresas_convenio limit 1));
+  perform pg_temp.vender_falla('C18b', 'convenio', v_focus, v_sf, vf, conv, ca, 150, 0);
+  dum3 := pg_temp.paciente('Dummy3', '0992000016', v_focus, v_sf);
+  insert into public.acuerdos_pago (venta_id, cuotas, monto_cuota, fecha_primera_cuota, texto, modalidad)
+  values (pg_temp.vender(v_focus, v_sf, vf, dum3, null, 10, 10), 3, 3.34, current_date, 'prueba optica por venta', 'optica');
+  if app_private.es_paciente_convenio(dum3) then raise exception 'FALLO C18c: financiamiento de la óptica (vía venta) contado como convenio'; end if;
+  dum4 := pg_temp.paciente('Dummy4', '0992000017', v_focus, v_sf);
+  insert into public.acuerdos_pago (venta_id, cuotas, monto_cuota, fecha_primera_cuota, texto, modalidad, empresa_convenio_id)
+  values (pg_temp.vender(v_focus, v_sf, vf, dum4, null, 10, 10), 3, 3.34, current_date, 'prueba convenio por venta', 'convenio', (select id from public.empresas_convenio limit 1));
+  if not app_private.es_paciente_convenio(dum4) then raise exception 'FALLO C18d: convenio (vía venta) no detectado'; end if;
+
+  -- C19 (fix 3): si el referido registrado en la ficha cambia mientras se cierra la venta, la venta se rechaza
+  race := pg_temp.paciente('Race', '0992000018', v_focus, v_sf);
+  perform set_config('request.jwt.claims', json_build_object('sub', vf, 'role', 'authenticated')::text, true);
+  set local role authenticated;
+  perform public.registrar_referido_ficha(race, v_focus, ca);
+  reset role;
+  perform set_config('t.race_pac', race::text, true);
+  perform set_config('t.race_venta', sd::text, true);
+  create trigger zz_carrera after insert on public.pagos_venta for each row execute function pg_temp.carrera();
+  perform pg_temp.vender_falla('C19', 'ya usó el beneficio', v_focus, v_sf, vf, race, ca, 150, 10);
+  drop trigger zz_carrera on public.pagos_venta;
+  if (select estado from public.referidos where referido_paciente_id = race) <> 'registrado' then raise exception 'FALLO C19b: el referido registrado quedó alterado'; end if;
+
+  raise exception 'PRUEBAS_OK: venta con referido (C1-C19)';
 end $$;

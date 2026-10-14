@@ -3,8 +3,8 @@
 create or replace function app_private.es_paciente_convenio(p_paciente uuid)
 returns boolean language sql stable security definer set search_path = '' as $$
   select exists (select 1 from public.convenio_personas where paciente_id = p_paciente)
-      or exists (select 1 from public.acuerdos_pago where titular_paciente_id = p_paciente)
-      or exists (select 1 from public.acuerdos_pago ap join public.ventas v on v.id = ap.venta_id where v.paciente_id = p_paciente);
+      or exists (select 1 from public.acuerdos_pago where titular_paciente_id = p_paciente and modalidad = 'convenio')
+      or exists (select 1 from public.acuerdos_pago ap join public.ventas v on v.id = ap.venta_id where v.paciente_id = p_paciente and ap.modalidad = 'convenio');
 $$;
 revoke all on function app_private.es_paciente_convenio(uuid) from public, anon, authenticated;
 
@@ -323,12 +323,13 @@ begin
     end if;
   end if;
 
-  -- REFERIDOS: registrar el referido en pago y gastar el crédito ANTES de completar la venta
-  if v_desc > 0 then
+  -- REFERIDOS: registrar el referido en pago (siempre que se evaluó un código, aunque el descuento sea 0) y gastar el crédito ANTES de completar la venta
+  if v_eval is not null then
     if v_eval->>'referido_existente' is not null then
       update public.referidos set estado = 'en_pago', venta_id = v_sale, descuento_aplicado = v_desc, credito_a_otorgar = v_prog.credito_por_referido,
              vigencia_dias = v_prog.vigencia_credito_dias, reglas = to_jsonb(v_prog), aplicado_en = now()
-       where id = (v_eval->>'referido_existente')::uuid returning id into v_ref;
+       where id = (v_eval->>'referido_existente')::uuid and estado = 'registrado' and venta_id is null returning id into v_ref;
+      if v_ref is null then raise exception 'Este paciente ya usó el beneficio de primera compra.'; end if;
     else
       insert into public.referidos (programa_id, codigo_id, referidor_paciente_id, referido_paciente_id, estado, venta_id, descuento_aplicado, credito_a_otorgar, vigencia_dias, reglas, registrado_por, aplicado_en)
       values (v_prog.id, (v_eval->>'codigo_id')::uuid, (v_eval->>'referidor_id')::uuid, p_paciente, 'en_pago', v_sale, v_desc, v_prog.credito_por_referido, v_prog.vigencia_credito_dias, to_jsonb(v_prog), v_user, now())
