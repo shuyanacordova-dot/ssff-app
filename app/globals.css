@@ -628,3 +628,10 @@ button.informe-card:hover { border-color: #a9ccc5; background: #f4fbf8; transfor
 .cuadre-dia.guardado { border-color: rgba(36, 118, 88, .32); background: rgba(215, 245, 231, .72); color: #247658; }
 .cuadre-dia:disabled { cursor: default; }
 @media (max-width: 600px) { .cuadres-semana { gap: 5px; } .cuadre-dia { padding: 10px 2px; border-radius: 12px; font-size: 11px; } .cuadre-dia strong { font-size: 18px; } }
+
+/* Facturación: las tarjetas tienen solo dos bloques (texto y acciones); sin esta clase el texto caía en la columna de 20 px y se leía letra por letra. */
+.factura-card { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.factura-card .task-main { min-width: 0; }
+.factura-card .task-main h2 { overflow-wrap: normal; word-break: normal; }
+.factura-card .task-main p { margin-bottom: 0; }
+@media (max-width: 780px) { .factura-card { grid-template-columns: minmax(0, 1fr); }.factura-card .task-actions { grid-column: 1; width: 100%; flex-direction: row; align-items: center; justify-content: space-between; } }
