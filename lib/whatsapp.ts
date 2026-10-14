@@ -26,3 +26,8 @@ export function enlaceWhatsapp(raw: string | null | undefined, mensaje: string):
   if (!numero) return null;
   return `https://wa.me/${numero}?text=${encodeURIComponent(textoSeguroWhatsapp(mensaje))}`;
 }
+
+// Enlace para que una persona elija a quién enviar el mensaje (sin número de destino).
+export function enlaceCompartirWhatsapp(mensaje: string): string {
+  return `https://wa.me/?text=${encodeURIComponent(textoSeguroWhatsapp(mensaje))}`;
+}
