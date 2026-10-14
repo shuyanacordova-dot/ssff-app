@@ -31,3 +31,14 @@ export async function obtenerHistorialCrm(pacienteId: string): Promise<ContactoC
   if (error) return [];
   return (data ?? []) as ContactoCrm[];
 }
+
+// Un toque en "Enviar por WhatsApp": registra que se envió el mensaje (el paciente sale de la lista y no vuelve a aparecer por 14 días).
+export async function marcarContactoCrm(input: { pacienteId: string; empresaId: string; sucursalId: string | null; motivo: string; referenciaId?: string | null }) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("registrar_contacto_crm", {
+    p_paciente: input.pacienteId, p_empresa: input.empresaId, p_sucursal: input.sucursalId, p_motivo: input.motivo,
+    p_canal: "whatsapp", p_resultado: "enviado", p_nota: "Mensaje enviado desde CRM", p_proximo: null, p_referencia: input.referenciaId ?? null,
+  });
+  if (error) throw new Error(error.message || "No se pudo registrar el envío.");
+  revalidatePath("/crm");
+}

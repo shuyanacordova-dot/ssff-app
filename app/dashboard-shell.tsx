@@ -32,7 +32,7 @@ function ResumenDelDia({ r, faltantes }: { r: ResumenHoy; faltantes: string[] })
   </section>;
 }
 
-export default function DashboardShell({ taskData, informeMensual, metasMessage, resumenHoy, cobrosHoy, acumulado, cuadresFaltantes = [] }: { taskData: TaskData; informeMensual: InformeMensual | null; metasMessage?: string; resumenHoy?: ResumenHoy | null; cobrosHoy: { cantidad: number; total: number }; acumulado?: DineroDisponible[] | null; cuadresFaltantes?: string[] }) {
+export default function DashboardShell({ taskData, informeMensual, metasMessage, resumenHoy, cobrosHoy, crmHoy, acumulado, cuadresFaltantes = [] }: { taskData: TaskData; informeMensual: InformeMensual | null; metasMessage?: string; resumenHoy?: ResumenHoy | null; cobrosHoy: { cantidad: number; total: number }; crmHoy?: { cumpleanos: number; controles: number; postventa: number }; acumulado?: DineroDisponible[] | null; cuadresFaltantes?: string[] }) {
   const role = taskData.profile?.rol;
   const canVerInformes = role === "superadmin" || role === "admin_sucursal";
 
@@ -54,6 +54,7 @@ export default function DashboardShell({ taskData, informeMensual, metasMessage,
     </section>
 
     {cobrosHoy.cantidad > 0 && <section className="glass cob-dashboard-banner"><span>Hoy hay <strong>{cobrosHoy.cantidad}</strong> mensajes de cobro por enviar ({money(cobrosHoy.total)})</span><Link className="outline-action" href="/cuentas-cobrar">Ver cobros de hoy</Link></section>}
+    {crmHoy && crmHoy.cumpleanos + crmHoy.controles + crmHoy.postventa > 0 && <section className="glass cob-dashboard-banner crm-dashboard-banner" style={{ flexWrap: "wrap" }}><span>Hoy hay <strong>{crmHoy.cumpleanos + crmHoy.controles + crmHoy.postventa}</strong> mensajes de CRM por enviar: {[crmHoy.cumpleanos > 0 && <Link key="c" href="/mensajes?tab=cumpleanos"><strong>{crmHoy.cumpleanos}</strong> cumpleaños</Link>, crmHoy.controles > 0 && <Link key="k" href="/mensajes?tab=controles"><strong>{crmHoy.controles}</strong> {crmHoy.controles === 1 ? "control" : "controles"}</Link>, crmHoy.postventa > 0 && <Link key="p" href="/mensajes?tab=entregas"><strong>{crmHoy.postventa}</strong> postventa</Link>].filter(Boolean).flatMap((item, i) => i === 0 ? [item] : [" · ", item])}</span><Link className="outline-action" href={`/mensajes?tab=${crmHoy.cumpleanos > 0 ? "cumpleanos" : crmHoy.controles > 0 ? "controles" : "entregas"}`}>Ver mensajes de CRM</Link></section>}
     {resumenHoy && <ResumenDelDia r={resumenHoy} faltantes={cuadresFaltantes} />}
     {acumulado && acumulado.length > 0 && <AcumuladoOpticas filas={acumulado} />}
     <section className="dashboard-main dashboard-main-wide">

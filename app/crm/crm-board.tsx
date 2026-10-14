@@ -3,14 +3,17 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarHeart, FolderOpen, MessageCircle, NotebookPen, Users, X } from "lucide-react";
-import { motivoLabels, type CrmData, type CrmItem, type CrmMotivo } from "@/lib/crm-labels";
+import { Ban, CalendarHeart, FolderOpen, MessageCircle, Search, Users } from "lucide-react";
+import { motivoLabels, type CrmData, type CrmItem, type CrmMotivo, type NoContactarItem } from "@/lib/crm-labels";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import { mensajeLentesListos } from "@/lib/mensajes";
 import { formatRecordDate } from "@/lib/record-date";
-import { registrarContactoCrm } from "./actions";
+import { marcarContactoCrm } from "./actions";
+import { marcarNoContactar } from "@/app/mensajes/actions";
+import { buscarPacientesClinicos } from "@/app/pacientes/actions";
 import BotonNoContactar from "@/app/no-contactar-button";
 
+type Pestana = CrmMotivo | "no_contactar";
 const motivos: CrmMotivo[] = ["examen_sin_compra", "lentes_listos", "control", "postventa", "cumpleanos", "inactivo"];
 
 const primerNombre = (nombre: string) => nombre.trim().split(/\s+/)[0]?.toLowerCase().replace(/^./, (c) => c.toUpperCase()) ?? "";
@@ -39,68 +42,95 @@ function detalle(item: CrmItem) {
   }
 }
 
-export default function CrmBoard(props: CrmData) {
-  const [tab, setTab] = useState<CrmMotivo>("examen_sin_compra");
-  const [registrando, setRegistrando] = useState<CrmItem | null>(null);
-  const [notice, setNotice] = useState("");
-  const counts = useMemo(() => Object.fromEntries(motivos.map((m) => [m, props.items.filter((i) => i.motivo === m).length])) as Record<CrmMotivo, number>, [props.items]);
-  const [sinContacto, setSinContacto] = useState<string[]>([]);
-  const visibles = props.items.filter((i) => i.motivo === tab && !sinContacto.includes(i.paciente_id));
+const claveItem = (i: CrmItem) => `${i.motivo}-${i.paciente_id}-${i.referencia_id ?? ""}`;
 
-  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">RELACIÓN CON PACIENTES</p><h1>CRM</h1><p className="subtitle">{props.message ?? "No se pudo abrir el CRM."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/crm">Iniciar sesión</Link>}</header></div></main>;
+export default function CrmBoard(props: CrmData) {
+  const router = useRouter();
+  const [tab, setTab] = useState<Pestana>("examen_sin_compra");
+  const [enviados, setEnviados] = useState<string[]>([]);
+  const [sinContacto, setSinContacto] = useState<string[]>([]);
+  const [aviso, setAviso] = useState("");
+  const visiblesItems = useMemo(() => props.items.filter((i) => !sinContacto.includes(i.paciente_id) && !enviados.includes(claveItem(i))), [props.items, sinContacto, enviados]);
+  const counts = useMemo(() => Object.fromEntries(motivos.map((m) => [m, visiblesItems.filter((i) => i.motivo === m).length])) as Record<CrmMotivo, number>, [visiblesItems]);
+  const visibles = tab === "no_contactar" ? [] : visiblesItems.filter((i) => i.motivo === tab);
+
+  if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">RELACIÓN CON PACIENTES</p><h1>A quién contactar hoy</h1><p className="subtitle">{props.message ?? "No se pudo abrir el CRM."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/crm">Iniciar sesión</Link>}</header></div></main>;
+
+  const enviar = (item: CrmItem, abrirWhatsapp: boolean) => {
+    if (!props.empresaId) return;
+    if (abrirWhatsapp) {
+      const url = enlaceWhatsapp(item.telefono, mensaje(item, props.empresaNombre ?? ""));
+      if (!url) return;
+      const ventana = window.open(url, "_blank");
+      if (!ventana) { setAviso("Permite las ventanas emergentes para abrir WhatsApp."); return; }
+      ventana.opener = null;
+    }
+    const clave = claveItem(item);
+    setEnviados((prev) => [...prev, clave]);
+    setAviso(`Enviado ✓ · ${item.nombre}`);
+    void marcarContactoCrm({ pacienteId: item.paciente_id, empresaId: props.empresaId, sucursalId: item.sucursal_id, motivo: item.motivo, referenciaId: item.referencia_id }).catch((err) => {
+      setEnviados((prev) => prev.filter((c) => c !== clave));
+      setAviso(err instanceof Error ? err.message : "No se pudo registrar el envío.");
+    });
+  };
 
   return <main className="page agenda-page"><div className="container agenda-shell">
     <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">RELACIÓN CON PACIENTES · {props.empresaNombre}</p><h1>A quién contactar hoy</h1><p className="subtitle">Nada se envía solo.</p></div></header>
-    <section className="agenda-summary"><article><Users size={21} /><strong>{props.items.length}</strong><span>pacientes por contactar</span></article><article><CalendarHeart size={21} /><strong>{counts.cumpleanos}</strong><span>cumpleaños esta semana</span></article></section>
-    {notice && <div className="notice"><span>{notice}</span></div>}
+    <section className="agenda-summary"><article><Users size={21} /><strong>{visiblesItems.length}</strong><span>pacientes por contactar</span></article><article><CalendarHeart size={21} /><strong>{counts.cumpleanos}</strong><span>cumpleaños esta semana</span></article><article><Ban size={21} /><strong>{props.noContactar.length}</strong><span>no contactar</span></article></section>
+    {aviso && <div className="notice" role="status"><span>{aviso}</span></div>}
     <section className="glass agenda-board">
       <div className="agenda-toolbar" style={{ flexWrap: "wrap", gap: 8 }}>
-        <div className="tabs" role="tablist">{motivos.map((m) => <button key={m} role="tab" type="button" className={tab === m ? "active" : ""} onClick={() => setTab(m)}>{motivoLabels[m]} ({counts[m]})</button>)}</div>
+        <div className="tabs" role="tablist">{motivos.map((m) => <button key={m} role="tab" type="button" className={tab === m ? "active" : ""} onClick={() => setTab(m)}>{motivoLabels[m]} ({counts[m]})</button>)}<button role="tab" type="button" className={tab === "no_contactar" ? "active" : ""} onClick={() => setTab("no_contactar")}>No contactar ({props.noContactar.length})</button></div>
         {props.branches.length > 1 && <div className="tabs">{[{ id: "todas", nombre: "Todas" }, ...props.branches].map((b) => <Link key={b.id} className={props.sucursalId === b.id ? "active" : ""} href={`/crm?sucursal=${b.id}`}>{b.nombre}</Link>)}</div>}
       </div>
-      {visibles.length ? <div className="task-list">{visibles.map((item) => {
-        const wa = enlaceWhatsapp(item.telefono, mensaje(item, props.empresaNombre ?? ""));
-        return <article className="task-card" key={`${item.motivo}-${item.paciente_id}-${item.referencia_id ?? ""}`}>
-          <div className="task-status"><span className="status-dot" /></div>
-          <div className="task-main"><div className="task-meta"><span>{motivoLabels[item.motivo]}</span>{item.telefono && <span>{item.telefono}</span>}{item.ultimo_contacto && <span>Último contacto {formatRecordDate(item.ultimo_contacto)}</span>}</div>
-            <h2>{item.nombre}</h2><p>{detalle(item)}</p></div>
-          <div className="task-actions">
-            {wa ? <a className="outline-action" href={wa} target="_blank" rel="noreferrer"><MessageCircle size={14} /> WhatsApp</a> : <span className="field-hint">Sin teléfono</span>}
-            <button className="outline-action" type="button" onClick={() => setRegistrando(item)}><NotebookPen size={14} /> Registrar contacto</button>
-            <BotonNoContactar pacienteId={item.paciente_id} nombre={item.nombre} onDone={() => setSinContacto((prev) => [...prev, item.paciente_id])} />
-            <Link className="text-action" href={`/pacientes?buscar=${encodeURIComponent(item.nombre.trim())}`}><FolderOpen size={14} /> Abrir carpeta</Link>
-          </div>
-        </article>;
-      })}</div> : <section className="empty-state"><Users size={27} /><h3>Nada pendiente en esta lista</h3><p>Cuando haya pacientes para contactar aparecerán aquí.</p></section>}
+      {tab === "no_contactar" ? <NoContactarPanel lista={props.noContactar} puedeRestaurar={!!props.puedeRestaurar} onCambio={() => router.refresh()} /> : <>
+        <div className="cob-heading"><div><p><strong>{visibles.length}</strong> mensajes pendientes en esta lista</p></div>
+          <button className="new-consultation" type="button" disabled={!visibles.length} onClick={() => { const primero = visibles[0]; if (primero) enviar(primero, !!enlaceWhatsapp(primero.telefono, "")); }}>Modo seguido · Siguiente</button></div>
+        {visibles.length ? <div className="task-list">{visibles.map((item) => {
+          const tieneWhatsapp = !!enlaceWhatsapp(item.telefono, "");
+          return <article className="task-card" key={claveItem(item)}>
+            <div className="task-status"><span className="status-dot" /></div>
+            <div className="task-main"><div className="task-meta"><span>{motivoLabels[item.motivo]}</span>{item.telefono && <span>{item.telefono}</span>}{item.ultimo_contacto && <span>Último contacto {formatRecordDate(item.ultimo_contacto)}</span>}</div>
+              <h2>{item.nombre}</h2><p>{detalle(item)}</p></div>
+            <div className="task-actions">
+              {tieneWhatsapp ? <button className="new-consultation" type="button" onClick={() => enviar(item, true)}><MessageCircle size={14} /> Enviar por WhatsApp</button> : <><span className="field-hint">Sin teléfono</span><button className="outline-action" type="button" onClick={() => enviar(item, false)}>Marcar como avisado</button></>}
+              <Link className="text-action" href={`/pacientes?buscar=${encodeURIComponent(item.nombre.trim())}`}><FolderOpen size={14} /> Abrir carpeta</Link>
+              <BotonNoContactar className="outline-action" pacienteId={item.paciente_id} nombre={item.nombre} onDone={() => { setSinContacto((prev) => [...prev, item.paciente_id]); router.refresh(); }} />
+            </div>
+          </article>;
+        })}</div> : <section className="empty-state"><Users size={27} /><h3>Nada pendiente en esta lista</h3><p>Cuando haya pacientes para contactar aparecerán aquí.</p></section>}
+      </>}
     </section>
-    {registrando && <RegistrarModal item={registrando} empresaId={props.empresaId ?? ""} onClose={(msg) => { setRegistrando(null); if (msg) setNotice(msg); }} />}
   </div></main>;
 }
 
-function RegistrarModal({ item, empresaId, onClose }: { item: CrmItem; empresaId: string; onClose: (message?: string) => void }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+// Pacientes que no se deben contactar por ningún motivo (problemas con la óptica u otra circunstancia).
+function NoContactarPanel({ lista, puedeRestaurar, onCambio }: { lista: NoContactarItem[]; puedeRestaurar: boolean; onCambio: () => void }) {
+  const [consulta, setConsulta] = useState("");
+  const [resultados, setResultados] = useState<{ id: string; nombres: string; apellidos: string; telefono: string | null }[] | null>(null);
+  const [buscando, startBuscar] = useTransition();
   const [error, setError] = useState("");
-  return <div className="modal-backdrop"><section className="new-patient-modal" role="dialog" aria-modal="true" aria-labelledby="crm-registro-title">
-    <button className="modal-close" onClick={() => onClose()} aria-label="Cerrar"><X size={19} /></button>
-    <p className="section-label">{motivoLabels[item.motivo].toUpperCase()}</p><h2 id="crm-registro-title">{item.nombre}</h2><p>{detalle(item)}</p>
-    <form className="new-patient-form" onSubmit={(event) => {
-      event.preventDefault(); setError("");
-      const form = new FormData(event.currentTarget);
-      startTransition(async () => {
-        try { await registrarContactoCrm(form); router.refresh(); onClose("Contacto registrado."); }
-        catch (err) { setError(err instanceof Error ? err.message : "No se pudo registrar el contacto."); }
-      });
-    }}>
-      <input type="hidden" name="paciente_id" value={item.paciente_id} /><input type="hidden" name="empresa_id" value={empresaId} />
-      <input type="hidden" name="sucursal_id" value={item.sucursal_id ?? ""} /><input type="hidden" name="motivo" value={item.motivo} />
-      <input type="hidden" name="referencia_id" value={item.referencia_id ?? ""} />
-      <label>Canal<select name="canal" defaultValue="whatsapp"><option value="whatsapp">WhatsApp</option><option value="llamada">Llamada</option><option value="presencial">Presencial</option></select></label>
-      <label>Resultado<select name="resultado" defaultValue="enviado"><option value="enviado">Mensaje enviado</option><option value="respondio">Respondió</option><option value="agendo">Agendó cita</option><option value="compro">Compró</option><option value="no_contesta">No contesta</option><option value="no_interesado">No está interesado</option></select></label>
-      <label>Volver a contactar el (opcional)<input name="proximo_seguimiento" type="date" /></label>
-      <label>Nota<textarea name="nota" rows={3} maxLength={2000} /></label>
-      {error && <p className="notice" role="alert">{error}</p>}
-      <div className="modal-actions"><button className="outline-action" type="button" onClick={() => onClose()}>Cancelar</button><button className="new-consultation" type="submit" disabled={pending}>{pending ? "Guardando…" : "Guardar contacto"}</button></div>
+  const idsMarcados = new Set(lista.map((p) => p.paciente_id));
+  const buscar = () => startBuscar(async () => {
+    setError("");
+    try { setResultados(await buscarPacientesClinicos(consulta)); } catch (err) { setError(err instanceof Error ? err.message : "No se pudo buscar."); }
+  });
+  const permitir = (id: string) => startBuscar(async () => {
+    setError("");
+    try { await marcarNoContactar(id, false); onCambio(); } catch (err) { setError(err instanceof Error ? err.message : "No se pudo actualizar."); }
+  });
+  return <div>
+    <p className="field-hint">Estos pacientes no aparecen en cobros, cumpleaños, controles, seguimiento ni CRM. Su ficha y su deuda se conservan.</p>
+    <form className="agenda-toolbar" style={{ gap: 8, flexWrap: "wrap" }} onSubmit={(event) => { event.preventDefault(); if (consulta.trim().length >= 2) buscar(); }}>
+      <label className="patient-search" style={{ flex: "1 1 260px" }}><Search size={16} /><input value={consulta} onChange={(event) => setConsulta(event.target.value)} placeholder="Buscar un paciente para marcarlo como no contactar" /></label>
+      <button className="outline-action" type="submit" disabled={buscando || consulta.trim().length < 2}>Buscar</button>
     </form>
-  </section></div>;
+    {error && <p className="notice" role="alert">{error}</p>}
+    {resultados && <div className="task-list" style={{ margin: "10px 0" }}>{resultados.length ? resultados.map((p) => <article className="task-card" key={p.id}><div className="task-status"><span className="status-dot" /></div><div className="task-main"><h2>{`${p.nombres} ${p.apellidos}`.trim()}</h2>{p.telefono && <p>{p.telefono}</p>}</div><div className="task-actions">{idsMarcados.has(p.id) ? <span className="field-hint">Ya está en la lista</span> : <BotonNoContactar className="outline-action" pacienteId={p.id} nombre={`${p.nombres} ${p.apellidos}`.trim()} onDone={() => { setResultados(null); setConsulta(""); onCambio(); }} />}</div></article>) : <p className="field-hint">No se encontró ningún paciente.</p>}</div>}
+    {lista.length ? <div className="task-list">{lista.map((p) => <article className="task-card" key={p.paciente_id}>
+      <div className="task-status"><span className="status-dot" /></div>
+      <div className="task-main"><div className="task-meta">{p.telefono && <span>{p.telefono}</span>}{p.desde && <span>Desde {formatRecordDate(p.desde)}</span>}{p.marcado_por && <span>Marcado por {p.marcado_por}</span>}</div><h2>{p.nombre}</h2>{p.motivo && <p>{p.motivo}</p>}</div>
+      <div className="task-actions"><Link className="text-action" href={`/pacientes?buscar=${encodeURIComponent(p.nombre.trim())}`}><FolderOpen size={14} /> Abrir carpeta</Link>{puedeRestaurar && <button className="outline-action" type="button" disabled={buscando} onClick={() => permitir(p.paciente_id)}>Volver a permitir contacto</button>}</div>
+    </article>)}</div> : <section className="empty-state"><Ban size={27} /><h3>Ningún paciente marcado</h3><p>Usa el botón "No contactar" en cualquier mensaje o búscalo arriba.</p></section>}
+  </div>;
 }

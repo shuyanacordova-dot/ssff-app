@@ -16,8 +16,8 @@ import { renderPlantilla } from "@/lib/plantillas-mensajes";
 type Tab = "cobros" | "cumpleanos" | "controles" | "entregas" | "plantillas";
 const fecha = (ymd: string) => new Intl.DateTimeFormat("es-EC", { timeZone: "America/Guayaquil", day: "numeric", month: "short", year: "numeric" }).format(new Date(`${ymd.slice(0, 10)}T12:00:00-05:00`));
 
-export default function MensajesBoard(props: MensajesDiaData) {
-  const [tab, setTab] = useState<Tab>("cobros");
+export default function MensajesBoard(props: MensajesDiaData & { tabInicial?: string }) {
+  const [tab, setTab] = useState<Tab>(() => (["cobros", "cumpleanos", "controles", "entregas"] as const).find((t) => t === props.tabInicial) ?? "cobros");
   if (props.status !== "ready" || !props.dia) return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">CONTACTO CON PACIENTES</p><h1>Mensajes del día</h1><p className="subtitle">{props.message ?? "No se pudo abrir esta sección."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/mensajes">Iniciar sesión</Link>}</header></div></main>;
 
   const { dia } = props;

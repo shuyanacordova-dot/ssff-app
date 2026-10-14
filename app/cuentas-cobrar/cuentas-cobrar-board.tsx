@@ -227,13 +227,13 @@ function DeudaCard({ deuda, sucursalActivaId, usuarioNombre, onMensaje, pending,
     {wa ? <button className="new-consultation" type="button" onClick={() => setVerMensaje(true)}><MessageCircle size={14} /> Ver mensaje</button> : <span style={{ color: "#a24150", fontSize: 12, fontWeight: 700 }}>Sin WhatsApp registrado</span>}
     <Link className="outline-action" href={`/pacientes?paciente=${deuda.paciente_id}${deuda.ventas.length === 1 ? `&venta=${deuda.ventas[0].id}` : "&tab=ventas"}`}><Wallet size={14} /> Añadir pago</Link>
     {onCanje && <button className="outline-action" type="button" onClick={onCanje} title="Solo Superadministradora: baja el saldo sin contar como abono ni venta"><Repeat size={14} /> Canje</button>}
+    <BotonNoContactar className="outline-action" pacienteId={deuda.paciente_id} nombre={nombre} onDone={() => router.refresh()} />
     <div className="menu-wrap" ref={menuRef}>
       <button className="outline-action" type="button" onClick={() => setMenuOpen((v) => !v)}><MoreVertical size={14} /> Más opciones</button>
       {menuOpen && <div className="menu-dropdown">
         <button type="button" onClick={() => { onApartado(); closeMenu(); }}><Tag size={14} /> {apartado ? "Quitar apartado" : "Marcar como apartado"}</button>
         <button type="button" onClick={() => { setVerFecha(true); closeMenu(); }}>Fecha de cobro</button>
         <button type="button" onClick={() => { onConvenio(); closeMenu(); }}><FileText size={14} /> Convenio de pago</button>
-        <BotonNoContactar className="danger" pacienteId={deuda.paciente_id} nombre={nombre} onDone={() => { closeMenu(); router.refresh(); }} />
         <button type="button" className={deuda.cobro_insistente ? "danger" : ""} onClick={() => { onCobroInsistente(!deuda.cobro_insistente); closeMenu(); }}><AlertTriangle size={14} /> {deuda.cobro_insistente ? "Quitar cobro insistente" : "Activar cobro insistente"}</button>
       </div>}
     </div>

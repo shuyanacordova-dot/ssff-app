@@ -37,6 +37,7 @@ export default async function Home() {
   let resumenHoy: ResumenHoy | null = null;
   let cobrosHoy = { cantidad: 0, total: 0 };
   let cuadresFaltantes: string[] = [];
+  let crmHoy = { cumpleanos: 0, controles: 0, postventa: 0 };
   try {
     const context = await getOperationalContext();
     if (context) {
@@ -45,6 +46,17 @@ export default async function Home() {
         const { data: cola, error } = await supabase.rpc("cola_cobros_hoy", { p_sucursal: context.activeBranch.id });
         if (!error && Array.isArray(cola)) cobrosHoy = { cantidad: cola.length, total: cola.reduce((sum: number, row: { saldo: number }) => sum + Number(row.saldo), 0) };
       } catch { /* El inicio sigue disponible si falla la cola. */ }
+      // Mensajes de CRM de hoy (los mismos de "Mensajes del día"): cumpleaños, controles y postventa que tocan.
+      try {
+        const [diaResult, entregasResult] = await Promise.all([
+          supabase.rpc("mensajes_del_dia", { p_sucursal: context.activeBranch.id }),
+          supabase.rpc("seguimiento_entregas", { p_sucursal: context.activeBranch.id }),
+        ]);
+        const pendiente = (x: { enviado_en: string | null; enviado_auto: boolean }) => !x.enviado_en && !x.enviado_auto;
+        const dia = diaResult.error ? null : (diaResult.data as { cumpleanos?: { enviado_en: string | null; enviado_auto: boolean }[]; controles?: { enviado_en: string | null; enviado_auto: boolean }[] } | null);
+        const entregas = entregasResult.error ? [] : ((entregasResult.data as { items?: { resena_en: string | null }[] } | null)?.items ?? []);
+        crmHoy = { cumpleanos: (dia?.cumpleanos ?? []).filter(pendiente).length, controles: (dia?.controles ?? []).filter(pendiente).length, postventa: entregas.filter((e) => !e.resena_en).length };
+      } catch { /* El inicio sigue disponible si fallan los mensajes de CRM. */ }
       try {
         const { data: dias } = await supabase.rpc("cuadres_faltantes", { p_sucursal: context.activeBranch.id });
         if (Array.isArray(dias)) cuadresFaltantes = dias as string[];
@@ -54,5 +66,5 @@ export default async function Home() {
     }
   } catch { resumenHoy = null; }
 
-  return <DashboardShell taskData={taskData} informeMensual={informeMensual} metasMessage={metasMessage} resumenHoy={resumenHoy} cobrosHoy={cobrosHoy} acumulado={acumulado} cuadresFaltantes={cuadresFaltantes} />;
+  return <DashboardShell taskData={taskData} informeMensual={informeMensual} metasMessage={metasMessage} resumenHoy={resumenHoy} cobrosHoy={cobrosHoy} crmHoy={crmHoy} acumulado={acumulado} cuadresFaltantes={cuadresFaltantes} />;
 }
