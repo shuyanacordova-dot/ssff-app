@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { emitirFactura, type ResultadoEmision } from "@/lib/sri/emitir";
 
 const value = (form: FormData, name: string) => String(form.get(name) ?? "").trim();
 const roleName = (roles: { nombre: string } | { nombre: string }[] | null) => Array.isArray(roles) ? roles[0]?.nombre : roles?.nombre;
@@ -28,4 +29,24 @@ export async function crearBorradorFactura(form: FormData) {
     throw new Error("No se pudo crear el borrador.");
   }
   revalidatePath("/facturacion");
+}
+
+/** Emite la factura al SRI (firma, envío y autorización). Solo la Superadministradora. */
+export async function emitirFacturaSri(form: FormData): Promise<ResultadoEmision> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data: esSuper, error } = await supabase.rpc("es_superadmin");
+    if (error || esSuper !== true) return { ok: false, error: "Solo la Superadministradora puede emitir facturas al SRI." };
+    const { data: auth } = await supabase.auth.getUser();
+    const { data: perfil } = await supabase.from("usuarios").select("id").eq("auth_user_id", auth.user?.id ?? "").maybeSingle();
+    if (!perfil) return { ok: false, error: "No se encontró tu perfil." };
+    const ventaId = value(form, "venta_id");
+    const tarifa = value(form, "tarifa_iva") === "0" ? 0 : 15;
+    if (!/^[0-9a-f-]{36}$/i.test(ventaId)) return { ok: false, error: "Venta inválida." };
+    const resultado = await emitirFactura({ ventaId, usuarioId: perfil.id, tarifaIva: tarifa, consumidorFinal: form.get("consumidor_final") === "on", identificacion: value(form, "cliente_identificacion"), email: value(form, "cliente_email") });
+    revalidatePath("/facturacion");
+    return resultado;
+  } catch {
+    return { ok: false, error: "No se pudo emitir la factura." };
+  }
 }

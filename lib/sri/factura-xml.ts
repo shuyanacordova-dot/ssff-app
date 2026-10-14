@@ -24,6 +24,11 @@ function numero(valor: number): string {
   if (!Number.isFinite(valor) || valor < 0 || valor >= 1e21) throw new Error("Importe o cantidad inválido.");
   return valor.toFixed(2);
 }
+/** Cantidad y precio unitario admiten hasta 6 decimales; se recortan los ceros sobrantes dejando al menos 2. */
+function numero6(valor: number): string {
+  if (!Number.isFinite(valor) || valor < 0 || valor >= 1e15) throw new Error("Importe o cantidad inválido.");
+  return valor.toFixed(6).replace(/(\.\d{2}\d*?)0+$/, "$1");
+}
 function impuesto(imp: ImpuestoFactura, detalle: boolean): string {
   if (!["0", "4"].includes(imp.codigoPorcentaje)) throw new Error("IVA no soportado.");
   return tag("codigo", 2) + tag("codigoPorcentaje", imp.codigoPorcentaje) + (detalle ? tag("tarifa", imp.codigoPorcentaje === "4" ? "15.00" : "0.00") : "") + tag("baseImponible", numero(imp.baseImponible)) + tag("valor", numero(imp.valor));
@@ -48,7 +53,7 @@ export function construirFacturaXml(d: DatosFactura): string {
   const factura = tag("fechaEmision", fecha) + tag("dirEstablecimiento", d.dirEstablecimiento) + tag("obligadoContabilidad", d.obligadoContabilidad ? "SI" : "NO") + tag("tipoIdentificacionComprador", d.tipoIdentificacionComprador) + tag("razonSocialComprador", d.razonSocialComprador) + tag("identificacionComprador", d.tipoIdentificacionComprador === "07" ? "9999999999999" : d.identificacionComprador) + tag("totalSinImpuestos", numero(d.totalSinImpuestos)) + tag("totalDescuento", numero(d.totalDescuento)) + `<totalConImpuestos>${d.totalConImpuestos.map((i) => `<totalImpuesto>${impuesto(i, false)}</totalImpuesto>`).join("")}</totalConImpuestos>` + tag("propina", "0.00") + tag("importeTotal", numero(d.importeTotal)) + tag("moneda", "DOLAR") + `<pagos>${pagos}</pagos>`;
   const detalles = d.detalles.map((i) => {
     if (i.cantidad <= 0 || !i.impuestos.length) throw new Error("Detalle inválido.");
-    return `<detalle>${tag("codigoPrincipal", i.codigoPrincipal)}${tag("descripcion", i.descripcion)}${tag("cantidad", numero(i.cantidad))}${tag("precioUnitario", numero(i.precioUnitario))}${tag("descuento", numero(i.descuento))}${tag("precioTotalSinImpuesto", numero(i.precioTotalSinImpuesto))}<impuestos>${i.impuestos.map((imp) => `<impuesto>${impuesto(imp, true)}</impuesto>`).join("")}</impuestos></detalle>`;
+    return `<detalle>${tag("codigoPrincipal", i.codigoPrincipal)}${tag("descripcion", i.descripcion)}${tag("cantidad", numero6(i.cantidad))}${tag("precioUnitario", numero6(i.precioUnitario))}${tag("descuento", numero(i.descuento))}${tag("precioTotalSinImpuesto", numero(i.precioTotalSinImpuesto))}<impuestos>${i.impuestos.map((imp) => `<impuesto>${impuesto(imp, true)}</impuesto>`).join("")}</impuestos></detalle>`;
   }).join("");
   const adicionales = (d.email ? `<campoAdicional nombre="Email">${escapar(d.email)}</campoAdicional>` : "") + (d.telefono ? `<campoAdicional nombre="Teléfono">${escapar(d.telefono)}</campoAdicional>` : "");
   return `<?xml version="1.0" encoding="UTF-8"?><factura id="comprobante" version="1.1.0"><infoTributaria>${tributaria}</infoTributaria><infoFactura>${factura}</infoFactura><detalles>${detalles}</detalles>${adicionales ? `<infoAdicional>${adicionales}</infoAdicional>` : ""}</factura>`;
