@@ -25,7 +25,7 @@ import {
   Sparkles,
   Users,
   Wallet,
-  X, HeartHandshake, LockKeyhole, ListChecks, MessagesSquare } from "lucide-react";
+  X, HeartHandshake, LockKeyhole, ListChecks, MessagesSquare, Gift } from "lucide-react";
 import { esSuperadminActual, puedeVerCuadreBancosActual } from "./nav-actions";
 
 type NavItem = { href: string; label: string; detail: string; icon: typeof Home; group: "Operación" | "Finanzas" | "Administración"; soloSuperadmin?: boolean; soloCuadreBancos?: boolean };
@@ -56,6 +56,7 @@ const menuItems: NavItem[] = [
   { href: "/asistente", label: "Asistente Shu", detail: "Plantillas y ayuda administrativa", icon: Sparkles, group: "Administración" },
   { href: "/equipo", label: "Equipo y accesos", detail: "Usuarios, roles y contraseñas", icon: Users, group: "Administración" },
   { href: "/configuracion/sucursales", label: "Sucursales e identidad", detail: "Logo, contacto y presentación", icon: Settings, group: "Administración" },
+  { href: "/configuracion/referidos", label: "Referidos y recompensas", detail: "Círculo Shu y Focus Friends", icon: Gift, group: "Administración", soloSuperadmin: true },
 ];
 
 const hiddenPrefixes = ["/login", "/olvide-contrasena", "/actualizar-contrasena", "/auth", "/recibo/", "/privacidad", "/tarjeta"];
