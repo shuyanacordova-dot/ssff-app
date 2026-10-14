@@ -56,8 +56,8 @@ begin
   perform set_config('t.focus', v_focus::text, true);
   perform set_config('t.shu', v_shu::text, true);
   perform set_config('t.su', coalesce((select u.auth_user_id::text from public.usuarios u join public.roles r on r.id = u.rol_id where r.nombre = 'superadmin' and u.activo limit 1), ''), true);
-  perform set_config('t.vend_focus', coalesce((select u.auth_user_id::text from public.usuarios u join public.roles r on r.id = u.rol_id where r.nombre in ('vendedor', 'optometra') and u.empresa_id = v_focus and u.activo limit 1), ''), true);
-  perform set_config('t.vend_shu', coalesce((select u.auth_user_id::text from public.usuarios u join public.roles r on r.id = u.rol_id where r.nombre in ('vendedor', 'optometra') and u.empresa_id = v_shu and u.activo limit 1), ''), true);
+  perform set_config('t.vend_focus', coalesce((select u.auth_user_id::text from public.usuarios u join public.roles r on r.id = u.rol_id where r.nombre in ('vendedor', 'optometra', 'admin_sucursal') and u.empresa_id = v_focus and u.activo order by (r.nombre = 'admin_sucursal') limit 1), ''), true);
+  perform set_config('t.vend_shu', coalesce((select u.auth_user_id::text from public.usuarios u join public.roles r on r.id = u.rol_id where r.nombre in ('vendedor', 'optometra', 'admin_sucursal') and u.empresa_id = v_shu and u.activo order by (r.nombre = 'admin_sucursal') limit 1), ''), true);
   perform set_config('t.suc_focus', coalesce((select id::text from public.sucursales where empresa_id = v_focus order by nombre limit 1), ''), true);
   perform set_config('t.suc_shu', coalesce((select id::text from public.sucursales where empresa_id = v_shu order by nombre limit 1), ''), true);
   perform set_config('t.producto_focus', coalesce((select id::text from public.productos_catalogo where empresa_id = v_focus and activo and categoria in ('accesorio', 'servicio') and not controla_inventario limit 1), ''), true);
