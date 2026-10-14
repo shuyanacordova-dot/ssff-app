@@ -2,12 +2,13 @@ import { getVentasData, type Sale, type SaleBranch, type SaleCompany, type SaleP
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type InvoiceDraft = { id: string; venta_id: string | null; empresa_id: string; sucursal_id: string | null; cliente_nombre: string; cliente_identificacion: string | null; cliente_email: string | null; numero_interno: number; subtotal: number; descuento: number; iva: number; total: number; estado: string; creado_en: string };
-export type ComprobanteSri = { id: string; venta_id: string; ambiente: string; establecimiento: string; punto_emision: string; secuencial: number; estado: string; comprador_nombre: string | null; total: number | null; numero_autorizacion: string | null; mensajes: { identificador: string; mensaje: string }[]; creado_en: string };
-export type BillingData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "setup_required" | "error"; message?: string; profile?: { id: string; rol: string }; sales: Sale[]; patients: SalePatient[]; companies: SaleCompany[]; branches: SaleBranch[]; drafts: InvoiceDraft[]; comprobantes: ComprobanteSri[] };
+export type EmisorSri = { id: string; sucursal_id: string; ruc: string; razon_social: string | null; regimen: string | null; ambiente: string; firma_cargada: boolean; firma_vence: string | null };
+export type ComprobanteSri = { id: string; sucursal_id: string | null; venta_id: string; ambiente: string; establecimiento: string; punto_emision: string; secuencial: number; estado: string; comprador_nombre: string | null; total: number | null; numero_autorizacion: string | null; mensajes: { identificador: string; mensaje: string }[]; creado_en: string };
+export type BillingData = { status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "setup_required" | "error"; message?: string; profile?: { id: string; rol: string }; sales: Sale[]; patients: SalePatient[]; companies: SaleCompany[]; branches: SaleBranch[]; drafts: InvoiceDraft[]; comprobantes: ComprobanteSri[]; emisores: EmisorSri[] };
 
 export async function getBillingData(): Promise<BillingData> {
   const salesData = await getVentasData();
-  const base = { sales: salesData.sales, patients: salesData.patients, companies: salesData.companies, branches: salesData.branches, drafts: [], comprobantes: [] };
+  const base = { sales: salesData.sales, patients: salesData.patients, companies: salesData.companies, branches: salesData.branches, drafts: [], comprobantes: [], emisores: [] };
   if (salesData.status !== "ready") return { status: salesData.status, message: salesData.message, profile: salesData.profile, ...base };
   if (!new Set(["superadmin", "admin_sucursal", "caja"]).has(salesData.profile?.rol ?? "")) return { status: "forbidden", message: "Tu perfil no tiene permiso para preparar facturas.", profile: salesData.profile, ...base };
   try {
@@ -15,8 +16,10 @@ export async function getBillingData(): Promise<BillingData> {
     const { data, error } = await supabase.from("facturas_borrador").select("id,venta_id,empresa_id,sucursal_id,cliente_nombre,cliente_identificacion,cliente_email,numero_interno,subtotal,descuento,iva,total,estado,creado_en").order("creado_en", { ascending: false }).limit(100);
     if (error?.code === "42P01" || error?.message?.includes("facturas_borrador")) return { status: "setup_required", message: "El módulo está construido localmente. Falta autorizar y aplicar su migración a Supabase para guardar borradores.", profile: salesData.profile, ...base };
     if (error) return { status: "error", message: "No se pudieron cargar los borradores de facturación.", profile: salesData.profile, ...base };
-    const { data: comp } = await supabase.from("comprobantes_sri").select("id,venta_id,ambiente,establecimiento,punto_emision,secuencial,estado,comprador_nombre,total,numero_autorizacion,mensajes,creado_en").order("creado_en", { ascending: false }).limit(100);
-    return { status: "ready", profile: salesData.profile, ...base, drafts: (data ?? []) as InvoiceDraft[], comprobantes: (comp ?? []) as ComprobanteSri[] };
+    const { data: comp } = await supabase.from("comprobantes_sri").select("id,sucursal_id,venta_id,ambiente,establecimiento,punto_emision,secuencial,estado,comprador_nombre,total,numero_autorizacion,mensajes,creado_en").order("creado_en", { ascending: false }).limit(100);
+    // Solo la superadmin puede leer los emisores (RLS); para el resto la lista llega vacía. Nunca se piden columnas de la firma.
+    const { data: emis } = await supabase.from("emisores_sri").select("id,sucursal_id,ruc,razon_social,regimen,ambiente,firma_cargada,firma_vence");
+    return { status: "ready", profile: salesData.profile, ...base, drafts: (data ?? []) as InvoiceDraft[], comprobantes: (comp ?? []) as ComprobanteSri[], emisores: (emis ?? []) as EmisorSri[] };
   } catch {
     return { status: "error", message: "No se pudo abrir facturación.", profile: salesData.profile, ...base };
   }
