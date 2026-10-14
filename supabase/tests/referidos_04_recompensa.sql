@@ -40,6 +40,28 @@ begin
   select count(*) into n from public.monedero_movimientos where paciente_id = a and tipo = 'credito';
   if n <> 2 then raise exception 'FALLO D4b: créditos %', n; end if;
 
+  -- D4c: un canje (la superadministradora deja el saldo en 0 sin que entre dinero) NO dispara la recompensa: exige venta 100 %% pagada
+  declare cano uuid; cano_cod text; cora uuid; s_cora uuid;
+  begin
+    cano := pg_temp.paciente('Cano', '0993000060', v_focus, v_sf);
+    select codigo into cano_cod from public.codigos_referido where programa_id = v_prog and paciente_id = cano;
+    cora := pg_temp.paciente('Cora', '0993000061', v_focus, v_sf);
+    s_cora := pg_temp.vender(v_focus, v_sf, vf, cora, cano_cod, 150, 100);   -- total 135, pagó 100, saldo 35
+    perform set_config('request.jwt.claims', json_build_object('sub', su, 'role', 'authenticated')::text, true);
+    set local role authenticated;
+    perform public.registrar_canje_venta(s_cora, 35, 'Prueba de canje del saldo');
+    reset role;
+    if (select saldo from public.ventas where id = s_cora) <> 0 or (select pagado from public.ventas where id = s_cora) <> 100 then
+      raise exception 'FALLO D4c-a: el canje debía dejar saldo 0 con pagado 100 (saldo %, pagado %)', (select saldo from public.ventas where id = s_cora), (select pagado from public.ventas where id = s_cora);
+    end if;
+    if (select estado from public.referidos where venta_id = s_cora) <> 'en_pago' or exists (select 1 from public.monedero_movimientos where paciente_id = cano) then
+      raise exception 'FALLO D4c-b: un canje no debe otorgar la recompensa';
+    end if;
+    if app_private.procesar_recompensas_pendientes(v_prog) <> 0 or (select estado from public.referidos where venta_id = s_cora) <> 'en_pago' then
+      raise exception 'FALLO D4c-c: el reproceso de pendientes otorgó una venta canjeada';
+    end if;
+  end;
+
   -- D5: bono de 3 referidos ($15) una sola vez; bono de 5 ($25) con el quinto
   d := pg_temp.paciente('Dani', '0993000004', v_focus, v_sf);
   perform pg_temp.vender(v_focus, v_sf, vf, d, ca, 150, 135);
@@ -133,14 +155,123 @@ begin
     if not exists (select 1 from public.referidos_auditoria where evento = 'reversa_incompleta' and referido_id = (select id from public.referidos where venta_id = srb) and (detalle->>'no_recuperado')::numeric = 4) then
       raise exception 'FALLO D9e: falta la marca de reversa incompleta ($4 gastados)';
     end if;
-    -- D10: anular la venta donde se usó crédito devuelve ese crédito al monedero
+    -- D10: el crédito que Rafa usó salió de un lote que D9 ya revirtió: NO se devuelve; queda marcado en auditoría
     perform set_config('request.jwt.claims', json_build_object('sub', su, 'role', 'authenticated')::text, true);
     set local role authenticated;
     perform public.anular_venta_con_modo(sgasto, 'Prueba de anulación con crédito usado', 'credito');
     reset role;
-    if (select monto from public.monedero_movimientos where paciente_id = ra and tipo = 'devolucion') <> 4 then raise exception 'FALLO D10: no se devolvió el crédito usado'; end if;
+    if exists (select 1 from public.monedero_movimientos where paciente_id = ra and tipo = 'devolucion') then raise exception 'FALLO D10a: se devolvió crédito de un lote ya revertido'; end if;
+    if not exists (select 1 from public.referidos_auditoria where evento = 'credito_no_devuelto' and paciente_id = ra and venta_id = sgasto and (detalle->>'monto')::numeric = 4) then
+      raise exception 'FALLO D10b: falta la marca credito_no_devuelto ($4)';
+    end if;
+    if app_private.saldo_disponible_monedero(v_prog, ra) <> 0 then raise exception 'FALLO D10c: saldo de Rafa %', app_private.saldo_disponible_monedero(v_prog, ra); end if;
   end;
 
+
+  -- D12: camino feliz de la devolución: Rosa gana $10, gasta $4, anula esa compra: vuelve exactamente $4 (una sola devolución)
+  declare r2 uuid; cr2 text; r2b uuid; sr2b uuid; sg2 uuid;
+  begin
+    r2 := pg_temp.paciente('Rosa', '0993000070', v_focus, v_sf);
+    select codigo into cr2 from public.codigos_referido where programa_id = v_prog and paciente_id = r2;
+    r2b := pg_temp.paciente('Rolo', '0993000071', v_focus, v_sf);
+    sr2b := pg_temp.vender(v_focus, v_sf, vf, r2b, cr2, 150, 135);
+    sg2 := pg_temp.vender(v_focus, v_sf, vf, r2, null, 100, 96, 4);
+    if app_private.saldo_disponible_monedero(v_prog, r2) <> 6 then raise exception 'FALLO D12a: saldo tras gastar %', app_private.saldo_disponible_monedero(v_prog, r2); end if;
+    perform set_config('request.jwt.claims', json_build_object('sub', su, 'role', 'authenticated')::text, true);
+    set local role authenticated;
+    perform public.anular_venta_con_modo(sg2, 'Prueba de anulación con crédito usado', 'credito');
+    reset role;
+    if (select count(*) from public.monedero_movimientos where paciente_id = r2 and tipo = 'devolucion') <> 1
+       or (select monto from public.monedero_movimientos where paciente_id = r2 and tipo = 'devolucion') <> 4 then
+      raise exception 'FALLO D12b: debía haber una sola devolución de $4';
+    end if;
+    if app_private.saldo_disponible_monedero(v_prog, r2) <> 10 then raise exception 'FALLO D12c: saldo final %', app_private.saldo_disponible_monedero(v_prog, r2); end if;
+    if exists (select 1 from public.referidos_auditoria where paciente_id = r2 and evento in ('credito_no_devuelto', 'reversa_incompleta')) then raise exception 'FALLO D12d: no debía quedar ninguna marca'; end if;
+  end;
+
+  -- D13: segunda anulación del mismo referidor: el bono de 3 se revierte una sola vez y no se marca "reversa incompleta"
+  declare r3 uuid; cr3 text; q1 uuid; q2 uuid; q3 uuid; sq1 uuid; sq2 uuid; sq3 uuid; bono3 uuid;
+  begin
+    r3 := pg_temp.paciente('Remi', '0993000080', v_focus, v_sf);
+    select codigo into cr3 from public.codigos_referido where programa_id = v_prog and paciente_id = r3;
+    q1 := pg_temp.paciente('Quim1', '0993000081', v_focus, v_sf);
+    sq1 := pg_temp.vender(v_focus, v_sf, vf, q1, cr3, 150, 135);
+    q2 := pg_temp.paciente('Quim2', '0993000082', v_focus, v_sf);
+    sq2 := pg_temp.vender(v_focus, v_sf, vf, q2, cr3, 150, 135);
+    q3 := pg_temp.paciente('Quim3', '0993000083', v_focus, v_sf);
+    sq3 := pg_temp.vender(v_focus, v_sf, vf, q3, cr3, 150, 135);
+    select id into bono3 from public.monedero_movimientos where paciente_id = r3 and tipo = 'bono_hito' and hito = 3;
+    if bono3 is null then raise exception 'FALLO D13a: no se otorgó el bono de 3'; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub', su, 'role', 'authenticated')::text, true);
+    set local role authenticated;
+    perform public.anular_venta_con_modo(sq1, 'Prueba primera anulación', 'credito');
+    reset role;
+    if (select count(*) from public.monedero_movimientos where lote_id = bono3 and tipo = 'reversa') <> 1 then raise exception 'FALLO D13b: el bono no se revirtió al bajar a 2'; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub', su, 'role', 'authenticated')::text, true);
+    set local role authenticated;
+    perform public.anular_venta_con_modo(sq2, 'Prueba segunda anulación', 'credito');
+    reset role;
+    if (select count(*) from public.monedero_movimientos where lote_id = bono3 and tipo = 'reversa') <> 1 then raise exception 'FALLO D13c: el bono tiene más de una reversa'; end if;
+    if exists (select 1 from public.referidos_auditoria where paciente_id = r3 and evento = 'reversa_incompleta') then
+      raise exception 'FALLO D13d: se marcó reversa incompleta sin que nada se hubiera gastado';
+    end if;
+    if app_private.saldo_disponible_monedero(v_prog, r3) <> 10 then raise exception 'FALLO D13e: saldo %', app_private.saldo_disponible_monedero(v_prog, r3); end if;
+  end;
+
+  -- D14: anular la venta de un referido que sigue "en_pago": queda revertido y no se mueve el monedero
+  declare r4 uuid; cr4 text; q4 uuid; sq4 uuid;
+  begin
+    r4 := pg_temp.paciente('Reno', '0993000090', v_focus, v_sf);
+    select codigo into cr4 from public.codigos_referido where programa_id = v_prog and paciente_id = r4;
+    q4 := pg_temp.paciente('Quino', '0993000091', v_focus, v_sf);
+    sq4 := pg_temp.vender(v_focus, v_sf, vf, q4, cr4, 150, 100);
+    if (select estado from public.referidos where venta_id = sq4) <> 'en_pago' then raise exception 'FALLO D14a: el referido debía seguir en_pago'; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub', su, 'role', 'authenticated')::text, true);
+    set local role authenticated;
+    perform public.anular_venta_con_modo(sq4, 'Prueba de anulación en pago', 'credito');
+    reset role;
+    if (select estado from public.referidos where venta_id = sq4) <> 'revertido' then raise exception 'FALLO D14b: no quedó revertido'; end if;
+    if exists (select 1 from public.monedero_movimientos where paciente_id = r4) then raise exception 'FALLO D14c: se movió el monedero'; end if;
+    if exists (select 1 from public.referidos_auditoria where paciente_id = r4 and evento = 'reversa_incompleta') then raise exception 'FALLO D14d: marca de reversa incompleta indebida'; end if;
+  end;
+
+  -- D15: bono de 3 gastado en parte: al bajar a 2 referidos se revierte solo lo no gastado y lo gastado queda marcado
+  declare r5 uuid; cr5 text; q5a uuid; q5b uuid; q5c uuid; sq5a uuid; sq5b uuid; sq5c uuid; bono5 uuid; cred5a uuid; v_vig integer;
+  begin
+    select vigencia_credito_dias into v_vig from public.programas_referidos where id = v_prog;
+    r5 := pg_temp.paciente('Remy', '0993000100', v_focus, v_sf);
+    select codigo into cr5 from public.codigos_referido where programa_id = v_prog and paciente_id = r5;
+    -- Los créditos de los referidos vencen a 120 días y el bono a 60: el bono es lo primero que se gasta.
+    update public.programas_referidos set vigencia_credito_dias = 120 where id = v_prog;
+    q5a := pg_temp.paciente('Quil1', '0993000101', v_focus, v_sf);
+    sq5a := pg_temp.vender(v_focus, v_sf, vf, q5a, cr5, 150, 135);
+    q5b := pg_temp.paciente('Quil2', '0993000102', v_focus, v_sf);
+    sq5b := pg_temp.vender(v_focus, v_sf, vf, q5b, cr5, 150, 135);
+    q5c := pg_temp.paciente('Quil3', '0993000103', v_focus, v_sf);
+    sq5c := pg_temp.vender(v_focus, v_sf, vf, q5c, cr5, 150, 100);
+    update public.programas_referidos set vigencia_credito_dias = 60 where id = v_prog;
+    perform set_config('request.jwt.claims', json_build_object('sub', vf, 'role', 'authenticated')::text, true);
+    set local role authenticated;
+    perform public.registrar_abono_venta(sq5c, 'efectivo', 35);
+    reset role;
+    update public.programas_referidos set vigencia_credito_dias = v_vig where id = v_prog;
+    select id into bono5 from public.monedero_movimientos where paciente_id = r5 and tipo = 'bono_hito' and hito = 3;
+    if bono5 is null then raise exception 'FALLO D15a: no se otorgó el bono de 3'; end if;
+    perform pg_temp.vender(v_focus, v_sf, vf, r5, null, 100, 95, 5);
+    if (select -sum(monto) from public.monedero_movimientos where lote_id = bono5 and tipo = 'uso') <> 5 then raise exception 'FALLO D15b: debía gastar $5 del bono (el que vence primero)'; end if;
+    select id into cred5a from public.monedero_movimientos where referido_id = (select id from public.referidos where venta_id = sq5a) and tipo = 'credito';
+    perform set_config('request.jwt.claims', json_build_object('sub', su, 'role', 'authenticated')::text, true);
+    set local role authenticated;
+    perform public.anular_venta_con_modo(sq5a, 'Prueba de bono gastado en parte', 'credito');
+    reset role;
+    if (select -monto from public.monedero_movimientos where lote_id = bono5 and tipo = 'reversa') <> 10 then raise exception 'FALLO D15c: la reversa del bono debía ser lo no gastado ($10)'; end if;
+    if (select -monto from public.monedero_movimientos where lote_id = cred5a and tipo = 'reversa') <> 10 then raise exception 'FALLO D15d: reversa del crédito del referido'; end if;
+    if not exists (select 1 from public.referidos_auditoria where evento = 'reversa_incompleta' and referido_id = (select id from public.referidos where venta_id = sq5a) and (detalle->>'no_recuperado')::numeric = 5) then
+      raise exception 'FALLO D15e: no_recuperado debía ser $5 (lo gastado del bono)';
+    end if;
+    if app_private.saldo_disponible_monedero(v_prog, r5) <> 20 then raise exception 'FALLO D15f: saldo %', app_private.saldo_disponible_monedero(v_prog, r5); end if;
+    if (select coalesce(sum(monto), 0) from public.monedero_movimientos where paciente_id = r5) < 0 then raise exception 'FALLO D15g: saldo negativo'; end if;
+  end;
 
   -- D11: public.estado_monedero (la tarjeta que ve el equipo): disponible, pendiente, usado, referidos, movimientos y referido_por
   declare pe uuid; spe uuid; j jsonb; jb jsonb; jp jsonb; el jsonb; prev timestamptz; cur timestamptz; n_ok int := 0; v_rechazo boolean := false;
@@ -176,7 +307,14 @@ begin
       raise exception 'FALLO D11h: referidos %', j->'referidos';
     end if;
     -- movimientos: 6 créditos + 2 bonos + 1 uso + 2 ajustes = 11, el más nuevo primero
-    if jsonb_array_length(j->'movimientos') <> 11 then raise exception 'FALLO D11i: movimientos % (se esperaban 11)', jsonb_array_length(j->'movimientos'); end if;
+    -- 6 créditos + 2 bonos + 2 ajustes + el uso de $15 (puede venir partido en varias filas si salió de más de un lote)
+    if (select count(*) from jsonb_array_elements(j->'movimientos') x where x->>'tipo' = 'credito') <> 6
+       or (select count(*) from jsonb_array_elements(j->'movimientos') x where x->>'tipo' = 'bono_hito') <> 2
+       or (select count(*) from jsonb_array_elements(j->'movimientos') x where x->>'tipo' = 'ajuste') <> 2
+       or (select -sum((x->>'monto')::numeric) from jsonb_array_elements(j->'movimientos') x where x->>'tipo' = 'uso') <> 15
+       or jsonb_array_length(j->'movimientos') <> 10 + (select count(*) from jsonb_array_elements(j->'movimientos') x where x->>'tipo' = 'uso') then
+      raise exception 'FALLO D11i: movimientos % ', j->'movimientos';
+    end if;
     if (j->'movimientos'->0->>'tipo') <> 'ajuste' or (j->'movimientos'->0->>'monto')::numeric <> 7 or (j->'movimientos'->1->>'monto')::numeric <> 5 then
       raise exception 'FALLO D11j: no viene el más nuevo primero: % / %', j->'movimientos'->0, j->'movimientos'->1;
     end if;
@@ -209,5 +347,5 @@ begin
     if not v_rechazo then raise exception 'FALLO D11r: otra empresa pudo leer el monedero de Focus'; end if;
   end;
 
-  raise exception 'PRUEBAS_OK: recompensas, bonos y reversas (D1-D11)';
+  raise exception 'PRUEBAS_OK: recompensas, bonos y reversas (D1-D15)';
 end $$;

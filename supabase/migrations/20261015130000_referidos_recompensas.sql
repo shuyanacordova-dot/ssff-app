@@ -6,6 +6,8 @@ declare r public.referidos; v_prog public.programas_referidos; v_cuenta integer;
 begin
   select * into r from public.referidos where id = p_referido and estado = 'en_pago' for update;
   if not found then return; end if;
+  -- Bloquea al referidor: dos recompensas simultáneas no pueden contar el mismo total y saltarse el bono.
+  perform 1 from public.pacientes_clinicos where id = r.referidor_paciente_id for update;
   select * into v_prog from public.programas_referidos where id = r.programa_id;
   if v_prog.recompensas_suspendidas then
     insert into public.referidos_auditoria (programa_id, evento, paciente_id, referido_id, venta_id, detalle)
@@ -43,7 +45,7 @@ declare r record; v_n integer := 0;
 begin
   for r in
     select rf.id from public.referidos rf join public.ventas v on v.id = rf.venta_id
-     where rf.programa_id = p_programa and rf.estado = 'en_pago' and v.estado = 'completada' and v.saldo <= 0
+     where rf.programa_id = p_programa and rf.estado = 'en_pago' and v.estado = 'completada' and v.saldo <= 0 and v.pagado >= v.total
   loop
     perform app_private.otorgar_recompensa(r.id);
     v_n := v_n + 1;
@@ -59,9 +61,11 @@ declare r public.referidos; l record; u record; v_cuenta integer; v_hito integer
 begin
   for r in select * from public.referidos where venta_id = p_venta and estado in ('en_pago', 'recompensado') for update loop
     v_no_recuperado := 0;
+    -- Bloquea al referidor antes de leer lo que queda de cada lote (evita revertir en paralelo a un gasto).
+    perform 1 from public.pacientes_clinicos where id = r.referidor_paciente_id for update;
     if r.estado = 'recompensado' then
       for l in
-        select m.id, m.monto, sum(x.monto) as restante
+        select m.id, m.monto, sum(x.monto) as restante, coalesce(-sum(x.monto) filter (where x.tipo = 'uso'), 0) as gastado
         from public.monedero_movimientos m join public.monedero_movimientos x on x.id = m.id or x.lote_id = m.id
         where m.referido_id = r.id and m.tipo = 'credito'
         group by m.id, m.monto
@@ -70,7 +74,7 @@ begin
           insert into public.monedero_movimientos (programa_id, paciente_id, tipo, monto, lote_id, venta_id, motivo)
           values (r.programa_id, r.referidor_paciente_id, 'reversa', -l.restante, l.id, p_venta, 'Venta del referido anulada') on conflict do nothing;
         end if;
-        v_no_recuperado := v_no_recuperado + (l.monto - l.restante);
+        v_no_recuperado := v_no_recuperado + l.gastado;
       end loop;
     end if;
     update public.referidos set estado = 'revertido' where id = r.id;
@@ -81,16 +85,17 @@ begin
     foreach v_hito in array array[3, 5] loop
       if v_cuenta < v_hito then
         for l in
-          select m.id, m.monto, sum(x.monto) as restante
+          select m.id, m.monto, sum(x.monto) as restante, coalesce(-sum(x.monto) filter (where x.tipo = 'uso'), 0) as gastado
           from public.monedero_movimientos m join public.monedero_movimientos x on x.id = m.id or x.lote_id = m.id
           where m.programa_id = r.programa_id and m.paciente_id = r.referidor_paciente_id and m.tipo = 'bono_hito' and m.hito = v_hito
+            and not exists (select 1 from public.monedero_movimientos z where z.lote_id = m.id and z.tipo = 'reversa')
           group by m.id, m.monto
         loop
           if l.restante > 0 then
             insert into public.monedero_movimientos (programa_id, paciente_id, tipo, monto, lote_id, venta_id, motivo)
             values (r.programa_id, r.referidor_paciente_id, 'reversa', -l.restante, l.id, p_venta, 'Bono por hito ya no corresponde') on conflict do nothing;
           end if;
-          v_no_recuperado := v_no_recuperado + (l.monto - l.restante);
+          v_no_recuperado := v_no_recuperado + l.gastado;
         end loop;
       end if;
     end loop;
@@ -105,17 +110,31 @@ begin
 
   -- Crédito que quien compró usó en la venta anulada: vuelve al monedero mientras no haya vencido.
   for u in
-    select x.programa_id, x.paciente_id, -sum(x.monto) as total, max(lt.vence_en) as vence
-    from public.monedero_movimientos x join public.monedero_movimientos lt on lt.id = x.lote_id
-    where x.venta_id = p_venta and x.tipo = 'uso'
-    group by x.programa_id, x.paciente_id
+    select q.programa_id, q.paciente_id,
+           -sum(q.monto) as total,
+           -coalesce(sum(q.monto) filter (where not q.revertido), 0) as devolvible,
+           max(q.vence_en) filter (where not q.revertido) as vence
+    from (
+      select x.programa_id, x.paciente_id, x.monto, lt.vence_en,
+             exists (select 1 from public.monedero_movimientos z where z.lote_id = lt.id and z.tipo = 'reversa') as revertido
+      from public.monedero_movimientos x join public.monedero_movimientos lt on lt.id = x.lote_id
+      where x.venta_id = p_venta and x.tipo = 'uso'
+    ) q
+    group by q.programa_id, q.paciente_id
   loop
-    if u.vence > now() then
-      insert into public.monedero_movimientos (programa_id, paciente_id, tipo, monto, vence_en, venta_id, motivo)
-      values (u.programa_id, u.paciente_id, 'devolucion', u.total, u.vence, p_venta, 'Venta anulada: se devuelve el crédito usado') on conflict do nothing;
-    else
+    if u.total - u.devolvible > 0 then
       insert into public.referidos_auditoria (programa_id, evento, paciente_id, venta_id, detalle)
-      values (u.programa_id, 'credito_vencido_no_devuelto', u.paciente_id, p_venta, jsonb_build_object('monto', u.total));
+      values (u.programa_id, 'credito_no_devuelto', u.paciente_id, p_venta,
+              jsonb_build_object('monto', u.total - u.devolvible, 'motivo', 'el crédito de origen ya fue revertido'));
+    end if;
+    if u.devolvible > 0 then
+      if u.vence > now() then
+        insert into public.monedero_movimientos (programa_id, paciente_id, tipo, monto, vence_en, venta_id, motivo)
+        values (u.programa_id, u.paciente_id, 'devolucion', u.devolvible, u.vence, p_venta, 'Venta anulada: se devuelve el crédito usado') on conflict do nothing;
+      else
+        insert into public.referidos_auditoria (programa_id, evento, paciente_id, venta_id, detalle)
+        values (u.programa_id, 'credito_vencido_no_devuelto', u.paciente_id, p_venta, jsonb_build_object('monto', u.devolvible));
+      end if;
     end if;
   end loop;
 end $$;
@@ -125,7 +144,7 @@ create or replace function app_private.trg_ventas_referidos()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare r record;
 begin
-  if new.estado = 'completada' and new.saldo <= 0 and (old.estado is distinct from 'completada' or old.saldo > 0) then
+  if new.estado = 'completada' and new.saldo <= 0 and new.pagado >= new.total and (old.estado is distinct from 'completada' or old.saldo > 0) then
     for r in select id from public.referidos where venta_id = new.id and estado = 'en_pago' loop
       perform app_private.otorgar_recompensa(r.id);
     end loop;
