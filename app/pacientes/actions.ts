@@ -31,7 +31,7 @@ async function currentClinicalProfile(allowedRoles: Set<string> = clinicalRoles)
 }
 
 export async function crearPacienteClinico(data: FormData) {
-  const { supabase } = await currentClinicalProfile(folderRoles);
+  const { supabase, profile } = await currentClinicalProfile(folderRoles);
   const nombres = text(data, "nombres"); const apellidos = text(data, "apellidos");
   if (!nombres || !apellidos) throw new Error("Ingresa nombres y apellidos.");
   const { data: result, error } = await supabase.rpc("registrar_paciente_clinico", {
@@ -41,13 +41,21 @@ export async function crearPacienteClinico(data: FormData) {
   });
   if (error) throw new Error(error.message || "No se pudo registrar el paciente.");
   const saved = result as { paciente_id: string; ya_existia: boolean };
+  let referido: { ok: boolean; mensaje: string } | null = null;
+  const codigoReferido = text(data, "codigo_referido");
+  if (codigoReferido && !saved.ya_existia) {
+    const { data: ref, error: refError } = await supabase.rpc("registrar_referido_ficha", { p_paciente: saved.paciente_id, p_empresa: profile.empresa_id, p_codigo: codigoReferido });
+    referido = refError
+      ? { ok: false, mensaje: refError.message || "No se pudo registrar quién lo refirió." }
+      : { ok: true, mensaje: `Referido por ${(ref as { referidor_nombre: string }).referidor_nombre}.` };
+  }
   const { data: patientRow, error: patientError } = await supabase.from("pacientes_clinicos")
     .select("id,nombres,apellidos,cedula,telefono,email,direccion,sexo,ocupacion,responsable_id,fecha_nacimiento,fecha_registro,observaciones,frecuencia_cobro,empresa_origen_id,actualizado_en")
     .eq("id", saved.paciente_id).single();
   if (patientError || !patientRow) throw new Error("La ficha se guardó, pero no se pudo volver a cargar.");
   const [patient] = await enrichPatientRecords(supabase, [patientRow]);
   revalidatePath("/pacientes");
-  return { ...saved, patient };
+  return { ...saved, patient, referido };
 }
 
 export async function actualizarPacienteClinico(data: FormData) {

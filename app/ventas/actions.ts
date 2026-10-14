@@ -37,7 +37,13 @@ export async function registrarVenta(form: FormData) {
     // Traspaso: solo armazones (el paciente trae sus lunas).
     const allowed = tipoVenta === "rapida" ? new Set(["accesorio", "gafas_sol", "servicio"]) : tipoVenta === "traspaso" ? new Set(["montura"]) : new Set(["montura", "lente"]);
     if (products?.some((product) => !allowed.has(product.categoria))) throw new Error(tipoVenta === "rapida" ? "La venta rápida solo admite accesorios, gafas de sol y exámenes." : tipoVenta === "traspaso" ? "El traspaso solo admite armazones." : "La venta de lentes solo admite armazones y lunas.");
-    const { data, error } = await supabase.rpc("registrar_venta", { p_empresa: empresaId, p_sucursal: sucursalId, p_cliente: cliente, p_items: items, p_pagos: payments, p_paciente: pacienteId });
+    const codigoReferido = text(form, "codigo_referido");
+    const usarCredito = Number(text(form, "usar_credito").replace(",", ".")) || 0;
+    const esConvenio = text(form, "es_convenio") === "si";
+    const { data, error } = await supabase.rpc("registrar_venta", {
+      p_empresa: empresaId, p_sucursal: sucursalId, p_cliente: cliente, p_items: items, p_pagos: payments, p_paciente: pacienteId,
+      p_codigo_referido: codigoReferido || null, p_usar_credito: usarCredito, p_es_convenio: esConvenio,
+    });
     if (error) throw new Error(error.message);
     ventaId = data as string;
     await supabase.from("ventas").update({ tipo_venta: tipoVenta }).eq("id", ventaId);
