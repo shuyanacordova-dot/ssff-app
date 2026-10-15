@@ -75,7 +75,7 @@ export default function CrmBoard(props: CrmData) {
   };
 
   return <main className="page agenda-page"><div className="container agenda-shell">
-    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">RELACIÓN CON PACIENTES · {props.empresaNombre}</p><h1>A quién contactar hoy</h1><p className="subtitle">Nada se envía solo.</p></div></header>
+    <header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">RELACIÓN CON PACIENTES · {props.empresaNombre}</p><h1>A quién contactar hoy</h1><p className="subtitle">Nada se envía solo.</p></div>{props.puedeVerReferidos && <Link className="outline-action" href="/crm/referidos">Referidos</Link>}</header>
     <section className="agenda-summary"><article><Users size={21} /><strong>{visiblesItems.length}</strong><span>pacientes por contactar</span></article><article><CalendarHeart size={21} /><strong>{counts.cumpleanos}</strong><span>cumpleaños esta semana</span></article><article><Ban size={21} /><strong>{props.noContactar.length}</strong><span>no contactar</span></article></section>
     {aviso && <div className="notice" role="status"><span>{aviso}</span></div>}
     <section className="glass agenda-board">

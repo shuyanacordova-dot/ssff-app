@@ -7,7 +7,7 @@ export type NoContactarItem = { paciente_id: string; nombre: string; telefono: s
 export type CrmBranch = { id: string; nombre: string; empresa_id: string };
 export type CrmData = {
   status: "ready" | "needs_configuration" | "needs_login" | "forbidden" | "error"; message?: string;
-  empresaId?: string; empresaNombre?: string; sucursalId?: string; branches: CrmBranch[]; items: CrmItem[]; noContactar: NoContactarItem[]; puedeRestaurar?: boolean;
+  empresaId?: string; empresaNombre?: string; sucursalId?: string; branches: CrmBranch[]; items: CrmItem[]; noContactar: NoContactarItem[]; puedeRestaurar?: boolean; puedeVerReferidos?: boolean;
 };
 
 export const motivoLabels: Record<CrmMotivo, string> = {

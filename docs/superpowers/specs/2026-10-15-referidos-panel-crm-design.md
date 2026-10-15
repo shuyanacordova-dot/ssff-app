@@ -35,7 +35,7 @@ Decisiones ya tomadas:
 | Ticket promedio | Ventas atribuidas ÷ número de ventas. |
 | Descuentos de bienvenida | Suma del descuento dado en esas ventas. |
 | Créditos generados | Créditos por referido y ajustes positivos creados en el período. |
-| Créditos usados | Créditos y bonos gastados en ventas en el período. |
+| Créditos usados | Créditos y bonos gastados en ventas **no anuladas** en el período. |
 | Créditos pendientes | Lo que recibirán los referidores cuando sus referidos terminen de pagar (referidos `en_pago`), **hoy**, sin filtro de período. |
 | Créditos vencidos | Créditos que vencieron sin usarse en el período. |
 | Bonos entregados | Bonos por 3 y 5 referidos creados en el período (cantidad y monto). |
@@ -93,3 +93,9 @@ Mismo método que la fase 1: un agente construye cada tarea y otro la revisa; la
 ## 8. Fuera de alcance
 
 Vista comparativa SHUVISION vs Focus (decisión de Shuyana); gráficos; exportar o imprimir; avisos automáticos por WhatsApp y QR (fase 3); líneas separadas de descuento y crédito en el recibo y la pantalla para "autorizar combinar con otra promoción" (fase 2b, a pedido); revocar los permisos amplios de escritura sobre `ventas`/`pagos_venta` (tarea aparte); margen exacto por producto (proyecto de proveedores y compras).
+
+## 9. Desviaciones de la fase 2 (2026-10-15)
+
+- El ranking devuelve los 20 con más actividad; reordenar por otra columna en la pantalla reordena solo esos 20 (no consulta de nuevo a la base de datos).
+- En el detalle de un referidor, el resumen (exitosos, ventas, crédito ganado/usado/vencido) respeta el período y la sucursal elegidos; el crédito disponible es el saldo de hoy de su monedero (es de toda la óptica).
+- «Pacientes con código» es el total de hoy de la óptica y no depende del período ni de la sucursal.

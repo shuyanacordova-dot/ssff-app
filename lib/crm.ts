@@ -23,7 +23,7 @@ export async function getCrmData(sucursalParam?: string): Promise<CrmData> {
       supabase.rpc("crm_no_contactar", { p_empresa: empresaId }),
     ]);
     if (error) return { status: "error", message: error.message || "No se pudo cargar el CRM.", ...empty };
-    return { status: "ready", empresaId, empresaNombre: context.activeCompany.nombre, sucursalId: sucursalId ?? "todas", branches, items: (data ?? []) as CrmItem[], noContactar: (noContactarResult.error ? [] : (noContactarResult.data ?? [])) as NoContactarItem[], puedeRestaurar: context.profile.rol === "superadmin" || context.profile.rol === "admin_sucursal" };
+    return { status: "ready", empresaId, empresaNombre: context.activeCompany.nombre, sucursalId: sucursalId ?? "todas", branches, items: (data ?? []) as CrmItem[], noContactar: (noContactarResult.error ? [] : (noContactarResult.data ?? [])) as NoContactarItem[], puedeRestaurar: context.profile.rol === "superadmin" || context.profile.rol === "admin_sucursal", puedeVerReferidos: context.profile.rol === "superadmin" || context.profile.rol === "admin_sucursal" };
   } catch {
     return { status: "error", message: "No se pudo cargar el CRM.", ...empty };
   }
