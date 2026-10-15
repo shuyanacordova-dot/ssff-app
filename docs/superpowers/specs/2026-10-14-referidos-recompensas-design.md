@@ -104,3 +104,15 @@ Cada fase tendrá su plan de implementación. No se enciende ningún programa si
 ## 12. Fuera de alcance
 
 Cupones genéricos, margen exacto por producto, envío automático por Meta/Make (siguen pausados por decisión del 2026-10-06), mezcla de datos entre SHUVISION y Focus.
+
+## 13. Desviaciones de la fase 1 (2026-10-15)
+
+- **Recibo:** el recibo sigue mostrando una sola línea «Descuento» (suma del descuento de bienvenida y el crédito). Las líneas separadas se ven en el resumen del carrito; el desglose en el recibo queda para la fase 2.
+- **Combinar con otras promociones:** la base de datos acepta `p_autoriza_combinar` (solo superadmin y admin de sucursal), pero ninguna pantalla lo ofrece todavía: una venta con descuentos de línea no puede usar el código ni el crédito.
+- **Rechazos:** un código no válido se rechaza con un mensaje y no se guarda como fila «rechazado» (ese estado se usa hoy para ventas de convenio y ventas saldadas por canje).
+- **Presupuesto mensual:** solo frena los descuentos de bienvenida; no limita el uso de crédito ni los bonos.
+- **Bonos y reversas:** un bono por hito se paga una sola vez por persona; si un referido se revierte y el conteo vuelve a subir, el bono no se paga de nuevo. Los montos de los bonos no se congelan al registrar al referido (el crédito por referido sí).
+- **Anulaciones:** si se anula la compra donde se usó crédito ANTES de anular la venta del referido que lo generó, el crédito se devuelve y la reversa posterior solo puede marcarlo como `reversa_incompleta` para revisión manual.
+- **Consumidor Final:** no recibe código ni monedero (cédula `9999999999999`). Otros pacientes «genéricos» deben limpiarse o excluirse antes de encender un programa.
+- **Seguridad pendiente fuera de esta fase:** el personal con permiso de ventas puede escribir directamente en `ventas` y `pagos_venta` (permiso amplio preexistente). La recompensa exige que los pagos registrados cubran el total, pero conviene cerrar ese permiso en una tarea aparte.
+- **Costos de la prueba:** las pruebas SQL corren sobre producción dentro de una transacción que se deshace; consumen números de folio (huecos en la secuencia) aunque no dejan datos.
