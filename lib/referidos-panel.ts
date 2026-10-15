@@ -61,3 +61,19 @@ export const porcentaje = (n: number | null | undefined): string =>
 
 export const dineroPanel = (n: number | null | undefined): string =>
   n === null || n === undefined || !Number.isFinite(Number(n)) ? "—" : `$${Number(n).toFixed(2)}`;
+
+export type OrdenRanking = "exitosos" | "ventas" | "credito_ganado" | "disponible";
+
+const numero = (valor: unknown): number => { const n = Number(valor); return Number.isFinite(n) ? n : 0; };
+
+// Mayor primero por la columna elegida; en empate se mantiene el criterio del servidor (exitosos, luego ventas) y por último el nombre.
+export function ordenarRanking(filas: FilaRanking[], orden: OrdenRanking): FilaRanking[] {
+  return [...filas].sort((a, b) =>
+    numero(b[orden]) - numero(a[orden]) ||
+    numero(b.exitosos) - numero(a.exitosos) ||
+    numero(b.ventas) - numero(a.ventas) ||
+    a.nombre.localeCompare(b.nombre, "es"));
+}
+
+export const esUuid = (valor: unknown): valor is string =>
+  typeof valor === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valor);

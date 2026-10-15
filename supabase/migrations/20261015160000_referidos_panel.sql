@@ -39,7 +39,7 @@ begin
 
   with refs as (
     select rf.id, rf.estado, rf.creado_en, rf.aplicado_en, rf.pagado_en, rf.venta_id, rf.descuento_aplicado, rf.credito_a_otorgar,
-           rf.referidor_paciente_id, v.total as venta_total, coalesce(v.sucursal_id, ur.sucursal_id) as suc
+           rf.referidor_paciente_id, v.total as venta_total, v.estado as venta_estado, coalesce(v.sucursal_id, ur.sucursal_id) as suc
     from public.referidos rf
     left join public.ventas v on v.id = rf.venta_id
     left join public.usuarios ur on ur.id = rf.registrado_por
@@ -58,7 +58,7 @@ begin
   ), act as (
     select r.referidor_paciente_id as pid,
            count(*) filter (where r.estado = 'recompensado' and r.pagado_en >= c.o_ini and r.pagado_en < c.o_fin) as exitosos,
-           coalesce(sum(r.venta_total) filter (where r.aplicado_en >= c.o_ini and r.aplicado_en < c.o_fin and r.estado <> 'revertido'), 0) as ventas
+           coalesce(sum(r.venta_total) filter (where r.aplicado_en >= c.o_ini and r.aplicado_en < c.o_fin and r.estado <> 'revertido' and r.venta_estado is distinct from 'anulada'), 0) as ventas
     from r
     where (r.creado_en >= c.o_ini and r.creado_en < c.o_fin) or (r.aplicado_en >= c.o_ini and r.aplicado_en < c.o_fin) or (r.pagado_en >= c.o_ini and r.pagado_en < c.o_fin)
     group by r.referidor_paciente_id
@@ -69,10 +69,10 @@ begin
     jsonb_build_object(
       'codigos', (select count(*) from public.codigos_referido where programa_id = c.o_programa),
       'registrados', (select count(*) from r where creado_en >= c.o_ini and creado_en < c.o_fin),
-      'compraron', (select count(*) from r where creado_en >= c.o_ini and creado_en < c.o_fin and venta_id is not null and estado <> 'revertido'),
-      'ventas_n', (select count(*) from r where aplicado_en >= c.o_ini and aplicado_en < c.o_fin and estado <> 'revertido'),
-      'ventas_total', (select coalesce(sum(venta_total), 0) from r where aplicado_en >= c.o_ini and aplicado_en < c.o_fin and estado <> 'revertido'),
-      'descuentos', (select coalesce(sum(descuento_aplicado), 0) from r where aplicado_en >= c.o_ini and aplicado_en < c.o_fin and estado <> 'revertido'),
+      'compraron', (select count(*) from r where creado_en >= c.o_ini and creado_en < c.o_fin and venta_id is not null and estado <> 'revertido' and venta_estado is distinct from 'anulada'),
+      'ventas_n', (select count(*) from r where aplicado_en >= c.o_ini and aplicado_en < c.o_fin and estado <> 'revertido' and venta_estado is distinct from 'anulada'),
+      'ventas_total', (select coalesce(sum(venta_total), 0) from r where aplicado_en >= c.o_ini and aplicado_en < c.o_fin and estado <> 'revertido' and venta_estado is distinct from 'anulada'),
+      'descuentos', (select coalesce(sum(descuento_aplicado), 0) from r where aplicado_en >= c.o_ini and aplicado_en < c.o_fin and estado <> 'revertido' and venta_estado is distinct from 'anulada'),
       'pendientes', (select coalesce(sum(credito_a_otorgar), 0) from r where estado = 'en_pago'),
       'creditos_generados', (select coalesce(sum(monto), 0) from mv where tipo in ('credito', 'ajuste') and monto > 0),
       'creditos_usados', (select coalesce(-sum(monto), 0) from mv where tipo = 'uso' and venta_estado is distinct from 'anulada'),
@@ -170,7 +170,7 @@ begin
   ), mv as (
     select * from mov where c.o_sucursal is null or suc = c.o_sucursal
   ), refs as (
-    select rf.estado, rf.aplicado_en, rf.pagado_en, rf.credito_a_otorgar, v.total as venta_total, coalesce(v.sucursal_id, ur.sucursal_id) as suc
+    select rf.estado, rf.aplicado_en, rf.pagado_en, rf.credito_a_otorgar, v.total as venta_total, v.estado as venta_estado, coalesce(v.sucursal_id, ur.sucursal_id) as suc
     from public.referidos rf
     left join public.ventas v on v.id = rf.venta_id
     left join public.usuarios ur on ur.id = rf.registrado_por
@@ -181,8 +181,8 @@ begin
   select jsonb_build_object(
     'exitosos', (select count(*) from rs where estado = 'recompensado' and pagado_en >= c.o_ini and pagado_en < c.o_fin),
     'en_espera', (select count(*) from rs where estado = 'en_pago'),
-    'ventas', (select coalesce(sum(venta_total), 0) from rs where aplicado_en >= c.o_ini and aplicado_en < c.o_fin and estado <> 'revertido'),
-    'credito_ganado', (select coalesce(sum(monto), 0) from mv where tipo in ('credito', 'bono_hito', 'ajuste') and monto > 0),
+    'ventas', (select coalesce(sum(venta_total), 0) from rs where aplicado_en >= c.o_ini and aplicado_en < c.o_fin and estado <> 'revertido' and venta_estado is distinct from 'anulada'),
+    'credito_ganado', (select coalesce(sum(monto), 0) from mv where tipo in ('credito', 'bono_hito') and monto > 0),
     'credito_usado', (select coalesce(-sum(monto), 0) from mv where tipo = 'uso' and venta_estado is distinct from 'anulada'),
     'credito_vencido', (select coalesce(-sum(monto), 0) from mv where tipo = 'vencimiento'),
     'disponible', app_private.saldo_disponible_monedero(c.o_programa, p_referidor))

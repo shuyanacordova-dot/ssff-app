@@ -57,10 +57,10 @@ declare
   adm_focus uuid := current_setting('t.vend_focus')::uuid;
   s_mat uuid := current_setting('t.suc_shu')::uuid;
   s_foc uuid := current_setting('t.suc_focus')::uuid;
-  s_sac uuid; adm_sac uuid; v_prog uuid;
+  s_sac uuid; adm_sac uuid; v_prog uuid; base_codigos integer;
   hoy date := (now() at time zone 'America/Guayaquil')::date;
-  a uuid; a2 uuid; b uuid; c uuid; d uuid; e uuid; f uuid; g uuid; ca text; ca2 text; sf uuid; se uuid;
-  r jsonb; i jsonb; det jsonb;
+  a uuid; a2 uuid; b uuid; c uuid; d uuid; e uuid; f uuid; g uuid; ca text; ca2 text; sf uuid; se uuid; h uuid; sh uuid; sg2 uuid;
+  r jsonb; i jsonb; det jsonb; antes jsonb; det_antes jsonb;
 begin
   select id into s_sac from public.sucursales where empresa_id = v_shu and nombre = 'Shuvision Sacha';
   select u.auth_user_id into adm_sac from public.usuarios u join public.roles ro on ro.id = u.rol_id
@@ -70,6 +70,7 @@ begin
     raise exception 'PRELUDIO7: el vendedor de Shuvisión no está en la sucursal Shuvision';
   end if;
   select id into v_prog from public.programas_referidos where empresa_id = v_shu;
+  select count(*) into base_codigos from public.codigos_referido where programa_id = v_prog;
 
   -- Datos: A (referidor) con B, C, D, E, F; A2 con G; A usa $8 de crédito. Descuento SHU = $10.
   a := pg_temp.paciente('Ana', '0995000001', v_shu, s_mat);
@@ -105,7 +106,7 @@ begin
   r := pg_temp.panel(su, v_shu, hoy, hoy, null);
   i := r->'indicadores';
   if not (r->>'programa_activo')::boolean then raise exception 'FALLO P1a: programa_activo'; end if;
-  if (i->>'codigos')::int <> 8 then raise exception 'FALLO P1b: códigos %', i->>'codigos'; end if;
+  if (i->>'codigos')::int <> base_codigos + 8 then raise exception 'FALLO P1b: códigos % (había % antes)', i->>'codigos', base_codigos; end if;
   if (i->>'registrados')::int <> 6 or (i->>'compraron')::int <> 4 or (i->>'conversion')::numeric <> 66.7 then raise exception 'FALLO P1c: registrados/compraron/conversión %', i; end if;
   if (i->>'ventas_n')::int <> 4 or (i->>'ventas_total')::numeric <> 630 or (i->>'ticket')::numeric <> 157.5 then raise exception 'FALLO P1d: ventas %', i; end if;
   if (i->>'descuentos')::numeric <> 40 or (i->>'pendientes')::numeric <> 10 then raise exception 'FALLO P1e: descuentos/pendientes %', i; end if;
@@ -165,6 +166,8 @@ begin
   if (det->'resumen'->>'exitosos')::int <> 2 or (det->'resumen'->>'en_espera')::int <> 1 or (det->'resumen'->>'disponible')::numeric <> 12 then raise exception 'FALLO P10b: resumen %', det->'resumen'; end if;
   if not exists (select 1 from jsonb_array_elements(det->'movimientos') m where m->>'tipo' = 'uso' and (m->>'monto')::numeric = -8) then raise exception 'FALLO P10c: falta el uso de $8'; end if;
   if not exists (select 1 from jsonb_array_elements(det->'referidos') x where x->>'estado' = 'revertido') then raise exception 'FALLO P10d: falta el referido revertido en el detalle'; end if;
+  -- P10g: "crédito ganado" del detalle = el del ranking (créditos por referido y bonos; sin ajustes manuales)
+  if (det->'resumen'->>'credito_ganado')::numeric <> 20 then raise exception 'FALLO P10g: crédito ganado del detalle % (el ranking dice 20)', det->'resumen'->>'credito_ganado'; end if;
   det := pg_temp.detalle(adm_sac, v_shu, a, hoy, hoy, null);
   if jsonb_array_length(det->'referidos') <> 1 then raise exception 'FALLO P10e: el administrador de Sacha vio % referidos', jsonb_array_length(det->'referidos'); end if;
   begin
@@ -173,6 +176,53 @@ begin
   exception when others then
     if sqlerrm like 'FALLO%' then raise; end if;
   end;
+
+  -- P10h: el detalle de alguien que no es de esta óptica se rechaza
+  begin
+    perform pg_temp.detalle(su, v_shu, pg_temp.paciente('Foco', '0995000010', v_focus, s_foc), hoy, hoy, null);
+    raise exception 'FALLO P10h: se abrió el detalle de alguien de otra óptica';
+  exception when others then
+    if sqlerrm like 'FALLO%' then raise; end if;
+    if position('no pertenece' in lower(sqlerrm)) = 0 then raise exception 'FALLO P10h: mensaje inesperado %', sqlerrm; end if;
+  end;
+
+  -- P12: un referido "rechazado" (convenio o canje) cuya venta luego se anula NO cuenta como venta atribuida ni como costo
+  antes := pg_temp.panel(su, v_shu, hoy, hoy, null);
+  det_antes := pg_temp.detalle(su, v_shu, a, hoy, hoy, null);
+  h := pg_temp.paciente('Hugo', '0995000009', v_shu, s_mat);
+  sh := pg_temp.vender(v_shu, s_mat, vend, h, ca, 120, 50);
+  update public.referidos set estado = 'rechazado', motivo_rechazo = 'prueba del panel' where venta_id = sh;
+  perform set_config('request.jwt.claims', json_build_object('sub', su, 'role', 'authenticated')::text, true);
+  set local role authenticated;
+  perform public.anular_venta_con_modo(sh, 'Prueba de anulación de un rechazado', 'credito');
+  reset role;
+  r := pg_temp.panel(su, v_shu, hoy, hoy, null);
+  if (r->'indicadores'->>'registrados')::int <> (antes->'indicadores'->>'registrados')::int + 1 then raise exception 'FALLO P12a: registrados %', r->'indicadores'; end if;
+  if (r->'indicadores'->>'compraron')::int <> (antes->'indicadores'->>'compraron')::int
+     or (r->'indicadores'->>'ventas_n')::int <> (antes->'indicadores'->>'ventas_n')::int
+     or (r->'indicadores'->>'ventas_total')::numeric <> (antes->'indicadores'->>'ventas_total')::numeric
+     or (r->'indicadores'->>'descuentos')::numeric <> (antes->'indicadores'->>'descuentos')::numeric
+     or (r->'indicadores'->>'costo')::numeric <> (antes->'indicadores'->>'costo')::numeric then
+    raise exception 'FALLO P12b: la venta anulada de un referido rechazado sigue contando %', r->'indicadores';
+  end if;
+  if (r->'ranking'->0->>'ventas')::numeric <> (antes->'ranking'->0->>'ventas')::numeric then raise exception 'FALLO P12c: el ranking cuenta la venta anulada'; end if;
+  det := pg_temp.detalle(su, v_shu, a, hoy, hoy, null);
+  if (det->'resumen'->>'ventas')::numeric <> (det_antes->'resumen'->>'ventas')::numeric then raise exception 'FALLO P12d: el detalle cuenta la venta anulada'; end if;
+
+  -- P13: el crédito usado en una venta que luego se anula no cuenta como costo
+  antes := pg_temp.panel(su, v_shu, hoy, hoy, null);
+  sg2 := pg_temp.vender(v_shu, s_mat, vend, a, null, 100, 96, 4);
+  r := pg_temp.panel(su, v_shu, hoy, hoy, null);
+  if (r->'indicadores'->>'creditos_usados')::numeric <> (antes->'indicadores'->>'creditos_usados')::numeric + 4 then raise exception 'FALLO P13a: el uso de $4 no se vio %', r->'indicadores'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', su, 'role', 'authenticated')::text, true);
+  set local role authenticated;
+  perform public.anular_venta_con_modo(sg2, 'Prueba de anulación con crédito usado', 'credito');
+  reset role;
+  r := pg_temp.panel(su, v_shu, hoy, hoy, null);
+  if (r->'indicadores'->>'creditos_usados')::numeric <> (antes->'indicadores'->>'creditos_usados')::numeric
+     or (r->'indicadores'->>'costo')::numeric <> (antes->'indicadores'->>'costo')::numeric then
+    raise exception 'FALLO P13b: un crédito usado en una venta anulada sigue contando %', r->'indicadores';
+  end if;
 
   -- P11: óptica sin datos: ceros y sin errores (administrador de Focus); luego programa apagado
   r := pg_temp.panel(adm_focus, v_focus, hoy, hoy, null);
@@ -185,5 +235,5 @@ begin
   r := pg_temp.panel(adm_focus, v_focus, hoy, hoy, null);
   if (r->>'programa_activo')::boolean then raise exception 'FALLO P11b: el programa apagado figura activo'; end if;
 
-  raise exception 'PRUEBAS_OK: panel de referidos (P1-P11)';
+  raise exception 'PRUEBAS_OK: panel de referidos (P1-P13)';
 end $$;

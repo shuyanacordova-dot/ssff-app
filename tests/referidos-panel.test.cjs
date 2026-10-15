@@ -15,7 +15,7 @@ function load(file) {
   return module.exports;
 }
 
-const { hoyEcuador, atajoPeriodo, periodoPorDefecto, periodoValido, porcentaje, dineroPanel } = load('referidos-panel');
+const { hoyEcuador, atajoPeriodo, periodoPorDefecto, periodoValido, porcentaje, dineroPanel, ordenarRanking, esUuid } = load('referidos-panel');
 
 test('hoyEcuador usa la fecha de Ecuador y no la de UTC', () => {
   // 03:00 UTC del 15-oct = 22:00 del 14-oct en Ecuador
@@ -54,4 +54,24 @@ test('formato de porcentaje y dinero', () => {
   assert.equal(dineroPanel(630), '$630.00');
   assert.equal(dineroPanel(157.5), '$157.50');
   assert.equal(dineroPanel(null), '—');
+});
+
+const fila = (nombre, extra = {}) => ({ paciente_id: nombre, nombre, codigo: null, exitosos: 0, ventas: 0, credito_ganado: 0, disponible: 0, ...extra });
+
+test('ordenarRanking: mayor primero, empates por nombre, sin cambiar la lista original', () => {
+  const lista = [fila('Zoe', { ventas: 100 }), fila('Ana', { ventas: 100 }), fila('Beto', { ventas: 300 })];
+  assert.deepEqual(ordenarRanking(lista, 'ventas').map((f) => f.nombre), ['Beto', 'Ana', 'Zoe']);
+  assert.deepEqual(lista.map((f) => f.nombre), ['Zoe', 'Ana', 'Beto']);
+});
+
+test('ordenarRanking: valores que llegan como texto o vacíos no rompen el orden', () => {
+  const lista = [fila('Ana', { disponible: '9.50' }), fila('Beto', { disponible: null }), fila('Carla', { disponible: '12.00' })];
+  assert.deepEqual(ordenarRanking(lista, 'disponible').map((f) => f.nombre), ['Carla', 'Ana', 'Beto']);
+});
+
+test('esUuid solo acepta identificadores completos', () => {
+  assert.equal(esUuid('3bd2a17c-1a2b-4c3d-8e4f-5a6b7c8d9e0f'), true);
+  assert.equal(esUuid('todas'), false);
+  assert.equal(esUuid("3bd2a17c'; drop"), false);
+  assert.equal(esUuid(undefined), false);
 });
