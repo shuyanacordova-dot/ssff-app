@@ -45,9 +45,11 @@ export async function crearPacienteClinico(data: FormData) {
   const codigoReferido = text(data, "codigo_referido");
   if (codigoReferido && !saved.ya_existia) {
     const { data: ref, error: refError } = await supabase.rpc("registrar_referido_ficha", { p_paciente: saved.paciente_id, p_empresa: profile.empresa_id, p_codigo: codigoReferido });
+    const tecnico = !refError?.message || /permission denied|violates|constraint|function |relation |syntax/i.test(refError.message);
+    const nombreReferidor = (ref as { referidor_nombre?: string } | null)?.referidor_nombre;
     referido = refError
-      ? { ok: false, mensaje: refError.message || "No se pudo registrar quién lo refirió." }
-      : { ok: true, mensaje: `Referido por ${(ref as { referidor_nombre: string }).referidor_nombre}.` };
+      ? { ok: false, mensaje: tecnico ? "No se pudo registrar quién lo refirió. Puedes agregarlo luego desde la pestaña Referidos." : refError.message }
+      : { ok: true, mensaje: nombreReferidor ? `Referido por ${nombreReferidor}.` : "Referido registrado." };
   }
   const { data: patientRow, error: patientError } = await supabase.from("pacientes_clinicos")
     .select("id,nombres,apellidos,cedula,telefono,email,direccion,sexo,ocupacion,responsable_id,fecha_nacimiento,fecha_registro,observaciones,frecuencia_cobro,empresa_origen_id,actualizado_en")

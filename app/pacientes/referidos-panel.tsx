@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Copy, MessageCircle } from "lucide-react";
 import { ajustarMonedero, obtenerEstadoMonedero, registrarReferidoFicha } from "@/app/referidos/actions";
 import { dinero, estadoReferidoLabel, mensajeCompartirCodigo, tipoMovimientoLabel, type EstadoMonedero } from "@/lib/referidos-textos";
@@ -14,10 +14,22 @@ export default function ReferidosPanel({ pacienteId, empresaId, esSuperadmin }: 
   const [aviso, setAviso] = useState("");
   const [codigoReferidor, setCodigoReferidor] = useState("");
   const [pending, start] = useTransition();
-  const cargar = useCallback(() => { obtenerEstadoMonedero(pacienteId, empresaId).then(setEstado).catch((err) => setError(err instanceof Error ? err.message : "No se pudo cargar.")); }, [pacienteId, empresaId]);
-  useEffect(() => { cargar(); }, [cargar]);
+  // Cada carga lleva un número: solo la última respuesta vigente (y del mismo paciente/óptica) se guarda.
+  const ultimaCarga = useRef(0);
+  const cargar = useCallback(() => {
+    const numero = ++ultimaCarga.current;
+    setError("");
+    obtenerEstadoMonedero(pacienteId, empresaId)
+      .then((resultado) => { if (numero === ultimaCarga.current) setEstado(resultado); })
+      .catch((err) => { if (numero === ultimaCarga.current) setError(err instanceof Error ? err.message : "No se pudo cargar."); });
+  }, [pacienteId, empresaId]);
+  useEffect(() => {
+    setEstado(null); setAviso(""); setCodigoReferidor("");
+    cargar();
+    return () => { ultimaCarga.current += 1; };
+  }, [cargar]);
 
-  if (error) return <section className="clinical-content"><p className="notice" role="alert">{error}</p></section>;
+  if (error) return <section className="clinical-content"><p className="notice" role="alert">{error}</p><button type="button" className="outline-action" onClick={() => { setEstado(null); cargar(); }}>Reintentar</button></section>;
   if (!estado) return <section className="clinical-content"><p className="field-hint">Cargando referidos…</p></section>;
   if (!estado.programa_activo) return <section className="clinical-content"><p className="notice">El programa de referidos no está activo en esta óptica.</p></section>;
 

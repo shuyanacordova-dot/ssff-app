@@ -19,6 +19,7 @@ function ProgramaCard({ programa, onSaved }: { programa: ProgramaReferidos & { e
   const guardar = (form: HTMLFormElement) => {
     const data = new FormData(form);
     if (data.get("activo") === "si" && !programa.activo && !window.confirm(`Vas a ENCENDER ${programa.nombre}. Se crean los códigos de todos los pacientes de ${programa.empresa_nombre} y el equipo ya podrá usarlos en las ventas. ¿Continuar?`)) return;
+    if (programa.recompensas_suspendidas && data.get("recompensas_suspendidas") !== "si" && !window.confirm("Al reanudar se otorgarán las recompensas que estaban en espera. ¿Continuar?")) return;
     start(async () => {
       try { setError(""); await guardarProgramaReferidos(data); onSaved(`${programa.nombre}: configuración guardada.`); }
       catch (err) { setError(err instanceof Error ? err.message : "No se pudo guardar."); }
@@ -29,7 +30,7 @@ function ProgramaCard({ programa, onSaved }: { programa: ProgramaReferidos & { e
       <input type="hidden" name="programa_id" value={programa.id} />
       <p className="section-label">{programa.empresa_nombre.toUpperCase()}</p>
       <h2>{programa.nombre} <span className={`state-pill ${programa.activo ? "aprobada" : ""}`}>{programa.activo ? "Encendido" : "Apagado"}</span></h2>
-      <p className="field-hint">Beneficio por referido ≈ {costoPorVenta.toFixed(0)} % de la compra mínima ({dinero(programa.descuento_bienvenida)} de descuento + {dinero(programa.credito_por_referido)} de crédito), sin contar bonos.</p>
+      {programa.compra_minima > 0 && <p className="field-hint">Beneficio por referido ≈ {costoPorVenta.toFixed(0)} % de la compra mínima ({dinero(programa.descuento_bienvenida)} de descuento + {dinero(programa.credito_por_referido)} de crédito), sin contar bonos.</p>}
       <div className="new-patient-form">
         <label>Nombre comercial<input name="nombre" defaultValue={programa.nombre} required /></label>
         <label>Compra mínima ($)<input name="compra_minima" type="number" min={0} step="0.01" defaultValue={programa.compra_minima} required /></label>
@@ -59,9 +60,24 @@ function ProgramaCard({ programa, onSaved }: { programa: ProgramaReferidos & { e
 
 const etiquetas: Record<string, string> = { activo: "Encendido", nombre: "Nombre", compra_minima: "Compra mínima", descuento_bienvenida: "Descuento de bienvenida", credito_por_referido: "Crédito por referido", bono_3_referidos: "Bono 3", bono_5_referidos: "Bono 5", vigencia_credito_dias: "Vigencia (días)", tope_uso_porcentaje: "Uso máximo (%)", presupuesto_mensual: "Presupuesto mensual", recompensas_suspendidas: "Recompensas suspendidas", categorias_excluidas: "Categorías excluidas", campana_desde: "Campaña desde", campana_hasta: "Campaña hasta" };
 
+const camposDinero = new Set(["compra_minima", "descuento_bienvenida", "credito_por_referido", "bono_3_referidos", "bono_5_referidos", "presupuesto_mensual"]);
+
+// Muestra un valor del historial en lenguaje de persona: Sí/No, montos con $, listas con comas y "—" si está vacío.
+function valorLegible(clave: string, valor: unknown): string {
+  if (valor === null || valor === undefined || valor === "") return "—";
+  if (typeof valor === "boolean") return valor ? "Sí" : "No";
+  if (Array.isArray(valor)) return valor.length ? valor.map((v) => categorias.find((c) => c.value === v)?.label ?? String(v)).join(", ") : "—";
+  if (camposDinero.has(clave) && Number.isFinite(Number(valor))) return dinero(Number(valor));
+  if (clave === "tope_uso_porcentaje" && Number.isFinite(Number(valor))) return `${Number(valor)} %`;
+  return String(valor);
+}
+
 function cambiosDe(detalle: Record<string, unknown>): string {
   const antes = (detalle.antes ?? {}) as Record<string, unknown>; const despues = (detalle.despues ?? {}) as Record<string, unknown>;
-  const lista = Object.keys(etiquetas).filter((k) => JSON.stringify(antes[k]) !== JSON.stringify(despues[k])).map((k) => `${etiquetas[k]}: ${JSON.stringify(antes[k]) ?? "—"} → ${JSON.stringify(despues[k]) ?? "—"}`);
+  const lista = Object.keys(etiquetas)
+    .map((k) => ({ k, antes: valorLegible(k, antes[k]), despues: valorLegible(k, despues[k]) }))
+    .filter((c) => c.antes !== c.despues)
+    .map((c) => `${etiquetas[c.k]}: ${c.antes} → ${c.despues}`);
   return lista.length ? lista.join(" · ") : "Sin cambios de valores";
 }
 

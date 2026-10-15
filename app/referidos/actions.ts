@@ -5,7 +5,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { EstadoMonedero, PreviewReferido } from "@/lib/referidos-textos";
 
 const texto = (data: FormData, key: string) => String(data.get(key) ?? "").trim();
-const numero = (data: FormData, key: string) => Number(texto(data, key).replace(",", "."));
+// Un campo vacío es NaN (no 0) para que la revisión de valores lo detecte.
+const numero = (data: FormData, key: string) => { const valor = texto(data, key); return valor === "" ? Number.NaN : Number(valor.replace(",", ".")); };
 const mensajeDe = (error: { message?: string } | null, porDefecto: string) => {
   if (!error?.message || error.message.startsWith("permission denied")) return porDefecto;
   if (error.message.includes("violates check constraint")) return "Revisa los valores: alguno está fuera del rango permitido (por ejemplo, el porcentaje debe estar entre 0 y 100).";
@@ -17,6 +18,17 @@ export async function obtenerEstadoMonedero(pacienteId: string, empresaId: strin
   const { data, error } = await supabase.rpc("estado_monedero", { p_paciente: pacienteId, p_empresa: empresaId });
   if (error) throw new Error(mensajeDe(error, "No se pudo cargar el monedero de referidos."));
   return data as EstadoMonedero;
+}
+
+// Indica si el programa de referidos de la empresa está encendido (cualquier error cuenta como apagado).
+export async function programaReferidosActivo(empresaId: string): Promise<boolean> {
+  if (!empresaId) return false;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.from("programas_referidos").select("activo").eq("empresa_id", empresaId).maybeSingle();
+    if (error) return false;
+    return data?.activo === true;
+  } catch { return false; }
 }
 
 export async function buscarCodigoReferido(empresaId: string, codigo: string): Promise<{ encontrado: boolean; nombre?: string }> {
