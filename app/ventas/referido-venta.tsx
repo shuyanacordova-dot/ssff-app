@@ -15,10 +15,10 @@ export default function ReferidoVenta({ empresaId, pacienteId, base, esConvenio,
   const [monto, setMonto] = useState("");
   const [preview, setPreview] = useState<PreviewReferido | null>(null);
   const pacientesConsultados = useRef(new Set<string>());
+  const pacientesEnConsulta = useRef(new Set<string>());
 
   useEffect(() => {
-    setPreview(null);
-    if (!empresaId || !pacienteId || base <= 0) return;
+    if (!empresaId || !pacienteId || base <= 0) { setPreview(null); return; }
     let vigente = true;
     const espera = setTimeout(() => {
       previsualizarReferido({ empresaId, pacienteId, codigo, base, esConvenio, hayOtrosDescuentos })
@@ -31,24 +31,30 @@ export default function ReferidoVenta({ empresaId, pacienteId, base, esConvenio,
   useEffect(() => {
     if (!preview?.programa_activo || !empresaId || !pacienteId) return;
     const clave = `${empresaId}:${pacienteId}`;
-    if (pacientesConsultados.current.has(clave)) return;
-    pacientesConsultados.current.add(clave);
-    let vigente = true;
+    if (pacientesConsultados.current.has(clave) || pacientesEnConsulta.current.has(clave)) return;
+    pacientesEnConsulta.current.add(clave);
     void obtenerEstadoMonedero(pacienteId, empresaId)
       .then((estado) => {
-        if (vigente && estado.referido_por?.estado === "registrado") {
+        pacientesConsultados.current.add(clave);
+        if (estado.referido_por?.estado === "registrado") {
           setCodigo((actual) => actual.trim() ? actual : estado.referido_por?.codigo ?? "");
         }
       })
-      .catch(() => undefined);
-    return () => { vigente = false; };
+      .catch(() => undefined)
+      .finally(() => { pacientesEnConsulta.current.delete(clave); });
   }, [preview?.programa_activo, empresaId, pacienteId]);
 
   const activo = !!preview?.programa_activo;
   const descuento = activo && preview?.codigo?.ok ? Number(preview.codigo.descuento ?? 0) : 0;
   const maximo = activo ? Number(preview?.credito_maximo ?? 0) : 0;
   const disponible = activo ? Number(preview?.credito_disponible ?? 0) : 0;
-  const credito = activo && usar ? Math.min(Math.max(Number(monto.replace(",", ".")) || 0, 0), maximo) : 0;
+  const credito = activo && usar && !esConvenio && !hayOtrosDescuentos ? Math.round(Math.min(Math.max(Number(monto.replace(",", ".")) || 0, 0), maximo) * 100) / 100 : 0;
+
+  useEffect(() => {
+    if (!usar || !monto.trim()) return;
+    const escrito = Number(monto.replace(",", "."));
+    if (escrito > maximo) setMonto(String(Math.round(maximo * 100) / 100));
+  }, [usar, monto, maximo]);
 
   useEffect(() => {
     onChange(activo ? { codigo: preview?.codigo?.ok ? codigo.trim() : "", usarCredito: credito, descuento, credito } : referidoVacio);
@@ -60,11 +66,11 @@ export default function ReferidoVenta({ empresaId, pacienteId, base, esConvenio,
     <div className="receta-option" style={{ marginTop: 12 }}>
       <p className="section-label">{(preview.nombre ?? "REFERIDOS").toUpperCase()}</p>
       <label>¿Tiene un código de referido?
-        <input value={codigo} onChange={(event) => setCodigo(event.target.value.toUpperCase())} placeholder="Ej.: SHU-000458" autoComplete="off" />
+        <input value={codigo} onChange={(event) => setCodigo(event.target.value.toUpperCase())} placeholder="Código de referido" autoComplete="off" />
       </label>
       {preview.codigo?.ok && <p className="notice" role="status" style={{ fontWeight: 700 }}>Código de {preview.codigo.referidor_nombre}: descuento de bienvenida −{dinero(descuento)}. Quien lo refirió gana {dinero(Number(preview.codigo.credito ?? 0))} cuando esta venta quede pagada por completo.</p>}
       {rechazo && <p className="notice" role="status" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 700 }}>{rechazo}</p>}
-      {disponible > 0 && <div style={{ marginTop: 8 }}>
+      {disponible > 0 && !esConvenio && !hayOtrosDescuentos && <div style={{ marginTop: 8 }}>
         <label style={{ display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={usar} onChange={(event) => { setUsar(event.target.checked); setMonto(event.target.checked ? String(maximo) : ""); }} /> Usar crédito de referidos (disponible {dinero(disponible)}, máximo en esta compra {dinero(maximo)})</label>
         {usar && <label>Monto del crédito $<input type="text" inputMode="decimal" value={monto} onChange={(event) => setMonto(event.target.value)} /></label>}
       </div>}
