@@ -2,10 +2,11 @@
 import { fechaGuayaquil, formatRecordDate } from "@/lib/record-date";
 import { printDocumentById } from "@/lib/print-document";
 import Link from "next/link";
-import { Fragment } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { SucursalTabs } from "@/app/sucursal-tabs";
 import { useRouter } from "next/navigation";
-import { Printer } from "lucide-react";
+import { Printer, Trash2 } from "lucide-react";
+import { eliminarAbono } from "./actions";
 import type { ResumenDiaData } from "@/lib/resumen-dia";
 
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -15,10 +16,19 @@ const clasificacionLabel: Record<string, string> = { salarios: "Salarios", pago_
 
 export default function ResumenDiaBoard(props: ResumenDiaData & { fecha: string }) {
   const router = useRouter();
+  const [pending, start] = useTransition();
+  const [aviso, setAviso] = useState("");
 
   if (props.status !== "ready") return <main className="page agenda-page"><div className="container agenda-shell"><header className="agenda-header"><div><Link className="back-link" href="/">← LUMOS</Link><p className="eyebrow">OPERACIÓN DEL DÍA</p><h1>Resumen del día</h1><p className="subtitle">{props.message ?? "No se pudo abrir el resumen."}</p></div>{props.status === "needs_login" && <Link className="primary-link" href="/login?next=/resumen-dia">Iniciar sesión</Link>}</header></div></main>;
 
   const sucursalId = props.sucursalId ?? "";
+  const esSuper = props.profile?.rol === "superadmin";
+  const borrarAbono = (a: { id: string; monto: number; metodo: string; paciente_nombre: string | null; cliente_nombre: string | null }) => {
+    const quien = a.paciente_nombre || a.cliente_nombre || "cliente sin nombre";
+    const motivo = window.prompt(`Vas a borrar el abono de ${money(a.monto)} (${metodoLabel[a.metodo] || a.metodo}) de ${quien}. El saldo de la venta vuelve a subir.\n\nEscribe el motivo:`);
+    if (motivo === null) return;
+    start(async () => { const r = await eliminarAbono(a.id, motivo); setAviso(r.ok ? "Abono borrado. Queda registrado quién lo hizo y por qué." : r.error); if (r.ok) router.refresh(); });
+  };
   const irA = (fecha: string, sucursal: string) => router.push(`/resumen-dia?fecha=${fecha}&sucursal=${sucursal}`);
   const { ventas, abonos, salidas, transferencias } = props;
   const totalVentas = ventas.reduce((sum, v) => sum + v.total, 0);
@@ -48,10 +58,10 @@ export default function ResumenDiaBoard(props: ResumenDiaData & { fecha: string 
       </section>
 
       <section className="glass agenda-board" style={{ marginBottom: 18 }}>
-        <p className="section-label">RESUMEN DE ABONOS</p><h2>Abonos del día</h2>
-        {abonos.length ? <table className="resumen-table"><thead><tr><th>Monto</th><th>Forma de pago</th><th>Paciente</th><th>Recibió</th><th>Saldo actual</th></tr></thead><tbody>
-          {abonos.map((a) => <tr key={a.id}><td>{money(a.monto)}</td><td>{metodoLabel[a.metodo] || a.metodo}</td><td>{a.paciente_nombre || a.cliente_nombre || "Cliente sin nombre"}{a.venta_fecha && fechaGuayaquil(new Date(a.venta_fecha)) < props.fecha && <small style={{ display: "block" }}>Venta del {formatRecordDate(a.venta_fecha)}</small>}</td><td>{a.autor_nombre || "—"}</td><td>{money(a.venta_saldo)}</td></tr>)}
-          <tr className="total-row"><td>{money(totalAbonos)}</td><td colSpan={4} /></tr>
+        <p className="section-label">RESUMEN DE ABONOS</p><h2>Abonos del día</h2>{aviso && <div className="notice no-print"><span>{aviso}</span></div>}
+        {abonos.length ? <table className="resumen-table"><thead><tr><th>Monto</th><th>Forma de pago</th><th>Paciente</th><th>Recibió</th><th>Saldo actual</th>{esSuper && <th className="no-print" />}</tr></thead><tbody>
+          {abonos.map((a) => <tr key={a.id}><td>{money(a.monto)}</td><td>{metodoLabel[a.metodo] || a.metodo}</td><td>{a.paciente_nombre || a.cliente_nombre || "Cliente sin nombre"}{a.venta_fecha && fechaGuayaquil(new Date(a.venta_fecha)) < props.fecha && <small style={{ display: "block" }}>Venta del {formatRecordDate(a.venta_fecha)}</small>}</td><td>{a.autor_nombre || "—"}</td><td>{money(a.venta_saldo)}</td>{esSuper && <td className="no-print"><button type="button" className="outline-action" disabled={pending} onClick={() => borrarAbono(a)} aria-label="Borrar abono"><Trash2 size={14} /> Borrar</button></td>}</tr>)}
+          <tr className="total-row"><td>{money(totalAbonos)}</td><td colSpan={esSuper ? 5 : 4} /></tr>
         </tbody></table> : <p className="field-hint">No hay abonos registrados este día.</p>}
       </section>
 
