@@ -1,6 +1,7 @@
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getOperationalContext } from "@/lib/operational-context";
+import { branchLetterhead } from "@/lib/sucursales";
 import CotizadorBoard, { type LenteCotizador } from "./cotizador-board";
 
 export const dynamic = "force-dynamic";
@@ -14,5 +15,5 @@ export default async function CotizadorPage() {
     .select("id,nombre,codigo,diseno,linea,material,indice,tecnologia,precio_venta,precio_venta_2,precio_convenio")
     .eq("empresa_id", context.activeCompany.id).eq("categoria", "lente").eq("activo", true)
     .order("nombre").order("id").range(from, to));
-  return <CotizadorBoard status={error ? "error" : "ready"} message={error?.message} lentes={data} empresaNombre={context.activeCompany.nombre} />;
+  return <CotizadorBoard status={error ? "error" : "ready"} message={error?.message} lentes={data} empresaNombre={context.activeCompany.nombre} membrete={branchLetterhead(context.activeCompany, context.activeBranch)} />;
 }

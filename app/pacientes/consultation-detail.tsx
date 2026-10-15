@@ -56,7 +56,7 @@ export default function ConsultationDetailModal({ consultation, patient, company
     <div className="consultation-screen no-print">
       <p className="section-label">REVISIÓN CLÍNICA</p>
       <h2 id="consultation-detail-title">{patient.nombres} {patient.apellidos}</h2>
-      <p className="field-hint">{formatDate(consultation.fecha_consulta)} · {branchName || "Sucursal no especificada"}</p>
+      <p className="field-hint">{edad === null ? "Edad no registrada" : `${edad} años`} · {formatDate(consultation.fecha_consulta)} · {branchName || "Sucursal no especificada"}</p>
       <p className="consultation-professional"><strong>Examen realizado por:</strong> {consultation.optometrista_nombre || "Profesional no identificado"}</p>
 
       <Section title="DATOS DEL PACIENTE"><div className="consultation-stats"><span><strong>Género</strong>{patient.sexo ? sexoLabel[patient.sexo] ?? patient.sexo : "—"}</span><span><strong>Nacimiento</strong>{patient.fecha_nacimiento ? formatDate(patient.fecha_nacimiento) : "—"}</span><span><strong>Edad</strong>{edad === null ? "—" : `${edad} años`}</span><span><strong>Cédula</strong>{patient.cedula || "—"}</span><span><strong>Celular</strong>{patient.telefono || "—"}</span><span><strong>Ocupación</strong>{patient.ocupacion || "—"}</span></div></Section>

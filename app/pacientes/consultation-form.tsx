@@ -95,7 +95,7 @@ function EyeRxCard({ eye, prefix, showDnp, showAv = true, showAdd = true, defaul
 
 const tieneRx = (rx?: Record<string, string>) => !!rx && ["od_esfera", "od_cilindro", "od_eje", "od_add", "oi_esfera", "oi_cilindro", "oi_eje", "oi_add"].some((key) => (rx[key] ?? "").trim() !== "");
 
-export default function ConsultationModal({ pacienteId, optometrists, defaultOptometristId, initial, previousConsultations = [], onClose, onSaved }: { pacienteId: string; optometrists: ClinicalOptometrist[]; defaultOptometristId?: string; initial?: Consultation; previousConsultations?: Consultation[]; onClose: () => void; onSaved: (message: string) => void }) {
+export default function ConsultationModal({ pacienteId, pacienteNombre, edad, optometrists, defaultOptometristId, initial, previousConsultations = [], onClose, onSaved }: { pacienteId: string; pacienteNombre?: string; edad?: number | null; optometrists: ClinicalOptometrist[]; defaultOptometristId?: string; initial?: Consultation; previousConsultations?: Consultation[]; onClose: () => void; onSaved: (message: string) => void }) {
   const [pending, start] = useTransition();
   // Nueva revisión: la lensometría arranca con la RX final de la última revisión (Shuyana 2026-10-02). Solo esfera, cilindro, eje y ADD; la AV se mide de nuevo.
   const ultimaRx = initial ? undefined : [...previousConsultations].sort((a, b) => b.fecha_consulta.localeCompare(a.fecha_consulta)).find((consulta) => tieneRx(consulta.refraccion));
@@ -134,7 +134,7 @@ export default function ConsultationModal({ pacienteId, optometrists, defaultOpt
   const av = initial?.agudeza_visual ?? {};
   const bino = initial?.examen_binocular ?? {};
   const receta0 = initial?.receta;
-  return <div className="modal-backdrop"><section className="new-patient-modal task-modal" role="dialog" aria-modal="true" aria-labelledby="new-consultation-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button><p className="section-label">{initial ? "EDITAR CONSULTA" : "NUEVA CONSULTA"}</p><h2 id="new-consultation-title">Consulta optométrica</h2><form onKeyDown={(event) => { const target = event.target as HTMLElement; if (event.key === "Enter" && target.tagName === "INPUT") event.preventDefault(); }} onSubmit={(event) => { event.preventDefault(); if (!pending) submit(event.currentTarget); }}>
+  return <div className="modal-backdrop"><section className="new-patient-modal task-modal" role="dialog" aria-modal="true" aria-labelledby="new-consultation-title"><button className="modal-close" onClick={onClose} aria-label="Cerrar"><X size={19} /></button><p className="section-label">{initial ? "EDITAR CONSULTA" : "NUEVA CONSULTA"}</p><h2 id="new-consultation-title">Consulta optométrica</h2>{pacienteNombre && <p className="field-hint"><strong>{pacienteNombre}</strong> · {edad === null || edad === undefined ? "edad no registrada" : `${edad} años`}</p>}<form onKeyDown={(event) => { const target = event.target as HTMLElement; if (event.key === "Enter" && target.tagName === "INPUT") event.preventDefault(); }} onSubmit={(event) => { event.preventDefault(); if (!pending) submit(event.currentTarget); }}>
     <div className="new-patient-form"><label className="task-description">Motivo de consulta<input name="motivo_consulta" defaultValue={initial?.motivo_consulta ?? ""} placeholder="Ej.: Control anual, visión borrosa de lejos" /></label></div>
 
     <p className="section-label">ANTECEDENTES</p>

@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Calculator, Copy, Plus, Search, X } from "lucide-react";
+import { Calculator, Copy, Plus, Printer, Search, X } from "lucide-react";
+import Letterhead, { type CompanyInfo } from "@/app/print-letterhead";
+import { printDocumentById } from "@/lib/print-document";
 
 export type LenteCotizador = {
   id: string; nombre: string; codigo: string | null; diseno: string | null; linea: string | null; material: string | null; indice: number | string | null; tecnologia: string | null;
   precio_venta: number | string | null; precio_venta_2: number | string | null; precio_convenio: number | string | null;
 };
-type Props = { status: "ready" | "needs_login" | "error"; message?: string; lentes: LenteCotizador[]; empresaNombre?: string };
+type Props = { status: "ready" | "needs_login" | "error"; message?: string; lentes: LenteCotizador[]; empresaNombre?: string; membrete?: CompanyInfo | null };
 type Tarifa = "mayor" | "menor" | "convenio";
 
 const MAX_FILAS = 60;
@@ -29,6 +31,7 @@ export default function CotizadorBoard(props: Props) {
   const [armazon, setArmazon] = useState("");
   const [verTodo, setVerTodo] = useState(false);
   const [copiado, setCopiado] = useState(false);
+  const [cliente, setCliente] = useState("");
 
   const disenos = useMemo(() => Array.from(new Set(props.lentes.map((l) => l.diseno).filter(Boolean) as string[])).sort(), [props.lentes]);
   const materiales = useMemo(() => Array.from(new Set(props.lentes.map((l) => l.material).filter(Boolean) as string[])).sort(), [props.lentes]);
@@ -68,7 +71,17 @@ export default function CotizadorBoard(props: Props) {
         <p className="section-label"><Calculator size={14} style={{ verticalAlign: "-2px" }} /> COTIZACIÓN</p>
         <label className="new-patient-form" style={{ gridTemplateColumns: "minmax(0, 220px)", marginBottom: 8 }}><span style={{ fontSize: 12, fontWeight: 800 }}>Precio del armazón (opcional)</span><input inputMode="decimal" value={armazon} onChange={(event) => setArmazon(event.target.value)} placeholder="0,00" /></label>
         <div className="task-list">{seleccion.map((l) => { const p = precioDe(l, tarifa); return <article className="task-card" key={l.id}><div className="task-main"><h2 style={{ fontSize: 15 }}>{l.nombre}</h2><p>{p === null ? "Sin precio en esta tarifa" : <>Lunas <strong>{money(p)}</strong>{montoArmazon > 0 && <> · Total con armazón <strong>{money(p + montoArmazon)}</strong></>}</>}</p></div><div className="task-actions"><button className="outline-action" type="button" onClick={() => setElegidos((c) => c.filter((id) => id !== l.id))} aria-label="Quitar"><X size={14} /></button></div></article>; })}</div>
-        <div className="modal-actions"><button className="outline-action" type="button" onClick={() => setElegidos([])}>Vaciar</button><button className="new-consultation" type="button" onClick={copiar}><Copy size={15} /> {copiado ? "Copiado" : "Copiar cotización"}</button></div>
+        <label className="new-patient-form" style={{ gridTemplateColumns: "minmax(0, 320px)", marginBottom: 8 }}><span style={{ fontSize: 12, fontWeight: 800 }}>Nombre del cliente (opcional, sale en la hoja impresa)</span><input value={cliente} onChange={(event) => setCliente(event.target.value)} maxLength={120} /></label>
+        <div className="modal-actions"><button className="outline-action" type="button" onClick={() => setElegidos([])}>Vaciar</button><button className="outline-action" type="button" onClick={copiar}><Copy size={15} /> {copiado ? "Copiado" : "Copiar cotización"}</button><button className="new-consultation" type="button" onClick={() => printDocumentById("cotizacion-print")}><Printer size={15} /> Imprimir cotización</button></div>
+        <div style={{ display: "none" }}><div id="cotizacion-print" className="print-area cotizacion-doc">
+          <Letterhead company={props.membrete ?? { nombre: props.empresaNombre ?? "LUMOS" }} />
+          <h2>COTIZACIÓN</h2>
+          <p><strong>Fecha:</strong> {new Date().toLocaleDateString("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "long", year: "numeric" })}{cliente.trim() && <> · <strong>Cliente:</strong> {cliente.trim()}</>}</p>
+          <table className="resumen-table"><thead><tr><th>Opción de lunas</th><th>Lunas</th>{montoArmazon > 0 && <th>Armazón</th>}{montoArmazon > 0 && <th>Total</th>}</tr></thead><tbody>
+            {seleccion.map((l) => { const p = precioDe(l, tarifa); return <tr key={l.id}><td>{l.nombre}</td><td>{p === null ? "—" : money(p)}</td>{montoArmazon > 0 && <td>{money(montoArmazon)}</td>}{montoArmazon > 0 && <td><strong>{p === null ? "—" : money(p + montoArmazon)}</strong></td>}</tr>; })}
+          </tbody></table>
+          <p className="cotizacion-nota">Cada fila es una opción distinta: no se suman entre sí.</p>
+        </div></div>
       </section>}
 
       <div className="task-list">{mostrados.map((l) => {

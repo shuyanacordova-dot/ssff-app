@@ -635,3 +635,12 @@ button.informe-card:hover { border-color: #a9ccc5; background: #f4fbf8; transfor
 .factura-card .task-main h2 { overflow-wrap: normal; word-break: normal; }
 .factura-card .task-main p { margin-bottom: 0; }
 @media (max-width: 780px) { .factura-card { grid-template-columns: minmax(0, 1fr); }.factura-card .task-actions { grid-column: 1; width: 100%; flex-direction: row; align-items: center; justify-content: space-between; } }
+
+/* Cotizador: hoja impresa de la cotización */
+.cotizacion-doc { color: #16233a; font-size: 13px; }
+.cotizacion-doc h2 { margin: 14px 0 6px; font-size: 20px; letter-spacing: .04em; }
+.cotizacion-doc p { margin: 4px 0 10px; }
+.cotizacion-doc .resumen-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.cotizacion-doc .resumen-table th, .cotizacion-doc .resumen-table td { padding: 7px 8px; border-bottom: 1px solid #d7e0ea; text-align: left; }
+.cotizacion-doc .resumen-table th:not(:first-child), .cotizacion-doc .resumen-table td:not(:first-child) { text-align: right; white-space: nowrap; }
+.cotizacion-doc .cotizacion-nota { margin-top: 14px; font-size: 11px; color: #5e6b80; }
