@@ -7,6 +7,7 @@ import { registrarVenta } from "./actions";
 import { detallesProducto, materialConIndice, textoBusquedaProducto } from "@/lib/producto-labels";
 import { convenioDelPaciente, crearAcuerdoPago, crearFinanciamientoOptica, crearEmpresaConvenio, type AcuerdoPago } from "./convenio-actions";
 import AcuerdoPagoView from "./acuerdo-pago-view";
+import ReferidoVenta, { referidoVacio, type ReferidoValor } from "./referido-venta";
 import type { EmpresaConvenio, PaymentMethod, SaleBranch, SaleCompany, SalePatient, SaleProduct, SaleStock } from "@/lib/ventas";
 
 // Carpeta "CONSUMIDOR FINAL" (identificación del SRI) para ventas rápidas sin datos del cliente.
@@ -37,6 +38,7 @@ export default function Cart({ products, stock, branches, patients, empresasConv
   const [items, setItems] = useState<CartItem[]>([]); const [payments, setPayments] = useState<CartPayment[]>([]);
   const [notice, setNotice] = useState(""); const [pending, start] = useTransition();
   const [convenioActivo, setConvenioActivo] = useState(false);
+  const [referido, setReferido] = useState<ReferidoValor>(referidoVacio);
   const [tipoAcuerdo, setTipoAcuerdo] = useState<"convenio" | "optica">("convenio");
   const [convenios, setConvenios] = useState(empresasConvenio);
   const [empresaConvenioId, setEmpresaConvenioId] = useState("");
@@ -71,6 +73,9 @@ export default function Cart({ products, stock, branches, patients, empresasConv
   const precioItem = (item: CartItem) => { const product = available.find((p) => p.id === item.producto_id); if (!product) return 0; if (item.precio !== undefined) { const n = Number(item.precio.replace(",", ".")); return Number.isFinite(n) ? n : 0; } return Number(product.precio_venta || 0); };
   const lineTotal = (item: CartItem) => Math.max(0, item.cantidad * precioItem(item) - item.descuento);
   const subtotal = useMemo(() => items.reduce((sum, item) => sum + lineTotal(item), 0), [items, available]);
+  // Total que paga el cliente: la compra menos el descuento de bienvenida y el crédito de referidos.
+  const totalVenta = Math.max(0, subtotal - referido.descuento - referido.credito);
+  const esConvenioVenta = !!convenioPaciente || (convenioActivo && tipoAcuerdo === "convenio");
   // Mínimo recomendado de la venta: armazones y lunas a su precio mínimo (el menor de precio 1/2/3); el resto a precio de catálogo.
   const minimoVenta = items.reduce((sum, item) => { const product = available.find((p) => p.id === item.producto_id); if (!product) return sum; const minimo = precioEditable(product) && Number.isFinite(minimoDe(product)) ? minimoDe(product) : Number(product.precio_venta || 0); return sum + item.cantidad * minimo; }, 0);
   const tieneEditables = items.some((item) => precioEditable(available.find((p) => p.id === item.producto_id)));
@@ -80,7 +85,7 @@ export default function Cart({ products, stock, branches, patients, empresasConv
   const totalEditables = items.reduce((sum, item) => precioEditable(available.find((p) => p.id === item.producto_id)) ? sum + lineTotal(item) : sum, 0);
   const bajoMinimo = totalEditables < minimoArmazon + minimoLunas - 0.004;
   const paidTotal = useMemo(() => payments.reduce((sum, payment) => sum + (Number(payment.monto) || 0), 0), [payments]);
-  const saldo = Math.max(0, subtotal - paidTotal);
+  const saldo = Math.max(0, totalVenta - paidTotal);
 
   const elegirModo = (value: Modo) => { setModo(value); setItems([]); };
   const resetBranch = (value: string) => { setBranch(value); setItems([]); };
@@ -90,7 +95,7 @@ export default function Cart({ products, stock, branches, patients, empresasConv
   const updatePayment = (index: number, patch: Partial<CartPayment>) => setPayments(payments.map((payment, i) => i === index ? { ...payment, ...patch } : payment));
   const removePayment = (index: number) => setPayments(payments.filter((_, i) => i !== index));
 
-  const resetAll = () => { setItems([]); setPayments([]); setCliente(""); setPacienteId(defaultPacienteId ?? ""); setConvenioActivo(false); setTipoAcuerdo("convenio"); setEmpresaConvenioId(""); setCuotas("6"); setModo(""); };
+  const resetAll = () => { setReferido(referidoVacio); setItems([]); setPayments([]); setCliente(""); setPacienteId(defaultPacienteId ?? ""); setConvenioActivo(false); setTipoAcuerdo("convenio"); setEmpresaConvenioId(""); setCuotas("6"); setModo(""); };
 
   const crearConvenio = () => start(async () => {
     try { const id = await crearEmpresaConvenio(nuevaConvenioNombre); setConvenios((list) => [...list, { id, nombre: nuevaConvenioNombre.trim() }]); setEmpresaConvenioId(id); setShowNuevaConvenio(false); setNuevaConvenioNombre(""); }
@@ -99,11 +104,14 @@ export default function Cart({ products, stock, branches, patients, empresasConv
 
   const submit = (form: HTMLFormElement) => {
     if (payments.some((p) => !(Number(p.monto) > 0))) { setNotice("Escribe el monto de cada abono (o quita el abono vacío)."); return; }
-    if (paidTotal > subtotal + 0.0001) { setNotice(`Los abonos (${money(paidTotal)}) no pueden superar el total de la venta (${money(subtotal)}). Si cobras recargo por tarjeta, súmalo al precio.`); return; }
+    if (paidTotal > totalVenta + 0.0001) { setNotice(`Los abonos (${money(paidTotal)}) no pueden superar el total de la venta (${money(totalVenta)}). Si cobras recargo por tarjeta, súmalo al precio.`); return; }
     if (convenioActivo && (tipoAcuerdo === "convenio" && !empresaConvenioId || !Number.isInteger(Number(cuotas)) || Number(cuotas) < 1 || Number(cuotas) > (tipoAcuerdo === "optica" ? 9 : 36) || saldo <= 0)) { setNotice(tipoAcuerdo === "optica" ? "Elige entre 1 y 9 pagos y deja un saldo pendiente." : "Elige la empresa, entre 1 y 36 cuotas, y deja un saldo pendiente."); return; }
     start(async () => {
       const data = new FormData(form);
       data.set("tipo_venta", modo);
+      data.set("codigo_referido", referido.codigo);
+      data.set("usar_credito", String(referido.usarCredito));
+      data.set("es_convenio", esConvenioVenta ? "si" : "no");
       data.set("items", JSON.stringify(items.map((item) => ({ producto_id: item.producto_id, cantidad: item.cantidad, descuento: item.descuento, ...(item.precio !== undefined ? { precio_unitario: precioItem(item) } : {}) }))));
       data.set("pagos", JSON.stringify(payments.filter((p) => Number(p.monto) > 0).map((p) => ({ metodo: p.metodo, monto: Number(p.monto), referencia: p.referencia || null, banco: p.banco || null }))));
       try {
@@ -112,7 +120,7 @@ export default function Cart({ products, stock, branches, patients, empresasConv
           const result = tipoAcuerdo === "optica" ? await crearFinanciamientoOptica(ventaId, Number(cuotas)) : await crearAcuerdoPago(ventaId, empresaConvenioId, Number(cuotas));
           setAcuerdo(result); setNotice(""); onDone("Venta registrada. Documento listo para imprimir y firmar.");
         } else {
-          const message = paidTotal + 0.0001 < subtotal ? `Venta registrada con saldo pendiente de ${money(subtotal - paidTotal)}.` : "Venta registrada y cobrada.";
+          const message = paidTotal + 0.0001 < totalVenta ? `Venta registrada con saldo pendiente de ${money(totalVenta - paidTotal)}.` : "Venta registrada y cobrada.";
           setNotice(message); onDone(message); resetAll();
         }
       } catch (err) { const message = err instanceof Error ? err.message : "No se pudo registrar la venta."; setNotice(message); }
@@ -145,7 +153,8 @@ export default function Cart({ products, stock, branches, patients, empresasConv
         {modo === "rapida" ? <button type="button" className="outline-action" onClick={() => setBuscando("rapida")}><Search size={15} /> Buscar accesorios, gafas o exámenes</button> : modo === "traspaso" ? <button type="button" className="outline-action" onClick={() => setBuscando("montura")}><Search size={15} /> Buscar armazón</button> : <><button type="button" className="outline-action" onClick={() => setBuscando("montura")}><Search size={15} /> Buscar armazón</button><button type="button" className="outline-action" onClick={() => setBuscando("lunas")}><Search size={15} /> Buscar lunas</button></>}
       </div>
       <div className="task-list">{items.map((item) => { const product = available.find((p) => p.id === item.producto_id); if (!product) return null; return <article className="task-card" key={item.producto_id}><div className="task-status" /><div className="task-main"><h2>{product.nombre}</h2>{detallesProducto(product).length > 0 && <div className="task-meta">{detallesProducto(product).map((d) => <span key={d}>{d}</span>)}</div>}<div className="task-meta">{item.precio !== undefined ? <label>Precio $<input type="text" inputMode="decimal" autoComplete="off" value={item.precio} onChange={(event) => updateItem(item.producto_id, { precio: event.target.value.replace(/,/g, ".").replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1") })} style={{ width: 76 }} /></label> : <span>{money(Number(product.precio_venta))} c/u</span>}<label>Cant. <input type="number" min={1} step={1} value={item.cantidad} onChange={(event) => updateItem(item.producto_id, { cantidad: Math.max(1, Number(event.target.value) || 1) })} style={{ width: 52 }} /></label><label>Desc. $<input type="number" min={0} step={0.01} value={item.descuento} onChange={(event) => updateItem(item.producto_id, { descuento: Math.max(0, Number(event.target.value) || 0) })} style={{ width: 68 }} /></label></div>{product.categoria === "lente" && product.precio_venta_2 ? <p className="field-hint" style={{ margin: "4px 0 0" }}>Rango de venta: menor {money(Number(product.precio_venta_2))} · mayor {money(Number(product.precio_venta))}{precioConvenio(product) ? ` · convenio ${money(precioConvenio(product)!)}` : ""}{tarifaConvenio && precioConvenio(product) ? " (precio de convenio aplicado)" : ""}</p> : precioEditable(product) && Number.isFinite(minimoDe(product)) && <p className="field-hint" style={{ margin: "4px 0 0" }}>Precio de catálogo {money(Number(product.precio_venta))} · mínimo recomendado {money(minimoDe(product))}</p>}{precioEditable(product) && item.precio !== undefined && Number.isFinite(minimoDe(product)) && precioItem(item) < minimoDe(product) - 0.004 && <p className="notice" role="alert" style={{ background: "#ffe5e8", color: "#a24150", fontWeight: 800, margin: "6px 0" }}>⚠ Estás colocando un precio menor al del recomendado ({money(minimoDe(product))}).</p>}<p>Subtotal línea: {money(lineTotal(item))}</p></div><div className="task-actions"><button type="button" className="outline-action" onClick={() => setItems(items.filter((x) => x.producto_id !== item.producto_id))}>Quitar</button></div></article>; })}</div>
-      <p className="subtitle">Total: <strong>{money(subtotal)}</strong></p>
+      <p className="subtitle">Total: <strong>{money(totalVenta)}</strong>{(referido.descuento > 0 || referido.credito > 0) && <span className="field-hint"> (compra {money(subtotal)}{referido.descuento > 0 ? ` − descuento de bienvenida ${money(referido.descuento)}` : ""}{referido.credito > 0 ? ` − crédito de referidos ${money(referido.credito)}` : ""})</span>}</p>
+      <ReferidoVenta empresaId={company} pacienteId={pacienteId} base={subtotal} esConvenio={esConvenioVenta} hayOtrosDescuentos={items.some((item) => item.descuento > 0)} onChange={setReferido} />
       {(minimoArmazon > 0 || minimoLunas > 0) && <p className="notice" role="status" style={bajoMinimo ? { background: "#ffe5e8", color: "#a24150", fontWeight: 800 } : { fontWeight: 700 }}>Precio mínimo de esta venta es de: {[minimoArmazon > 0 && `Armazón ${money(minimoArmazon)}`, minimoLunas > 0 && `Lunas ${money(minimoLunas)}`].filter(Boolean).join(" · ")}{minimoArmazon > 0 && minimoLunas > 0 ? ` (total ${money(minimoArmazon + minimoLunas)})` : ""}{bajoMinimo ? " — estás por debajo del mínimo." : ""}</p>}
       {tieneEditables && <p className="notice" role="status" style={subtotal < minimoVenta - 0.004 ? { background: "#ffe5e8", color: "#a24150", fontWeight: 800 } : { fontWeight: 700 }}>El precio mínimo recomendado de esta venta es: {money(minimoVenta)}{subtotal < minimoVenta - 0.004 ? ` · el total actual (${money(subtotal)}) está por debajo.` : ""}</p>}
       <div className="notice"><span>Abonos ({money(paidTotal)}) — saldo que quedará pendiente: <strong>{money(saldo)}</strong></span><button type="button" className="outline-action" onClick={addPayment} disabled={!items.length}>Agregar abono</button></div>
