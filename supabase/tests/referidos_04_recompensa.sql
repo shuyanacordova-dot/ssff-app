@@ -54,10 +54,11 @@ begin
     if (select saldo from public.ventas where id = s_cora) <> 0 or (select pagado from public.ventas where id = s_cora) <> 100 then
       raise exception 'FALLO D4c-a: el canje debía dejar saldo 0 con pagado 100 (saldo %, pagado %)', (select saldo from public.ventas where id = s_cora), (select pagado from public.ventas where id = s_cora);
     end if;
-    if (select estado from public.referidos where venta_id = s_cora) <> 'en_pago' or exists (select 1 from public.monedero_movimientos where paciente_id = cano) then
-      raise exception 'FALLO D4c-b: un canje no debe otorgar la recompensa';
+    -- Corrección DB-7 (migración 6): un canje ya no deja el referido "en_pago" para siempre; queda "rechazado" (antes se esperaba 'en_pago').
+    if (select estado from public.referidos where venta_id = s_cora) <> 'rechazado' or exists (select 1 from public.monedero_movimientos where paciente_id = cano) then
+      raise exception 'FALLO D4c-b: un canje no debe otorgar la recompensa y el referido debe quedar rechazado';
     end if;
-    if app_private.procesar_recompensas_pendientes(v_prog) <> 0 or (select estado from public.referidos where venta_id = s_cora) <> 'en_pago' then
+    if app_private.procesar_recompensas_pendientes(v_prog) <> 0 or (select estado from public.referidos where venta_id = s_cora) <> 'rechazado' then
       raise exception 'FALLO D4c-c: el reproceso de pendientes otorgó una venta canjeada';
     end if;
   end;
