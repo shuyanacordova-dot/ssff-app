@@ -15,6 +15,8 @@ export async function eliminarAbono(pagoId: string, motivo: string): Promise<{ o
     revalidatePath("/resumen-dia");
     revalidatePath("/caja");
     revalidatePath("/ventas");
+    revalidatePath("/informes");
+    revalidatePath("/cuentas-por-cobrar");
     return { ok: true };
   } catch {
     return { ok: false, error: "No se pudo borrar el abono." };
