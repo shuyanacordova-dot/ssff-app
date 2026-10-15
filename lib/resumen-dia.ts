@@ -58,17 +58,39 @@ export async function getResumenDiaData(fecha: string, sucursalParam?: string): 
     const cuentasResult = cuentaIds.length ? await supabase.from("cuentas_bancarias").select("id,banco").in("id", cuentaIds) : { data: [] as { id: string; banco: string }[], error: null };
     if (cuentasResult.error) return { status: "error", message: "No se pudieron cargar los bancos del día.", ...empty };
     const bancos = new Map((cuentasResult.data ?? []).map((c) => [c.id, c.banco]));
-    const transferencias: TransferenciaResumen[] = (bancoResult.data ?? []).map((g) => ({ id: g.id, concepto: g.concepto, monto: Number(g.monto), banco: g.cuenta_bancaria_id ? bancos.get(g.cuenta_bancaria_id) ?? "Banco sin identificar" : "Banco sin identificar" }));
 
     const pagosResult = await supabase.from("pagos_venta")
-      .select("id,venta_id,metodo,monto,creado_en,recibido_por,ventas!inner(id,sucursal_id,creado_en,saldo,cliente_nombre,paciente_id,estado,anulacion_modo)")
+      .select("id,venta_id,metodo,monto,creado_en,recibido_por,ventas!inner(id,folio,sucursal_id,creado_en,saldo,cliente_nombre,paciente_id,estado,anulacion_modo)")
       .eq("ventas.empresa_id", empresa).in("ventas.sucursal_id", sucursalIds).neq("metodo", "saldo_favor")
       .gte("creado_en", inicio).lt("creado_en", fin).order("creado_en", { ascending: true });
     if (pagosResult.error) return { status: "error", message: "No se pudieron cargar los abonos del día.", ...empty };
     // El dinero de una venta anulada con devolución o saldo a favor sí entró ese día; las anulaciones antiguas
     // (duplicados) no cuentan. El saldo a favor usado no es dinero nuevo (se excluye arriba).
-    const ventaDePago = (p: { ventas: unknown }) => (Array.isArray(p.ventas) ? p.ventas[0] : p.ventas) as { estado: string; anulacion_modo: string | null } | undefined;
+    const ventaDePago = (p: { ventas: unknown }) => (Array.isArray(p.ventas) ? p.ventas[0] : p.ventas) as { estado: string; anulacion_modo: string | null; folio: number | null } | undefined;
     if (pagosResult.data) pagosResult.data = pagosResult.data.filter((p) => { const v = ventaDePago(p); return !!v && (v.estado !== "anulada" || !!v.anulacion_modo); });
+
+    // Venta anulada con devolución el mismo día que se cobró: el abono y su devolución se compensan, así que ninguno
+    // aparece en el resumen (el cuadre y el acumulado no cambian: la suma es cero). Solo si la devolución iguala
+    // exactamente lo cobrado ese día; si no, se dejan los dos para que el resumen siga cuadrando.
+    const devoluciones = [...(gastosResult.data ?? []), ...(bancoResult.data ?? [])].filter((g) => /^Devolución venta folio /.test(g.concepto));
+    const cobradoHoyPorFolio = new Map<number, number>();
+    for (const p of pagosResult.data ?? []) {
+      const v = ventaDePago(p);
+      if (v?.estado === "anulada" && v.anulacion_modo === "devolver" && v.folio != null) cobradoHoyPorFolio.set(v.folio, (cobradoHoyPorFolio.get(v.folio) ?? 0) + Number(p.monto));
+    }
+    const foliosCompensados = new Set<number>();
+    for (const [folio, cobrado] of cobradoHoyPorFolio) {
+      const devuelto = devoluciones.filter((g) => g.concepto === `Devolución venta folio ${folio}`).reduce((t, g) => t + Number(g.monto), 0);
+      if (Math.abs(devuelto - cobrado) < 0.005) foliosCompensados.add(folio);
+    }
+    if (foliosCompensados.size) {
+      const compensada = (concepto: string) => { const m = /^Devolución venta folio (\d+)$/.exec(concepto); return !!m && foliosCompensados.has(Number(m[1])); };
+      if (pagosResult.data) pagosResult.data = pagosResult.data.filter((p) => { const v = ventaDePago(p); return !(v?.folio != null && v.anulacion_modo === "devolver" && foliosCompensados.has(v.folio)); });
+      if (gastosResult.data) gastosResult.data = gastosResult.data.filter((g) => !compensada(g.concepto));
+      if (bancoResult.data) bancoResult.data = bancoResult.data.filter((g) => !compensada(g.concepto));
+    }
+
+    const transferencias: TransferenciaResumen[] = (bancoResult.data ?? []).map((g) => ({ id: g.id, concepto: g.concepto, monto: Number(g.monto), banco: g.cuenta_bancaria_id ? bancos.get(g.cuenta_bancaria_id) ?? "Banco sin identificar" : "Banco sin identificar" }));
 
     const ventasPagadas = (pagosResult.data ?? []).flatMap((p) => p.ventas);
     const pacienteIds = Array.from(new Set([...(ventasResult.data ?? []), ...ventasPagadas].map((v) => v.paciente_id).filter(Boolean))) as string[];
