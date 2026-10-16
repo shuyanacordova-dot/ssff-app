@@ -40,6 +40,12 @@ export async function crearProductoInventario(form: FormData) {
   const fechaCompra = text(form, "fecha_compra");
   if (!nombre || !Number.isFinite(precio) || precio < 0 || (costo !== null && (!Number.isFinite(costo) || costo < 0))) throw new Error("Completa nombre y precios válidos.");
   const { db, extra } = await clienteParaEmpresa(supabase, profile, role, empresaId);
+  // Se valida antes de crear nada, para no dejar productos sin existencia si la sucursal no corresponde.
+  const sucursalElegida = text(form, "sucursal_id");
+  if (sucursalElegida) {
+    const { data: suc } = await createSupabaseAdminClient().from("sucursales").select("empresa_id").eq("id", sucursalElegida).maybeSingle();
+    if (!suc || suc.empresa_id !== empresaId) throw new Error("La sucursal elegida no pertenece a la empresa del producto.");
+  }
   const { data: producto, error } = await db.from("productos_catalogo").insert({ empresa_id: empresaId, nombre, categoria, clasificacion: clasificacion || null, codigo: codigo || null, codigo_barra: codigoBarra || null, precio_venta: precio, costo_referencial: costo, proveedor: proveedor || null, controla_inventario: controlaInventario, marca: marca || null, modelo: modelo || null, color: color || null, material: material || null, consignacion, precio_venta_2: precioVenta2, precio_venta_3: precioVenta3, precio_convenio: precioConvenio, medida_puente: medidaPuente, fecha_compra: fechaCompra || null }).select("id").single();
   if (error?.message.includes("productos_catalogo_empresa_id_codigo_key")) {
     const { data: existente } = await db.from("productos_catalogo").select("nombre").eq("empresa_id", empresaId).eq("codigo", codigo).maybeSingle();
