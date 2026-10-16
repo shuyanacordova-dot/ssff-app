@@ -27,7 +27,7 @@ const categorias: { id: CategoriaDeuda; label: string; ayuda: string }[] = [
   { id: "apartados", label: "Sistema de apartado", ayuda: `Productos separados con abono: se entregan solo cuando el paciente paga todo. Plazo de ${DIAS_APARTADO} días desde la venta; si vence, decide si extender o liberar (anular la venta devuelve el producto al stock).` },
   { id: "rezagados", label: "Lentes rezagados", ayuda: `Lentes listos que el paciente no retira: deudas que moviste aquí y órdenes de laboratorio listas o notificadas hace ${DIAS_REZAGO} días o más (tengan saldo o no).` },
   { id: "credito_optica", label: "Crédito óptica", ayuda: "Crédito directo de la óptica: el paciente abona según su frecuencia de cobro." },
-  { id: "credito_kamina", label: "Crédito Kamina", ayuda: "Deudas con crédito Kamina." },
+  { id: "credito_kamina", label: "Crédito directo", ayuda: "Deudas con crédito directo." },
   { id: "convenio", label: "Convenios", ayuda: "Acuerdos de pago con empresa o financiamiento directo con la óptica. Solo los convenios de empresa entran al informe mensual." },
   { id: "urgentes", label: "Cobro urgente", ayuda: `Deudas de más de 3 meses (${DIAS_URGENTE} días) o marcadas como urgentes, de la más antigua a la más reciente.` },
 ];
