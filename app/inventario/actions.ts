@@ -9,17 +9,26 @@ const text = (form: FormData, name: string) => typeof form.get(name) === "string
 async function requireInventarioAdmin() {
   const supabase = await createSupabaseServerClient(); const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error("Necesitas iniciar sesión.");
-  const { data: raw } = await supabase.from("usuarios").select("empresa_id,activo,roles(nombre)").eq("auth_user_id", auth.user.id).maybeSingle();
-  const profile = raw as unknown as { empresa_id: string; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null } | null;
+  const { data: raw } = await supabase.from("usuarios").select("id,empresa_id,activo,roles(nombre)").eq("auth_user_id", auth.user.id).maybeSingle();
+  const profile = raw as unknown as { id: string; empresa_id: string; activo: boolean; roles: { nombre: string } | { nombre: string }[] | null } | null;
   const role = Array.isArray(profile?.roles) ? profile.roles[0]?.nombre : profile?.roles?.nombre;
   if (!profile?.activo || !["superadmin", "admin_sucursal"].includes(role ?? "")) throw new Error("Solo administración puede crear o editar productos.");
-  return { supabase, profile };
+  return { supabase, profile, role: role as string };
+}
+
+// Cliente con el que se crea un producto en una empresa. En la propia empresa (o superadmin) rige la seguridad normal;
+// en la otra empresa solo si el usuario tiene acceso extra (inventario_acceso_extra), igual que la subida masiva.
+async function clienteParaEmpresa(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, profile: { empresa_id: string }, role: string, empresaId: string) {
+  if (role === "superadmin" || empresaId === profile.empresa_id) return { db: supabase, extra: false };
+  const { data: extra } = await supabase.from("inventario_acceso_extra").select("empresa_id").eq("empresa_id", empresaId).maybeSingle();
+  if (!extra) throw new Error("No tienes permiso para ingresar productos en esa empresa.");
+  return { db: createSupabaseAdminClient(), extra: true };
 }
 
 const num = (form: FormData, name: string) => { const v = text(form, name); return v ? Number(v) : null; };
 
 export async function crearProductoInventario(form: FormData) {
-  const { supabase, profile } = await requireInventarioAdmin();
+  const { supabase, profile, role } = await requireInventarioAdmin();
   const nombre = text(form, "nombre"); const categoria = text(form, "categoria") || "producto"; const codigo = text(form, "codigo");
   const clasificacion = text(form, "clasificacion"); const codigoBarra = text(form, "codigo_barra");
   const empresaId = text(form, "empresa_id") || profile.empresa_id; const proveedor = text(form, "proveedor");
@@ -30,15 +39,22 @@ export async function crearProductoInventario(form: FormData) {
   const precioVenta2 = num(form, "precio_venta_2"); const precioVenta3 = num(form, "precio_venta_3"); const precioConvenio = num(form, "precio_convenio"); const medidaPuente = num(form, "medida_puente");
   const fechaCompra = text(form, "fecha_compra");
   if (!nombre || !Number.isFinite(precio) || precio < 0 || (costo !== null && (!Number.isFinite(costo) || costo < 0))) throw new Error("Completa nombre y precios válidos.");
-  const { data: producto, error } = await supabase.from("productos_catalogo").insert({ empresa_id: empresaId, nombre, categoria, clasificacion: clasificacion || null, codigo: codigo || null, codigo_barra: codigoBarra || null, precio_venta: precio, costo_referencial: costo, proveedor: proveedor || null, controla_inventario: controlaInventario, marca: marca || null, modelo: modelo || null, color: color || null, material: material || null, consignacion, precio_venta_2: precioVenta2, precio_venta_3: precioVenta3, precio_convenio: precioConvenio, medida_puente: medidaPuente, fecha_compra: fechaCompra || null }).select("id").single();
+  const { db, extra } = await clienteParaEmpresa(supabase, profile, role, empresaId);
+  const { data: producto, error } = await db.from("productos_catalogo").insert({ empresa_id: empresaId, nombre, categoria, clasificacion: clasificacion || null, codigo: codigo || null, codigo_barra: codigoBarra || null, precio_venta: precio, costo_referencial: costo, proveedor: proveedor || null, controla_inventario: controlaInventario, marca: marca || null, modelo: modelo || null, color: color || null, material: material || null, consignacion, precio_venta_2: precioVenta2, precio_venta_3: precioVenta3, precio_convenio: precioConvenio, medida_puente: medidaPuente, fecha_compra: fechaCompra || null }).select("id").single();
   if (error?.message.includes("productos_catalogo_empresa_id_codigo_key")) {
-    const { data: existente } = await supabase.from("productos_catalogo").select("nombre").eq("empresa_id", empresaId).eq("codigo", codigo).maybeSingle();
+    const { data: existente } = await db.from("productos_catalogo").select("nombre").eq("empresa_id", empresaId).eq("codigo", codigo).maybeSingle();
     throw new Error(`El código ${codigo} ya está registrado${existente?.nombre ? ` en "${existente.nombre}"` : ""}. Si no tiene existencia, búscalo en "Armazones en cero", ábrelo y usa "Sumar unidades".`);
   }
   if (error || !producto) throw new Error("No se pudo crear el producto.");
   const sucursalId = text(form, "sucursal_id"); const cantidadInicial = Number(text(form, "cantidad_inicial"));
   if (sucursalId && controlaInventario && Number.isFinite(cantidadInicial) && cantidadInicial > 0) {
-    const { error: movError } = await supabase.rpc("registrar_movimiento_inventario", { p_producto: producto.id, p_sucursal: sucursalId, p_tipo: "entrada", p_cantidad: cantidadInicial, p_motivo: "Carga inicial" });
+    // Con acceso extra el stock se carga directo (la función de movimientos solo autoriza a la propia empresa);
+    // se comprueba antes que la sucursal sea de la empresa elegida.
+    let movError: unknown = null;
+    if (extra) {
+      const { data: suc } = await db.from("sucursales").select("empresa_id").eq("id", sucursalId).maybeSingle();
+      movError = suc?.empresa_id !== empresaId ? new Error("sucursal") : (await db.from("movimientos_inventario").insert({ producto_id: producto.id, sucursal_id: sucursalId, tipo: "entrada", cantidad: cantidadInicial, motivo: "Carga inicial", created_by: profile.id })).error;
+    } else movError = (await supabase.rpc("registrar_movimiento_inventario", { p_producto: producto.id, p_sucursal: sucursalId, p_tipo: "entrada", p_cantidad: cantidadInicial, p_motivo: "Carga inicial" })).error;
     if (movError) throw new Error("El producto se creó, pero no se pudo cargar el stock inicial.");
   }
   revalidatePath("/inventario"); revalidatePath("/ventas");
