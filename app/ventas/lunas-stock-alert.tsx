@@ -42,13 +42,13 @@ export default function LunasStockAlert({ empresaId, rx, orderId, patientName }:
   });
 
   return <div className="notice" style={{ display: "block", marginTop: 12 }}>
-    <strong><PackageCheck size={16} style={{ verticalAlign: "-3px" }} /> Tienes lunas guardadas que coinciden con esta graduación</strong>
+    <strong><PackageCheck size={16} style={{ verticalAlign: "-3px" }} /> Tienes esta medida en el banco de lunas</strong>
     {(["od", "oi"] as const).map((eye) => matches[eye].length ? <div key={eye} style={{ marginTop: 8 }}>
       <p className="section-label">{eye.toUpperCase()}</p>
       {matches[eye].map((luna) => <div key={luna.id} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
         <span className={`state-pill ${luna.origen === "garantia" ? "aprobada" : ""}`}>{luna.origen === "garantia" ? "De garantía" : "En bodega"}</span>
         <span>{fmt(luna.esfera)} {luna.cilindro ? `${fmt(luna.cilindro)}${luna.tallada && luna.eje !== null ? ` × ${luna.eje}°` : ""}` : "esf."}{luna.adicion ? ` · Add ${fmt(luna.adicion)}` : ""} · {[luna.tipo, luna.material, luna.indice, luna.tratamiento].filter(Boolean).join(" · ")} · {luna.sucursal} · {usadas[luna.id] ?? luna.cantidad} disp.</span>
-        {usadas[luna.id] === undefined ? <button type="button" className="outline-action" disabled={pending} onClick={() => usar(luna, eye)}>Usar esta luna</button> : <span className="field-hint">Usada ✓</span>}
+        {usadas[luna.id] === undefined ? <button type="button" className="outline-action" disabled={pending} onClick={() => usar(luna, eye)}>Descargar del banco</button> : <span className="field-hint">Descargada del banco ✓</span>}
       </div>)}
     </div> : null)}
     {error && <p role="alert">{error}</p>}

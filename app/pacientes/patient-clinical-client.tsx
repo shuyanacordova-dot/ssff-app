@@ -7,6 +7,7 @@ import { AlertTriangle, ArrowLeft, Building2, CalendarDays, ChevronRight, Clipbo
 import { useEffect, useMemo, useState, useTransition, useRef } from "react";
 import { actualizarObservacionesPaciente, actualizarPacienteClinico, buscarPacientesClinicos, crearPacienteClinico, obtenerHistorialPaciente, obtenerPacienteClinico, obtenerProteccionPaciente, registrarConsentimientoPaciente, registrarAperturaCarpeta, registrarPromocionesPaciente, type ConsentimientoPaciente, type AccesoHistoria } from "./actions";
 import ConsultationModal from "./consultation-form";
+import BancoLunasAviso, { type RxBanco } from "@/app/ventas/banco-lunas-aviso";
 import ConsultationDetailModal from "./consultation-detail";
 import FilesPanel from "./files-panel";
 import ComunicacionesPanel from "./comunicaciones-panel";
@@ -90,6 +91,7 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
   const [patientNameInput, setPatientNameInput] = useState("");
   const [saldosFavor, setSaldosFavor] = useState<Record<string, number>>({});
   const [edadNuevoPaciente, setEdadNuevoPaciente] = useState<number | null>(null);
+  const [bancoAviso, setBancoAviso] = useState<RxBanco | null>(null);
   const [tieneResponsable, setTieneResponsable] = useState(false);
   const [responsableId, setResponsableId] = useState("");
   const [buscarResponsable, setBuscarResponsable] = useState("");
@@ -130,6 +132,13 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
   const selected = selectedId ? allPatients.get(selectedId) : undefined;
   const usingExtraHistorial = !!selected && !initialIds.has(selected.id);
   const consultations = usingExtraHistorial ? (historial[selected.id]?.consultations ?? []) : props.consultations.filter((consultation) => consultation.paciente_id === selected?.id);
+  // Receta final (refracción) de la revisión más reciente: sirve para avisar en la venta si el banco de lunas tiene esa medida.
+  const ultimaRxFinal: RxBanco | null = (() => {
+    const con = [...consultations].filter((c) => c.refraccion && (c.refraccion.od_esfera || c.refraccion.oi_esfera)).sort((a, b) => b.fecha_consulta.localeCompare(a.fecha_consulta))[0];
+    if (!con) return null;
+    const r = con.refraccion;
+    return { od: { esfera: r.od_esfera ?? "", cilindro: r.od_cilindro ?? "", eje: r.od_eje ?? "", add: r.od_add ?? "" }, oi: { esfera: r.oi_esfera ?? "", cilindro: r.oi_cilindro ?? "", eje: r.oi_eje ?? "", add: r.oi_add ?? "" } };
+  })();
   const photos = usingExtraHistorial ? (historial[selected.id]?.photos ?? []) : props.photos.filter((photo) => photo.paciente_id === selected?.id);
   const sales = usingExtraHistorial ? (historial[selected.id]?.sales ?? []) : props.sales.filter((sale) => sale.paciente_id === selected?.id);
   const visibleConsultations = consultations.filter((consultation) => historyBranchId === "all" || consultation.sucursal_atencion_id === historyBranchId);
@@ -371,8 +380,9 @@ export default function PatientClinicalClient(props: ClinicalData & { autoCreate
       <span className="patient-row-text"><strong>{formatTimestamp(sale.creado_en)} · {money(sale.total)}</strong><small>{sale.venta_items.map((item) => `${item.descripcion} ×${item.cantidad}`).join(", ") || "Sin artículos registrados"}</small></span><ChevronRight size={16} />
     </button>)}</div></> : <><p>Para crear una orden primero registra la venta de los lentes.</p><button className="new-consultation" type="button" onClick={() => { setShowLabSalePicker(false); setIsSelling(true); }}><ReceiptText size={17} /> Nueva venta</button></>}
   </section></div>}
-  {(isConsulting || editingConsultation) && selected && <ConsultationModal pacienteId={selected.id} pacienteNombre={fullName(selected)} edad={calcularEdad(selected.fecha_nacimiento ?? "")} optometrists={props.optometrists} defaultOptometristId={props.optometrists.some((person) => person.id === props.profile?.id) ? props.profile?.id : undefined} initial={editingConsultation ?? undefined} previousConsultations={consultations} onClose={() => { setIsConsulting(false); setEditingConsultation(null); }} onSaved={(message) => { setNotice(message); refreshSelected(); }} />}
-  {isSelling && selected && !demoMode && <div className="modal-backdrop"><div className="sale-modal-shell"><button className="modal-close" onClick={() => setIsSelling(false)} aria-label="Cerrar"><X size={19} /></button><Cart products={catalogo.products} stock={catalogo.stock} cargandoCatalogo={catalogo.cargando} companies={props.companies} branches={props.branches} patients={[selected]} empresasConvenio={props.empresasConvenio} defaultCompany={props.profile?.empresa_id ?? props.companies[0]?.id ?? ""} defaultBranch={props.profile?.sucursal_id ?? ""} defaultPacienteId={selected.id} saldosFavor={saldosFavor} lockPatient onDone={(message) => { setNotice(message); setSection("sales"); setIsSelling(false); refreshSelected(); }} /></div></div>}
+  {(isConsulting || editingConsultation) && selected && <ConsultationModal pacienteId={selected.id} pacienteNombre={fullName(selected)} edad={calcularEdad(selected.fecha_nacimiento ?? "")} optometrists={props.optometrists} defaultOptometristId={props.optometrists.some((person) => person.id === props.profile?.id) ? props.profile?.id : undefined} initial={editingConsultation ?? undefined} previousConsultations={consultations} onClose={() => { setIsConsulting(false); setEditingConsultation(null); }} onSaved={(message, rxFinal) => { setNotice(message); refreshSelected(); if (rxFinal) setBancoAviso(rxFinal); }} />}
+  {bancoAviso && selected && <BancoLunasAviso empresaId={props.profile?.empresa_id ?? ""} rx={bancoAviso} ventana={{ titulo: "RECETA GUARDADA", subtitulo: fullName(selected), onClose: () => setBancoAviso(null) }} />}
+  {isSelling && selected && !demoMode && <div className="modal-backdrop"><div className="sale-modal-shell"><button className="modal-close" onClick={() => setIsSelling(false)} aria-label="Cerrar"><X size={19} /></button><Cart products={catalogo.products} stock={catalogo.stock} cargandoCatalogo={catalogo.cargando} companies={props.companies} branches={props.branches} patients={[selected]} empresasConvenio={props.empresasConvenio} defaultCompany={props.profile?.empresa_id ?? props.companies[0]?.id ?? ""} defaultBranch={props.profile?.sucursal_id ?? ""} defaultPacienteId={selected.id} saldosFavor={saldosFavor} lockPatient rxFinal={ultimaRxFinal} onDone={(message) => { setNotice(message); setSection("sales"); setIsSelling(false); refreshSelected(); }} /></div></div>}
   {viewingConsultation && selected && <ConsultationDetailModal consultation={viewingConsultation} patient={selected} company={branchLetterhead(props.companies.find((c) => c.id === viewingConsultation.empresa_atencion_id) ?? props.companies[0], props.branches.find((b) => b.id === viewingConsultation.sucursal_atencion_id)) ?? undefined} branchName={props.branches.find((b) => b.id === viewingConsultation.sucursal_atencion_id)?.nombre} onClose={() => setViewingConsultation(null)} onEdit={() => { setEditingConsultation(viewingConsultation); setViewingConsultation(null); }} />}
   {viewingSale && selected && <VentaDetailModal sale={viewingSale} companyName={companyName(viewingSale.empresa_id)} patient={selected} onClose={() => setViewingSale(null)} />}
   {labOrderContext && selected && <LabOrderModal sale={labOrderContext.sale} lensItems={labOrderItemsFor(labOrderContext.sale)} productoById={catalogo.products.length ? productoById : undefined} existingOrderId={labOrderContext.orderId} editInitially={labOrderContext.editInitially} esGarantia={labOrderContext.esGarantia} patientName={fullName(selected)} patientPhone={selected.telefono} company={branchLetterhead(props.companies.find((c) => c.id === labOrderContext.sale.empresa_id), props.branches.find((b) => b.id === labOrderContext.sale.sucursal_id)) ?? undefined} branchName={props.branches.find((b) => b.id === labOrderContext.sale.sucursal_id)?.nombre} onClose={() => setLabOrderContext(null)} onCreated={(message) => { setNotice(message); setSection("laboratory"); refreshSelected(); }} />}

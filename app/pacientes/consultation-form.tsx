@@ -95,7 +95,7 @@ function EyeRxCard({ eye, prefix, showDnp, showAv = true, showAdd = true, defaul
 
 const tieneRx = (rx?: Record<string, string>) => !!rx && ["od_esfera", "od_cilindro", "od_eje", "od_add", "oi_esfera", "oi_cilindro", "oi_eje", "oi_add"].some((key) => (rx[key] ?? "").trim() !== "");
 
-export default function ConsultationModal({ pacienteId, pacienteNombre, edad, optometrists, defaultOptometristId, initial, previousConsultations = [], onClose, onSaved }: { pacienteId: string; pacienteNombre?: string; edad?: number | null; optometrists: ClinicalOptometrist[]; defaultOptometristId?: string; initial?: Consultation; previousConsultations?: Consultation[]; onClose: () => void; onSaved: (message: string) => void }) {
+export default function ConsultationModal({ pacienteId, pacienteNombre, edad, optometrists, defaultOptometristId, initial, previousConsultations = [], onClose, onSaved }: { pacienteId: string; pacienteNombre?: string; edad?: number | null; optometrists: ClinicalOptometrist[]; defaultOptometristId?: string; initial?: Consultation; previousConsultations?: Consultation[]; onClose: () => void; onSaved: (message: string, rxFinal?: { od: { esfera: string; cilindro: string; eje: string; add: string }; oi: { esfera: string; cilindro: string; eje: string; add: string } }) => void }) {
   const [pending, start] = useTransition();
   // Nueva revisión: la lensometría arranca con la RX final de la última revisión (Shuyana 2026-10-02). Solo esfera, cilindro, eje y ADD; la AV se mide de nuevo.
   const ultimaRx = initial ? undefined : [...previousConsultations].sort((a, b) => b.fecha_consulta.localeCompare(a.fecha_consulta)).find((consulta) => tieneRx(consulta.refraccion));
@@ -125,7 +125,11 @@ export default function ConsultationModal({ pacienteId, pacienteNombre, edad, op
         if (initial) data.set("consulta_id", initial.id);
         const result = initial ? await actualizarConsulta(data) : await crearConsulta(data);
         if (!result.ok) { setSaveError(result.error); return; }
-        onSaved(initial ? "Consulta actualizada en la historia clínica." : "Consulta registrada en la historia clínica.");
+        const campo = (name: string) => String(data.get(name) ?? "").trim();
+        onSaved(initial ? "Consulta actualizada en la historia clínica." : "Consulta registrada en la historia clínica.", {
+          od: { esfera: campo("ref_od_esfera"), cilindro: campo("ref_od_cilindro"), eje: campo("ref_od_eje"), add: campo("ref_od_add") },
+          oi: { esfera: campo("ref_oi_esfera"), cilindro: campo("ref_oi_cilindro"), eje: campo("ref_oi_eje"), add: campo("ref_oi_add") },
+        });
         onClose();
       } catch { setSaveError("No se pudo guardar la consulta. Revisa tu conexión e inténtalo de nuevo."); }
     });
